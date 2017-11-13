@@ -34,10 +34,10 @@ domain_dict = structure.domain_desc_filter(domains_description)
 # (to allow distinction of hydrogen bonds) and R_factor (working value) < 0.25.
 # Writes a file listing all PDB ids that meet these criteria suitable for
 # uploading to the PISCES web server.
-structure = beta_structure_df(run=run, domain_dict=domain_dict)
 print('Select resolution cutoff')
 resn = float(input(prompt))
 print('Select Rfactor (working value) cutoff')
 rfac = float(input(prompt))
-filtered_domain_dict = structure.resn_rfac_filter(resn, rfac)
+structure = beta_structure_df(run=run, resn=resn, rfac=rfac, domain_dict=domain_dict)
+filtered_domain_dict = structure.resn_rfac_filter()
 structure.gen_PISCES_list(filtered_domain_dict)

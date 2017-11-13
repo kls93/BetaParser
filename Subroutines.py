@@ -127,8 +127,10 @@ class gen_beta_structure_df():
 
 
 class beta_structure_df():
-    def __init__(self, run, domain_dict):
+    def __init__(self, run, resn, rfac, domain_dict):
         self.run = run
+        self.resn = resn
+        self.rfac = rfac
         self.domain_dict = domain_dict
 
     # Downloads a copy of each beta-barrel / beta-sandwich PDB structure from
@@ -136,7 +138,7 @@ class beta_structure_df():
     # and rfactor from the header information. The structures are filtered to
     # only retain those determined by X-ray diffraction to a resolution of 1.6
     # Angstrom or higher with an Rfactor (working value) of 0.25 or lower.
-    def resn_rfac_filter(self, resn, rfac):
+    def resn_rfac_filter(self):
         unprocessed_list = []
         processed_list = []
         resolution_list = []
@@ -187,7 +189,7 @@ class beta_structure_df():
 
             if resolution == 0 or rfactor == 0:
                 unprocessed_list.append(self.domain_dict['PDB_CODE'][row])
-            elif resolution <= resn and rfactor <= rfac:
+            elif resolution <= self.resn and rfactor <= self.rfac:
                 processed_list.append(self.domain_dict['PDB_CODE'][row])
                 resolution_list.append(resolution)
                 rfactor_list.append(rfactor)
@@ -197,8 +199,8 @@ class beta_structure_df():
         filtered_domain_dict_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
                                                     'RFACTOR': rfactor_list})
         filtered_domain_dict = pd.concat([filtered_domain_dict_part_1, filtered_domain_dict_part_2], axis=1)
-        filtered_domain_dict.to_pickle('CATH_{}_resn_{}_rfac_{}_pre_pisces.pkl'.format(self.run, resn, rfac))
-        filtered_domain_dict.to_csv('CATH_{}_resn_{}_rfac_{}_pre_pisces.csv'.format(self.run, resn, rfac))
+        filtered_domain_dict.to_pickle('CATH_{}_resn_{}_rfac_{}_pre_pisces.pkl'.format(self.run, self.resn, self.rfac))
+        filtered_domain_dict.to_csv('CATH_{}_resn_{}_rfac_{}_pre_pisces.csv'.format(self.run, self.resn, self.rfac))
 
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'w') as unprocessed_file:
             unprocessed_list = set(unprocessed_list)
@@ -211,6 +213,13 @@ class beta_structure_df():
     def gen_PISCES_list(self, filtered_domain_dict):
         fasta = filtered_domain_dict.DSEQS.tolist()
         count = len(fasta)
-        with open('CATH_{}_domain_chain_entries.txt'.format(self.run), 'w') as chain_entries_file:
+        with open('CATH_{}_{}_{}_domain_chain_entries.txt'.format(self.run, self.resn, self.rfac), 'w') as chain_entries_file:
             for num in range(count):
                 chain_entries_file.write('{}\n'.format(fasta[num]))
+
+
+class beta_structure_coords():
+    def __init__(self, run, resn, rfac):
+        self.run = run
+        self.resn = resn
+        self.rfac = rfac
