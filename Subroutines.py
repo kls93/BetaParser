@@ -199,8 +199,8 @@ class beta_structure_df():
         filtered_domain_dict_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
                                                     'RFACTOR': rfactor_list})
         filtered_domain_dict = pd.concat([filtered_domain_dict_part_1, filtered_domain_dict_part_2], axis=1)
-        filtered_domain_dict.to_pickle('CATH_{}_resn_{}_rfac_{}_pre_pisces.pkl'.format(self.run, self.resn, self.rfac))
-        filtered_domain_dict.to_csv('CATH_{}_resn_{}_rfac_{}_pre_pisces.csv'.format(self.run, self.resn, self.rfac))
+        filtered_domain_dict.to_pickle('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.pkl'.format(self.run, self.resn, self.rfac))
+        filtered_domain_dict.to_csv('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.csv'.format(self.run, self.resn, self.rfac))
 
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'w') as unprocessed_file:
             unprocessed_list = set(unprocessed_list)
@@ -209,12 +209,30 @@ class beta_structure_df():
         return filtered_domain_dict
 
     # Generates list of beta-structure chain entries for sequence redundancy
-    # filtering using the PISCES web server
-    def gen_PISCES_list(self, filtered_domain_dict):
+    # filtering using the cd_hit web server
+    def gen_cd_hit_list(self, filtered_domain_dict):
         fasta = filtered_domain_dict.DSEQS.tolist()
+        pdb_ids = filtered_domain_dict.PDB_CODE.tolist()
+        pdb_chains = filtered_domain_dict.CHAIN.tolist()
+
+        fasta_copy = copy.copy(fasta)
+        fasta_repeat = []
+        for index, seq in enumerate(fasta_copy):
+            if seq in fasta_repeat:
+                fasta[index] = None
+                pdb_ids[index] = None
+                pdb_chains[index] = None
+            elif seq not in fasta_repeat:
+                fasta_repeat.append(seq)
+
+        fasta = [seq for seq in fasta if seq is not None]
+        pdb_ids = [pdb_id for pdb_id in pdb_ids if pdb_id is not None]
+        pdb_chains = [chain for chain in pdb_chains if chain is not None]
+
         count = len(fasta)
         with open('CATH_{}_{}_{}_domain_chain_entries.txt'.format(self.run, self.resn, self.rfac), 'w') as chain_entries_file:
             for num in range(count):
+                chain_entries_file.write('>{}{}\n'.format(pdb_ids[num], pdb_chains[num]))
                 chain_entries_file.write('{}\n'.format(fasta[num]))
 
 
