@@ -275,7 +275,8 @@ class beta_structure_coords():
         return cd_hit_domain_dict
 
     def get_xyz_coords(self, cd_hit_domain_dict):
-        # Extends the input dataframe to list the xyz coordinates of each segment sequence (SSEQS)
+        # Extends the filtered (for resolution, Rfactor and sequence redundancy)
+        # dataframe to list the xyz coordinates of each segment sequence (SSEQS)
         domain_xyz = []
         unprocessed_list = []
         for row in range(cd_hit_domain_dict.shape[0]):
@@ -333,24 +334,29 @@ class beta_structure_coords():
                     similarity = SequenceMatcher(a=segment, b=sequence).ratio()
                     if similarity > 0.95:
                         sequence_identified = True
+                        pdb_file = open('PDB_files/{}_{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row],
+                            cd_hit_domain_dict['CHAIN'][row]), 'a')
                         for index_4 in indices[index_3]:
+                            pdb_file.write('{}\n'.format(pdb_file_lines[index_4]))
                             x = float(pdb_file_lines[index_4][30:38].strip())
                             y = float(pdb_file_lines[index_4][38:46].strip())
                             z = float(pdb_file_lines[index_4][46:54].strip())
                             xyz.append([x, y, z])
-
-                    if sequence_identified is True:
+                        pdb_file.write('TER'.ljust(80)+'\n')
+                        pdb_file.close()
                         xyz_segments.append(xyz)
                         break
 
-                if similarity <= 0.95:
-                    unprocessed_list.append('{}\n'.format(cd_hit_domain_dict['PDB_CODE'][row]))
+                if sequence_identified is False:
+                    unprocessed_list.append('{}{}\n'.format(cd_hit_domain_dict['PDB_CODE'][row],
+                                                            cd_hit_domain_dict['SEGMENT_ID'][row]))
+                    xyz_segments.append(xyz)
 
-            domain_xyz.append(xyz)
+            domain_xyz.append(xyz_segments)
 
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'a') as unprocessed_file:
             unprocessed_file.write('\n\n')
-            unprocessed_file.write('Dissimilar coordinates:')
+            unprocessed_file.write('Dissimilar coordinates:\n')
             for pdb_file in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(pdb_file))
             unprocessed_file.write('\n\n')
@@ -359,4 +365,3 @@ class beta_structure_coords():
         cd_hit_domain_dict_xyz = pd.concat([cd_hit_domain_dict, domain_xyz], axis=1)
         cd_hit_domain_dict_xyz.to_csv('CATH_{}_resn_{}_rfac_{}_filtered_xyz.csv'.format(self.run, self.resn, self.rfac))
         cd_hit_domain_dict_xyz.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered_xyz.pkl'.format(self.run, self.resn, self.rfac))
-        return cd_hit_domain_dict_xyz

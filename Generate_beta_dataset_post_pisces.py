@@ -1,5 +1,6 @@
 
 import os
+import shutil
 import pandas as pd
 from Subroutines import beta_structure_coords
 prompt = '> '
@@ -37,4 +38,9 @@ filtered_domain_dict = filtered_domain_dict.reset_index(drop=True)
 # Obtains xyz coordinates for the sequences output from CD-HIT
 structure = beta_structure_coords(run=run, resn=resn, rfac=rfac)
 cd_hit_domain_dict = structure.gen_cd_hit_dict(filtered_domain_dict)
-cd_hit_domain_dict_xyz = structure.get_xyz_coords(cd_hit_domain_dict)
+
+if os.path.isdir('PDB_files'):
+    shutil.rmtree('PDB_files')
+os.mkdir('PDB_files')
+
+structure.get_xyz_coords(cd_hit_domain_dict)
