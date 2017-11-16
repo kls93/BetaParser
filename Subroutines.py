@@ -279,7 +279,11 @@ class beta_structure_coords():
         # dataframe to list the xyz coordinates of each segment sequence (SSEQS)
         domain_xyz = []
         unprocessed_list = []
+        count = 0
+
         for row in range(cd_hit_domain_dict.shape[0]):
+            count = count + 1
+
             print('Downloading {} from the RCSB PDB website'.format(cd_hit_domain_dict['PDB_CODE'][row]))
             url = 'http://www.rcsb.org/pdb/files/{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row].upper())
             pdb_file_lines = requests.get(url).text
@@ -335,7 +339,7 @@ class beta_structure_coords():
                     if similarity > 0.95:
                         sequence_identified = True
                         pdb_file = open('PDB_files/{}_{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row],
-                            cd_hit_domain_dict['CHAIN'][row]), 'a')
+                                        count), 'a')
                         for index_4 in indices[index_3]:
                             pdb_file.write('{}\n'.format(pdb_file_lines[index_4]))
                             x = float(pdb_file_lines[index_4][30:38].strip())
