@@ -152,6 +152,7 @@ class beta_structure_df():
             url = 'http://www.rcsb.org/pdb/files/{}.pdb'.format(self.domain_dict['PDB_CODE'][row].upper())
             pdb_file_lines = requests.get(url).text
             pdb_file_lines = pdb_file_lines.split('\n')
+
             filtered_pdb_lines = []
             remark_end = False
             for line in pdb_file_lines:
@@ -196,7 +197,7 @@ class beta_structure_df():
                 rfactor_list.append(rfactor)
 
         filtered_domain_dict_part_1 = self.domain_dict.loc[self.domain_dict['PDB_CODE'].isin(processed_list)]
-        filtered_domain_dict_part_1 = filtered_domain_dict_part_1.reset_index()
+        filtered_domain_dict_part_1 = filtered_domain_dict_part_1.reset_index(drop=True)
         filtered_domain_dict_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
                                                     'RFACTOR': rfactor_list})
         filtered_domain_dict = pd.concat([filtered_domain_dict_part_1, filtered_domain_dict_part_2], axis=1)
@@ -258,8 +259,8 @@ class beta_structure_coords():
         for seq in fasta_list:
             df_index_sub_list = []
             for row in range(filtered_domain_dict.shape[0]):
-                if seq == filtered_domain_dict['DSEQS'].iloc[row]:
-                    df_index_sub_list.append(filtered_domain_dict.index[row])
+                if seq == filtered_domain_dict['DSEQS'][row]:
+                    df_index_sub_list.append(row)
 
             rand_num = random.randint(0, len(df_index_sub_list)-1)
             index = df_index_sub_list[rand_num]
@@ -267,28 +268,32 @@ class beta_structure_coords():
 
         # Filters dataframe further to retain only the domains selected in the previous
         # step
-        cd_hit_domain_dict = filtered_domain_dict.loc[filtered_domain_dict.index.isin(df_index_list)]
+        cd_hit_domain_dict = filtered_domain_dict.iloc[df_index_list]
+        cd_hit_domain_dict = cd_hit_domain_dict.reset_index(drop=True)
+        cd_hit_domain_dict.to_csv('CATH_{}_resn_{}_rfac_{}_filtered.csv'.format(self.run, self.resn, self.rfac))
+        cd_hit_domain_dict.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered.pkl'.format(self.run, self.resn, self.rfac))
         return cd_hit_domain_dict
 
     def get_xyz_coords(self, cd_hit_domain_dict):
         # Extends the input dataframe to list the xyz coordinates of each segment sequence (SSEQS)
         domain_xyz = []
         unprocessed_list = []
-        for row in range(0, cd_hit_domain_dict.shape[0]):
-            print('Downloading {} from the RCSB PDB website'.format(cd_hit_domain_dict['PDB_CODE'].iloc[row]))
-            url = 'http://www.rcsb.org/pdb/files/{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'].iloc[row].upper())
+        for row in range(cd_hit_domain_dict.shape[0]):
+            print('Downloading {} from the RCSB PDB website'.format(cd_hit_domain_dict['PDB_CODE'][row]))
+            url = 'http://www.rcsb.org/pdb/files/{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row].upper())
             pdb_file_lines = requests.get(url).text
             pdb_file_lines = pdb_file_lines.split('\n')
             pdb_file_lines = [line for line in pdb_file_lines
                               if line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))
 
-            for index_1, segment in enumerate(cd_hit_domain_dict['SSEQS'].iloc[row]):
+            xyz_segments = []
+            for index_1, segment in enumerate(cd_hit_domain_dict['SSEQS'][row]):
                 sequences = []
                 indices = []
 
-                start = cd_hit_domain_dict['SSEQS_START_STOP'].iloc[row][index_1][0].replace('START=', '')
-                stop = cd_hit_domain_dict['SSEQS_START_STOP'].iloc[row][index_1][1].replace('STOP=', '')
+                start = cd_hit_domain_dict['SSEQS_START_STOP'][row][index_1][0].replace('START=', '')
+                stop = cd_hit_domain_dict['SSEQS_START_STOP'][row][index_1][1].replace('STOP=', '')
                 start_seq = False
                 stop_seq = False
                 sequence = ''
@@ -296,7 +301,7 @@ class beta_structure_coords():
 
                 for index_2, line in enumerate(pdb_file_lines):
                     if index_2 != (len(pdb_file_lines)-1):
-                        if line[22:27].strip() == start and line[21:22] == cd_hit_domain_dict['CHAIN'].iloc[row]:
+                        if line[22:27].strip() == start and line[21:22] == cd_hit_domain_dict['CHAIN'][row]:
                             start_seq = True
 
                         if start_seq is True and stop_seq is False:
@@ -316,7 +321,7 @@ class beta_structure_coords():
 
                         if (pdb_file_lines[index_2+1][0:3] == 'TER'
                             or (line[22:27].strip() == stop
-                                and line[21:22] == cd_hit_domain_dict['CHAIN'].iloc[row]
+                                and line[21:22] == cd_hit_domain_dict['CHAIN'][row]
                                 and pdb_file_lines[index_2+1][22:27].strip() != stop
                                 )
                             ):
@@ -335,19 +340,20 @@ class beta_structure_coords():
                             xyz.append([x, y, z])
 
                     if sequence_identified is True:
+                        xyz_segments.append(xyz)
                         break
 
-                domain_xyz.append(xyz)
-
                 if similarity <= 0.95:
-                    unprocessed_list.append('{}\n'.format(cd_hit_domain_dict['PDB_CODE'].iloc[row]))
+                    unprocessed_list.append('{}\n'.format(cd_hit_domain_dict['PDB_CODE'][row]))
+
+            domain_xyz.append(xyz)
 
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'a') as unprocessed_file:
             unprocessed_file.write('\n\n')
             unprocessed_file.write('Dissimilar coordinates:')
-            unprocessed_file.write('\n\n')
             for pdb_file in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(pdb_file))
+            unprocessed_file.write('\n\n')
 
         domain_xyz = pd.DataFrame({'XYZ': domain_xyz})
         cd_hit_domain_dict_xyz = pd.concat([cd_hit_domain_dict, domain_xyz], axis=1)

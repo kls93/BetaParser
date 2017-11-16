@@ -32,6 +32,7 @@ rfac = float(input(prompt))
 # Loads the dataframe generated in previous steps
 filtered_domain_dict = pd.read_pickle('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.pkl'.format(run, resn, rfac))
 filtered_domain_dict = filtered_domain_dict.drop('index', axis=1)
+filtered_domain_dict = filtered_domain_dict.reset_index(drop=True)
 
 # Obtains xyz coordinates for the sequences output from CD-HIT
 structure = beta_structure_coords(run=run, resn=resn, rfac=rfac)
