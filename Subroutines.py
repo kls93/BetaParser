@@ -270,8 +270,6 @@ class beta_structure_coords():
         # step
         cd_hit_domain_dict = filtered_domain_dict.iloc[df_index_list]
         cd_hit_domain_dict = cd_hit_domain_dict.reset_index(drop=True)
-        cd_hit_domain_dict.to_csv('CATH_{}_resn_{}_rfac_{}_filtered.csv'.format(self.run, self.resn, self.rfac))
-        cd_hit_domain_dict.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered.pkl'.format(self.run, self.resn, self.rfac))
         return cd_hit_domain_dict
 
     def get_xyz_coords(self, cd_hit_domain_dict):
@@ -369,3 +367,70 @@ class beta_structure_coords():
         cd_hit_domain_dict_xyz = pd.concat([cd_hit_domain_dict, domain_xyz], axis=1)
         cd_hit_domain_dict_xyz.to_csv('CATH_{}_resn_{}_rfac_{}_filtered_xyz.csv'.format(self.run, self.resn, self.rfac))
         cd_hit_domain_dict_xyz.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered_xyz.pkl'.format(self.run, self.resn, self.rfac))
+
+
+class beta_structure_dssp_classification():
+    def __init__(self, run, resn, rfac, pdb_code):
+        self.run = run
+        self.resn = resn
+        self.rfac = rfac
+        self.pdb = pdb_code
+
+    def extract_dssp_secondary_structure(pdb_file_lines):
+        pdb_res_num = [line[22:27].replace(' ', '') for line in pdb_file_lines]
+        pdb_chains = [line[21:22] for line in pdb_file_lines]
+
+        middle_characters = self.pdb[1:len(self.pdb)-1]
+        os.chdir('./../../shared/structural_bioinformatics/data/{}/{}/dssp/'.format(
+            middle_characters, self.pdb))
+
+        dssp_file_lines = []
+        with open('{}_1.mmol.dssp'.format(pdb), 'r') as dssp_file:
+            for line in dssp_file:
+                if line.startswith('#'):
+                    start = True
+                if start is True:
+                    if line[] in
+                    dssp_file_lines.append(line.strip('\n'))
+                else:
+                    continue
+        dssp_file_lines.append('TER'.ljust(80))
+
+        for index, res_num in enumerate(pdb_res_num):
+            
+            if index != (len(pdb_res_num)-1):
+
+
+
+            for index_2, line in enumerate(pdb_file_lines):
+                if index_2 != (len(pdb_file_lines)-1):
+                    if line[22:27].strip() == start and line[21:22] == cd_hit_domain_dict['CHAIN'][row]:
+                        start_seq = True
+
+                    if start_seq is True and stop_seq is False:
+                        index.append(index_2)
+                        if (line[22:27].strip() != pdb_file_lines[index_2+1][22:27].strip()
+                            or pdb_file_lines[index_2+1][0:3] == 'TER'):
+                                if line[17:20].strip() in amino_acids_dict:
+                                    sequence = sequence + amino_acids_dict[line[17:20].strip()]
+                    elif stop_seq is True:
+                        sequences.append(sequence)
+                        indices.append(index)
+                        sequence = ''
+                        index = []
+                        start_seq = False
+                        stop_seq = False
+                        continue
+
+                    if (pdb_file_lines[index_2+1][0:3] == 'TER'
+                        or (line[22:27].strip() == stop
+                            and line[21:22] == cd_hit_domain_dict['CHAIN'][row]
+                            and pdb_file_lines[index_2+1][22:27].strip() != stop
+                            )
+                        ):
+                            stop_seq = True
+
+
+
+
+            os.chdir('./../../../')
