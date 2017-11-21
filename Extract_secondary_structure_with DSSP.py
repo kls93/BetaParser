@@ -24,12 +24,14 @@ resn = float(input(prompt))
 print('Select Rfactor (working value) cutoff')
 rfac = float(input(prompt))
 
+os.mkdir('DSSP_PDB_files_{}'.format(run))
 os.chdir('CD_HIT_PDB_files_{}'.format(run))
 
 for pdb in os.listdir('.'):
-    with open('{}.pdb'.format(pdb), 'r') as pdb_file:
+    with open('{}'.format(pdb), 'r') as pdb_file:
         pdb_file_lines = [line.strip('\n') for line in pdb]
     pdb_code = pdb.split('_')[0]
     beta_structure = beta_structure_dssp_classification(run=run, resn=resn,
-                                                        rfac=rfac, pdb_code=pdb)
+                                                        rfac=rfac, pdb_name=pdb,
+                                                        pdb_code=pdb)
     beta_structure.extract_dssp_secondary_structure(pdb_file_lines)

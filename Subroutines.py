@@ -6,6 +6,8 @@ import requests
 import random
 import pandas as pd
 from difflib import SequenceMatcher
+import networkx as nx
+import matplotlib.pyplot as plt
 
 # Defines dictionary of three- and one-letter codes of standard amino acids
 amino_acids_dict = {'ALA': 'A',
@@ -370,67 +372,192 @@ class beta_structure_coords():
 
 
 class beta_structure_dssp_classification():
-    def __init__(self, run, resn, rfac, pdb_code):
+    def __init__(self, run, resn, rfac, pdb_name, pdb_code):
         self.run = run
         self.resn = resn
         self.rfac = rfac
+        self.pdb_name = pdb_name
         self.pdb = pdb_code
 
     def extract_dssp_secondary_structure(pdb_file_lines):
-        pdb_res_num = [line[22:27].replace(' ', '') for line in pdb_file_lines]
-        pdb_chains = [line[21:22] for line in pdb_file_lines]
+        unprocessed_files = []
+
+        pdb_res_num = []
+        pdb_chains = []
+        for index, line in enumerate(pdb_file_lines):
+            if index != (len(pdb_file_lines)-1):
+                if (line[0:3] != 'TER'
+                    and line[21:27].replace(' ', '') != pdb_file_lines[index+1][21:27].replace(' ', '')
+                    ):
+                    pdb_res_num.append(line[22:27].replace(' ', ''))
+                    pdb_chains.append(line[21:22])
 
         middle_characters = self.pdb[1:len(self.pdb)-1]
+
+        # Changes directory to open DSSP file
+        cwd = os.getcwd()
         os.chdir('./../../shared/structural_bioinformatics/data/{}/{}/dssp/'.format(
             middle_characters, self.pdb))
 
+        # Generates list from DSSP file on Tombstone
+        start = False
         dssp_file_lines = []
-        with open('{}_1.mmol.dssp'.format(pdb), 'r') as dssp_file:
+        with open('{}_1.mmol.dssp'.format(self.pdb), 'r') as dssp_file:
             for line in dssp_file:
-                if line.startswith('#'):
-                    start = True
                 if start is True:
-                    if line[] in
-                    dssp_file_lines.append(line.strip('\n'))
-                else:
-                    continue
+                    if (line[5:11].replace(' ', '') in pdb_res_num
+                        and line[11:12].strip() in pdb_chains
+                        ):
+                        dssp_file_lines.append(line.strip('\n'))
+                if line.strip().startswith('#'):
+                    start = True
         dssp_file_lines.append('TER'.ljust(80))
 
-        for index, res_num in enumerate(pdb_res_num):
-            
-            if index != (len(pdb_res_num)-1):
+        # Changes back to current working directory after DSSP file has been read
+        os.chdir(cwd)
+
+        # Checks that all required asymmetric unit chains are in the DSSP file
+        # opened on Tombstone (which are of the biological assemblies rather
+        # than the asymmetric unit)
+        dssp_chains = [line[11:12] for line in dssp_file_lines]
+        for chain in set(pdb_chains):
+            if chain not in dssp_chains:
+                unprocessed_files.append(self.pdb_name)
+
+
+        # Generates dataframe of relevant information in DSSP file
+        dssp_num = []
+        secondary_structure_assignment = []
+        strand_number = 1
+        strand_number_list = []
+        sheet_number_list = []
+        bridge_pair_list = []
+        for index_1, res_num in enumerate(pdb_res_num):
+            for index_2, line in enumerate(dssp_file_lines):
+                if (index_2 != (len(dssp_file_lines)-1)
+                    and res_num == line[5:11].replace(' ', '')
+                    and pdb_chains[index_1] == line[11:12]
+                    ):
+                    dssp_num.append(line[0:5].strip())
+                    secondary_structure = line[16:17]
+                    if secondary_structure == 'E':
+                        secondary_structure_assignment.append(secondary_structure)
+                        strand_number_list.append(strand_number)
+                        if dssp_file_lines[index_2+1][16:17] != 'E':
+                            strand_number = strand_number + 1
+                        sheet_number_list.append(line[33:34])
+                        bridge_pair_list.append([line[25:29].strip(),
+                                                 line[29:33].strip()])
+                    elif secondary_structure != 'E':
+                        secondary_structure_assignment.append('')
+                        strand_number_list.append('')
+                        sheet_number_list.append('')
+                        bridge_pair_list.append(['', ''])
+                    break
+
+        dssp_df = pd.DataFrame({'RESNUM': pdb_res_num,
+                                'CHAIN': pdb_chains,
+                                'DSSP_NUM': dssp_num,
+                                'SHEET?': secondary_structure_assignment,
+                                'STRAND_NUM': strand_number_list,
+                                'SHEET_NUM': sheet_number_list,
+                                'H-BONDS': bridge_pair_list})
+
+        # Writes a PDB file of the residues that DSSP classifies as forming a
+        # beta-strand (secondary structure code = 'E')
+        with open('DSSP_PDB_files_{}/{}'.format(self.run, self.pdb_name)) as pdb_file:
+            for index, line in enumerate(secondary_structure_assignment):
+                if line == 'E':
+                    chain = pdb_chains[index]
+                    res_num = pdb_res_num[index]
+                    for line in pdb_file_lines:
+                        if line[21:22] == chain and line[22:27].replace(' ', '') == res_num:
+                            pdb_file.write('{}\n'.format(line))
+                        elif line[0:3] == 'TER':
+                            pdb_file.write('{}\n'.format(line))
+
+        # Separates the beta-strands identified by DSSP into sheets, and works
+        # out the strand interactions and thus loop connections both within and
+        # between sheets
+        sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
+        for sheet in sheets:
+            globals()['dssp_df_{}'.format(sheet)] = dssp_df[dssp_df['PDB_CODE']==sheet]
+            sheet_df = globals()['dssp_df_{}'.format(sheet)]
+
+            strands_dict = {}
+            strands = [str(strand) for strand in set(sheet_df['STRAND_NUM'].tolist())]
+            for strand in strands:
+                globals()['dssp_df_{}_{}'.format(sheet, strand)] = sheet_df[sheet_df['STRAND_NUM']==strand]
+                strand_df = globals()['dssp_df_{}_{}'.format(sheet, strand)]
+
+                strand_min = strand_df['STRAND_NUM'][0]
+                strand_max = strand_df['STRAND_NUM'][strand_df.shape[0]-1]
+
+                strands_dict[strand] = range(strand_min, strand_max+1)
+
+            interacting_strands = []
+            for index, pair in enumerate(sheet_df['H-BONDS'].tolist()):
+                res_num_1 = int(sheet_df['DSSP_NUM'].tolist()[index])
+                res_num_2 = int(pair[0])
+                res_num_3 = int(pair[1])
+                for key, value in strands_dict:
+                    if res_num_1 in value:
+                        strand_1 = str(key)
+                    if not res_num_2 == 0:
+                        if res_num_2 in value:
+                            strand_2 = str(key)
+                    if not res_num_3 == 0:
+                        if res_num_3 in value:
+                            strand_3 = str(key)
+                if strand_2:
+                    interacting_strands.append(','.join(sorted([strand_1, strand_2])))
+                if strand_3:
+                    interacting_strands.append(''.join(sorted([strand_1, strand_3])))
+            interacting_strands = [pair for pair in set(interacting_strands)]
+
+            # Creates network of the interacting strands in the sheet
+            network = nx.DiGraph()
+            for strand in strands:
+                network.add_node(strand)
+            for pair in interacting_strands:
+                network.add_edge(pair.split(',')[0], pair.split(',')[1])
+
+            # Draws plot of the network of interacting strands
+            plt.clf()
+            nx.draw_networkx_nodes(network, nodelist=strands)
+            nx.draw_networkx_edges(network, edgelist=interacting_strands)
+            plt.savefig('{}_sheet_{}_network.png'.format(self.pdb_name, sheet))
 
 
 
-            for index_2, line in enumerate(pdb_file_lines):
-                if index_2 != (len(pdb_file_lines)-1):
-                    if line[22:27].strip() == start and line[21:22] == cd_hit_domain_dict['CHAIN'][row]:
-                        start_seq = True
-
-                    if start_seq is True and stop_seq is False:
-                        index.append(index_2)
-                        if (line[22:27].strip() != pdb_file_lines[index_2+1][22:27].strip()
-                            or pdb_file_lines[index_2+1][0:3] == 'TER'):
-                                if line[17:20].strip() in amino_acids_dict:
-                                    sequence = sequence + amino_acids_dict[line[17:20].strip()]
-                    elif stop_seq is True:
-                        sequences.append(sequence)
-                        indices.append(index)
-                        sequence = ''
-                        index = []
-                        start_seq = False
-                        stop_seq = False
-                        continue
-
-                    if (pdb_file_lines[index_2+1][0:3] == 'TER'
-                        or (line[22:27].strip() == stop
-                            and line[21:22] == cd_hit_domain_dict['CHAIN'][row]
-                            and pdb_file_lines[index_2+1][22:27].strip() != stop
-                            )
-                        ):
-                            stop_seq = True
 
 
 
 
-            os.chdir('./../../../')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ g
