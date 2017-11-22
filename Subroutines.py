@@ -411,7 +411,7 @@ class beta_structure_dssp_classification():
                         dssp_file_lines.append(line.strip('\n'))
                 if line.strip().startswith('#'):
                     start = True
-        dssp_file_lines.append('TER'.ljust(80))
+        dssp_file_lines.append('TER'.ljust(136))
 
         # Changes back to current working directory after DSSP file has been read
         os.chdir(cwd)
@@ -431,6 +431,7 @@ class beta_structure_dssp_classification():
         strand_number = 1
         strand_number_list = []
         sheet_number_list = []
+        orientation_list = []
         bridge_pair_list = []
         for index_1, res_num in enumerate(pdb_res_num):
             for index_2, line in enumerate(dssp_file_lines):
@@ -446,12 +447,28 @@ class beta_structure_dssp_classification():
                         if dssp_file_lines[index_2+1][16:17] != 'E':
                             strand_number = strand_number + 1
                         sheet_number_list.append(line[33:34])
+                        ladder_1 = line[23:24]
+                        if ladder_1 == ' ':
+                            ladder_1 = ''
+                        elif ladder_1.isupper():
+                            ladder_1 = 'A'
+                        elif ladder_1.islower():
+                            ladder_1 = 'P'
+                        ladder_2 = line[24:25]
+                        if ladder_2 == ' ':
+                            ladder_2 = ''
+                        elif ladder_2.isupper():
+                            ladder_2 = 'A'
+                        elif ladder_2.islower():
+                            ladder_2 = 'P'
+                        orientation_list.append([ladder_1,ladder_2])
                         bridge_pair_list.append([line[25:29].strip(),
                                                  line[29:33].strip()])
                     elif secondary_structure != 'E':
                         secondary_structure_assignment.append('')
                         strand_number_list.append('')
                         sheet_number_list.append('')
+                        orientation_list.append(['', ''])
                         bridge_pair_list.append(['', ''])
                     break
 
@@ -461,6 +478,7 @@ class beta_structure_dssp_classification():
                                 'SHEET?': secondary_structure_assignment,
                                 'STRAND_NUM': strand_number_list,
                                 'SHEET_NUM': sheet_number_list,
+                                'ORIENTATION': orientation_list,
                                 'H-BONDS': bridge_pair_list})
 
         # Writes a PDB file of the residues that DSSP classifies as forming a
@@ -481,51 +499,64 @@ class beta_structure_dssp_classification():
         # between sheets
         sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
         for sheet in sheets:
-            globals()['dssp_df_{}'.format(sheet)] = dssp_df[dssp_df['PDB_CODE']==sheet]
-            sheet_df = globals()['dssp_df_{}'.format(sheet)]
+            sheet_df = dssp_df[dssp_df['SHEET_NUM']==sheet]
 
             strands_dict = {}
-            strands = [str(strand) for strand in set(sheet_df['STRAND_NUM'].tolist())]
+            strands = [int(strand) for strand in set(sheet_df['STRAND_NUM'].tolist())]
             for strand in strands:
-                globals()['dssp_df_{}_{}'.format(sheet, strand)] = sheet_df[sheet_df['STRAND_NUM']==strand]
-                strand_df = globals()['dssp_df_{}_{}'.format(sheet, strand)]
+                strand_df = sheet_df[sheet_df['STRAND_NUM']==strand]
 
-                strand_min = strand_df['STRAND_NUM'][0]
-                strand_max = strand_df['STRAND_NUM'][strand_df.shape[0]-1]
+                strand_res_num = [int(res) for res in strand_df['DSSP_NUM'].tolist()]
+                strand_min = min(strand_res_num)
+                strand_max = max(strand_res_num)
 
-                strands_dict[strand] = range(strand_min, strand_max+1)
+                strands_dict[strand] = [num for num in range(strand_min, strand_max+1)]
 
-            interacting_strands = []
+            strand_pairs = {}
             for index, pair in enumerate(sheet_df['H-BONDS'].tolist()):
                 res_num_1 = int(sheet_df['DSSP_NUM'].tolist()[index])
                 res_num_2 = int(pair[0])
+                orientation_2 = sheet_df['ORIENTATION'].tolist()[index][0]
                 res_num_3 = int(pair[1])
-                for key, value in strands_dict:
-                    if res_num_1 in value:
-                        strand_1 = str(key)
+                orientation_3 = sheet_df['ORIENTATION'].tolist()[index][1]
+                for key in strands_dict:
+                    if res_num_1 in strands_dict[key]:
+                        strand_1 = key
+
                     if not res_num_2 == 0:
-                        if res_num_2 in value:
-                            strand_2 = str(key)
+                        if res_num_2 in strands_dict[key]:
+                            strand_2 = key
+                    else:
+                        strand_2 = None
+
                     if not res_num_3 == 0:
-                        if res_num_3 in value:
-                            strand_3 = str(key)
-                if strand_2:
-                    interacting_strands.append(','.join(sorted([strand_1, strand_2])))
-                if strand_3:
-                    interacting_strands.append(''.join(sorted([strand_1, strand_3])))
-            interacting_strands = [pair for pair in set(interacting_strands)]
+                        if res_num_3 in strands_dict[key]:
+                            strand_3 = key
+                    else:
+                        strand_3 = None
+
+                if strand_2 is not None:
+                    strand_pair = [strand_1, strand_2]
+                    strand_pairs[(min(strand_pair), max(strand_pair))] = orientation_2
+                if strand_3 is not None:
+                    strand_pair = [strand_1, strand_3]
+                    strand_pairs[(min(strand_pair), max(strand_pair))] = orientation_3
+
+            interacting_strands = {}
+            for key in strand_pairs:
+                if key not in interacting_strands:
+                    interacting_strands[key] = strand_pairs[key]
 
             # Creates network of the interacting strands in the sheet
-            network = nx.DiGraph()
-            for strand in strands:
-                network.add_node(strand)
+            G = nx.Graph()
             for pair in interacting_strands:
-                network.add_edge(pair.split(',')[0], pair.split(',')[1])
+                G.add_edge(pair[0], pair[1], attr=interacting_strands[pair])
+            pos = nx.spring_layout(G)
 
             # Draws plot of the network of interacting strands
             plt.clf()
-            nx.draw_networkx_nodes(network, nodelist=strands)
-            nx.draw_networkx_edges(network, edgelist=interacting_strands)
+            nx.draw_networkx(G, pos=pos, with_labels=True)
+            nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=interacting_strands)
             plt.savefig('{}_sheet_{}_network.png'.format(self.pdb_name, sheet))
 
 
