@@ -494,6 +494,42 @@ class beta_structure_dssp_classification():
                         elif line[0:3] == 'TER':
                             pdb_file.write('{}\n'.format(line))
 
+        # Merges sheet names of sheets that share strands
+        sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
+        sheet_strands = []
+        for sheet in sheets:
+            locals()['sheet_{}_strands'.format(sheet)] = [
+                str(strand) for strand in set(dssp_df[dssp_df['SHEET_NUM']==sheet]['STRAND_NUM'].tolist())
+                ]
+            sheet_strands.append(locals()['sheet_{}_strands'.format(sheet)])
+
+        sheet_strand_numbers = [strand for strands in sheet_strands for strand in strands]
+        count = 0
+        while len(sheet_strand_numbers) != len(set(sheet_strand_numbers)):
+            sheet_strand_numbers = [strand for strands in sheet_strands for strand in strands]
+            strands = sheet_strands[count]
+            track = 1
+            sheet_strands_copy = copy.copy(sheet_strands)
+            for index in range(0, len(sheet_strands)):
+                if count != index:
+                    intersect = set(strands).intersection(set(sheet_strands[index]))
+                    if len(intersect) > 0:
+                        sheet_strands_copy[count] = list(set(sheet_strands[count])|set(sheet_strands[index]))
+                        sheet_strands_copy[index] = ''
+                        sheet_strands = [x for x in sheet_strands_copy if x != '']
+                        break
+                    elif len(intersect) == 0:
+                        track = track + 1
+
+            if track == len(sheet_strands):
+                track = 0
+                count = count + 1
+
+        for row in range(dssp_df.shape[0]):
+            matching = [index for index, strands in enumerate(sheet_strands) if str(dssp_df['STRAND_NUM'][row]) in strands]
+            dssp_df['SHEET_NUM'][row] = matching[0]
+        # Currently is also labelling non-beta_strands
+
         # Separates the beta-strands identified by DSSP into sheets, and works
         # out the strand interactions and thus loop connections both within and
         # between sheets

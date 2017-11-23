@@ -29,7 +29,7 @@ os.chdir('CD_HIT_PDB_files_{}'.format(run))
 
 for pdb in os.listdir('.'):
     with open('{}'.format(pdb), 'r') as pdb_file:
-        pdb_file_lines = [line.strip('\n') for line in pdb]
+        pdb_file_lines = [line.strip('\n') for line in pdb_file]
     pdb_code = pdb.split('_')[0]
     beta_structure = beta_structure_dssp_classification(run=run, resn=resn,
                                                         rfac=rfac, pdb_name=pdb,
