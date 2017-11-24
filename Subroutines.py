@@ -483,9 +483,10 @@ class beta_structure_dssp_classification():
 
         # Writes a PDB file of the residues that DSSP classifies as forming a
         # beta-strand (secondary structure code = 'E')
-        with open('DSSP_PDB_files_{}/{}'.format(self.run, self.pdb_name)) as pdb_file:
-            for index, line in enumerate(secondary_structure_assignment):
-                if line == 'E':
+        with open('DSSP_PDB_files_{}/{}'.format(self.run, self.pdb_name), 'w') as pdb_file:
+            dssp_df_beta_structure = dssp_df[dssp_df['SHEET?']=='E']
+            for index, secondary_structure in enumerate(secondary_structure_assignment):
+                if secondary_structure == 'E':
                     chain = pdb_chains[index]
                     res_num = pdb_res_num[index]
                     for line in pdb_file_lines:
@@ -493,6 +494,7 @@ class beta_structure_dssp_classification():
                             pdb_file.write('{}\n'.format(line))
                         elif line[0:3] == 'TER':
                             pdb_file.write('{}\n'.format(line))
+                elif
 
         # Merges sheet names of sheets that share strands
         sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
@@ -502,6 +504,7 @@ class beta_structure_dssp_classification():
                 str(strand) for strand in set(dssp_df[dssp_df['SHEET_NUM']==sheet]['STRAND_NUM'].tolist())
                 ]
             sheet_strands.append(locals()['sheet_{}_strands'.format(sheet)])
+            locals()['sheet_{}_strands'.format(sheet)] = []
 
         sheet_strand_numbers = [strand for strands in sheet_strands for strand in strands]
         count = 0
@@ -526,9 +529,10 @@ class beta_structure_dssp_classification():
                 count = count + 1
 
         for row in range(dssp_df.shape[0]):
-            matching = [index for index, strands in enumerate(sheet_strands) if str(dssp_df['STRAND_NUM'][row]) in strands]
-            dssp_df['SHEET_NUM'][row] = matching[0]
-        # Currently is also labelling non-beta_strands
+            for strands in sheet_strands:
+                if str(dssp_df['STRAND_NUM'][row]) in strands:
+                    dssp_df['SHEET_NUM'][row] = (sheet_strands.index(strands)+1)
+                    break
 
         # Separates the beta-strands identified by DSSP into sheets, and works
         # out the strand interactions and thus loop connections both within and
