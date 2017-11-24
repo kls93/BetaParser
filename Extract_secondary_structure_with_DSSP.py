@@ -38,6 +38,6 @@ pdb_list = cd_hit_domain_dict_xyz.PDB_CODE.tolist()
 for pdb in pdb_list:
     beta_structure = beta_structure_dssp_classification(run=run, resn=resn,
                                                         rfac=rfac, pdb_code=pdb)
-    dssp_file = 'DSSP_files/{}.dssp'.format(pdb_code)
-    dssp_file_lines = beta_structure.extract_dssp_file_lines(dssp_file)
+    dssp_file_lines = beta_structure.extract_dssp_file_lines()
+
     beta_structure.(dssp_file_lines)

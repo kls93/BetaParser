@@ -1,9 +1,7 @@
 
-# Code for running on Tombstone
-
 import os
-import shutil
 import pandas as pd
+from Subroutines import filter_dssp_database
 prompt = '> '
 
 # Determines whether user wants to analyse beta-barrels or beta-sandwiches
@@ -26,22 +24,16 @@ resn = float(input(prompt))
 print('Select Rfactor (working value) cutoff')
 rfac = float(input(prompt))
 
-cd_hit_domain_dict_xyz = pd.read_pickle('CATH_{}_resn_{}_rfac_{}_filtered_xyz.pkl'.format(run, resn, rfac))
+# Determines the absolte file path of the domain directory
+print('Specify absolute file path of working directory')
+directory = input(prompt)
+os.chdir('{}'.format(directory))
+
+# Copies required DSSP files from database (on hard drive) to local machine
+cd_hit_domain_dict_xyz = pd.read_pickle(
+    'CATH_{}_resn_{}_rfac_{}_filtered_xyz.pkl'.format(run, resn, rfac)
+    )
 pdb_list = cd_hit_domain_dict_xyz['PDB_CODE'].tolist()
-unprocessed_list = []
 
-os.makedirs('CATH_{}/DSSP_files'.format(run))
-os.chdir('../shared/structural_bioinformatics/data/')
-for pdb in pdb_list:
-    middle_characters = pdb[1:len(pdb)-1]
-    try:
-        shutil.copy2(
-            '{}/{}/dssp/{}_1.mmol.dssp'.format(middle_characters, pdb, pdb),
-            '../../../ks17361/CATH_{}/DSSP_files/{}.dssp'.format(run, pdb))
-    except FileNotFoundError:
-        unprocessed_list.append(pdb)
-
-os.chdir('../../../ks17361/CATH_{}/DSSP_files'.format(run))
-with open('Unprocessed_pdb_files.txt', 'w') as unprocessed_file:
-    for pdb in unprocessed_list:
-        unprocessed_file.write('{}\n'.format(pdb))
+filtered_files = filter_dssp_database(run=run, resn=resn, rfac=rfac)
+filtered_files.copy_files_from_dssp_database(pdb_list)

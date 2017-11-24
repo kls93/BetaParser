@@ -166,7 +166,7 @@ class filter_beta_structure():
                     else:
                         filtered_pdb_lines.append(line)
 
-            os.chdir(cwd)
+            os.chdir('{}'.format(cwd))
 
             resolution = 0
             rfactor = 0
@@ -316,7 +316,7 @@ class extract_beta_structure_coords():
                                   line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))
 
-            os.chdir(cwd)
+            os.chdir('{}'.format(cwd))
 
             xyz_segments = []
             # For each segment sequence in the domain, makes a list of all
@@ -367,11 +367,15 @@ class extract_beta_structure_coords():
                     similarity = SequenceMatcher(a=segment, b=sequence).ratio()
                     if similarity > 0.95:
                         sequence_identified = True
+                        pdb_file = open('PDB_files/{}_{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row],
+                                        count), 'a')
                         for index_4 in indices[index_3]:
                             x = float(pdb_file_lines[index_4][30:38].strip())
                             y = float(pdb_file_lines[index_4][38:46].strip())
                             z = float(pdb_file_lines[index_4][46:54].strip())
                             xyz.append([x, y, z])
+                        pdb_file.write('TER'.ljust(80)+'\n')
+                        pdb_file.close()
                         xyz_segments.append(xyz)
                         break
 
@@ -400,6 +404,44 @@ class extract_beta_structure_coords():
         cd_hit_domain_dict_xyz.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered_xyz.pkl'.format(self.run, self.resn, self.rfac))
 
 
+class filter_dssp_database():
+    import pandas as pd
+    import os
+    import shutil
+
+    def __init__(self, run, resn, rfac):
+        self.run = run
+        self.resn = resn
+        self.rfac = rfac
+
+
+    def copy_files_from_dssp_database(pdb_list):
+        # Generates list of all PDB accession codes to be extracted from the
+        # DSSP database
+        os.mkdir('DSSP_files')
+
+        # Copies DSSP files of listed PDB accession codes to current working
+        # directory
+        unprocessed_list = []
+        for pdb in pdb_list:
+            middle_characters = pdb[1:len(pdb)-1]
+            cwd = os.getcwd()
+
+            try:
+                shutil.copy2(
+                    '/Volumes/Seagate Backup Plus Drive/pdb/{}/{}.dssp'.format(middle_characters, pdb)
+                    '{}/DSSP_files/{}.dssp'.format(cwd, pdb))
+            except FileNotFoundError:
+                unprocessed_list.append(pdb)
+
+        # Writes PDB accession codes that could not be processed to output file
+        with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'a') as unprocessed_file:
+            unprocessed_file.write('\n\n')
+            unprocessed_file.write('Not in DSSP database:\n')
+            for pdb in unprocessed_list:
+                unprocessed_file.write('{}\n'.format(pdb))
+
+
 class beta_structure_dssp_classification():
     import pandas as pd
     import os
@@ -414,11 +456,11 @@ class beta_structure_dssp_classification():
         self.rfac = rfac
         self.pdb = pdb_code
 
-    def extract_dssp_file_lines(dssp_file=dssp_file):
+    def extract_dssp_file_lines():
         # Extracts list of file lines from input DSSP file
         start = False
         dssp_file_lines = []
-        with open('{}'.format(dssp_file), 'r') as dssp_file:
+        with open('DSSP_files/{}.dssp'.format(self.pdb), 'r') as dssp_file:
             for line in dssp_file:
                 if start is True:
                     if (line[5:11].replace(' ', '') in pdb_res_num
@@ -453,7 +495,7 @@ class beta_structure_dssp_classification():
 
 
         # Changes back to current working directory after DSSP file has been read
-        os.chdir(cwd)
+        os.chdir('{}'.format(cwd))
 
         # Checks that all required asymmetric unit chains are in the DSSP file
         # opened on Tombstone (which are of the biological assemblies rather
