@@ -1,14 +1,4 @@
 
-import os
-import shutil
-import copy
-import requests
-import random
-import pandas as pd
-from difflib import SequenceMatcher
-import networkx as nx
-import matplotlib.pyplot as plt
-
 # Defines dictionary of three- and one-letter codes of standard amino acids
 amino_acids_dict = {'ALA': 'A',
                     'ARG': 'R',
@@ -31,7 +21,10 @@ amino_acids_dict = {'ALA': 'A',
                     'TYR': 'Y',
                     'VAL': 'V'}
 
-class gen_beta_structure_df():
+class select_beta_structures():
+    import pandas as pd
+    import copy
+
     def __init__(self, run):
         self.run = run
 
@@ -129,7 +122,11 @@ class gen_beta_structure_df():
         return domain_dict
 
 
-class beta_structure_df():
+class filter_beta_structure():
+    import pandas as pd
+    import os
+    import copy
+
     def __init__(self, run, resn, rfac, domain_dict):
         self.run = run
         self.resn = resn
@@ -138,9 +135,10 @@ class beta_structure_df():
 
     # Downloads a copy of each beta-barrel / beta-sandwich PDB structure from
     # the RCSB PDB website, and extracts its experimental method, resolution
-    # and rfactor from the header information. The structures are filtered to
-    # only retain those determined by X-ray diffraction to a resolution of 1.6
-    # Angstrom or higher with an Rfactor (working value) of 0.25 or lower.
+    # and R_factor (working value) from the header information. The structures
+    # are filtered to only retain those determined by X-ray diffraction to a
+    # resolution of 1.6 Angstroms or higher with an R_factor (working value)
+    # of 0.20 or lower.
     def resn_rfac_filter(self):
         unprocessed_list = []
         processed_list = []
@@ -149,29 +147,33 @@ class beta_structure_df():
         row_num = self.domain_dict.shape[0]
 
         for row in range(row_num):
+            print('Obtaining header information for {}'.format(self.domain_dict['PDB_CODE'][row]))
             print('{}'.format((row/row_num)*100))
-            print('Downloading {} from the RCSB PDB website'.format(self.domain_dict['PDB_CODE'][row]))
-            url = 'http://www.rcsb.org/pdb/files/{}.pdb'.format(self.domain_dict['PDB_CODE'][row].upper())
-            pdb_file_lines = requests.get(url).text
-            pdb_file_lines = pdb_file_lines.split('\n')
+
+            middle_characters = self.domain_dict['PDB_CODE'][row][1:3]
+            cwd = os.getcwd()
+            os.chdir('/Volumes/Seagate Backup Plus Drive/pdb/{}'.format(middle_characters))
 
             filtered_pdb_lines = []
-            remark_end = False
-            for line in pdb_file_lines:
-                if (line.replace(' ', ''))[0:7] == 'REMARK4':
-                    remark_end = True
+            with open('{}.pdb'.format(self.domain_dict['PDB_CODE'][row]), 'r') as pdb_file:
+                remark_end = False
+                for line in pdb_file:
+                    if (line.replace(' ', ''))[0:7] == 'REMARK4':
+                        remark_end = True
 
-                if remark_end is True:
-                    break
-                else:
-                    filtered_pdb_lines.append(line)
+                    if remark_end is True:
+                        break
+                    else:
+                        filtered_pdb_lines.append(line)
+
+            os.chdir(cwd)
 
             resolution = 0
             rfactor = 0
             for line in filtered_pdb_lines:
                 whitespace_remv_line = line.replace(' ', '')
                 if whitespace_remv_line.startswith('EXPDTA'):
-                    if not any(x in whitespace_remv_line for x in ['XRAY', 'X-RAY']):
+                    if not any(x in whitespace_remv_line for x in ['XRAYDIFFRACTION', 'X-RAYDIFFRACTION']):
                         unprocessed_list.append(self.domain_dict['PDB_CODE'][row])
                         break
                 elif (whitespace_remv_line.startswith('REMARK2')
@@ -207,6 +209,11 @@ class beta_structure_df():
         filtered_domain_dict.to_csv('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.csv'.format(self.run, self.resn, self.rfac))
 
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'w') as unprocessed_file:
+            unprocessed_file.write('Not solved by X-ray diffraction\n'
+                                   'OR\n'
+                                   'Failed to extract value for resolution\n'
+                                   'OR\n'
+                                   'Failed to extract value for Rfactor (working value)\n')
             unprocessed_list = set(unprocessed_list)
             for pdb in unprocessed_list:
                 unprocessed_file.write('{}\n'.format(pdb))
@@ -234,13 +241,20 @@ class beta_structure_df():
         pdb_chains = [chain for chain in pdb_chains if chain is not None]
 
         count = len(fasta)
-        with open('CATH_{}_{}_{}_domain_chain_entries.txt'.format(self.run, self.resn, self.rfac), 'w') as chain_entries_file:
+        with open(
+            'CATH_{}_{}_{}_domain_chain_entries_for_CD_HIT.txt'.format(self.run, self.resn, self.rfac), 'w'
+            ) as chain_entries_file:
             for num in range(count):
-                chain_entries_file.write('>{}{}\n'.format(pdb_ids[num], pdb_chains[num]))
+                chain_entries_file.write('>{}_{}\n'.format(pdb_ids[num], pdb_chains[num]))
                 chain_entries_file.write('{}\n'.format(fasta[num]))
 
 
-class beta_structure_coords():
+class extract_beta_structure_coords():
+    import pandas as pd
+    import os
+    import random
+    from difflib import SequenceMatcher
+
     def __init__(self, run, resn, rfac):
         self.run = run
         self.resn = resn
@@ -249,7 +263,11 @@ class beta_structure_coords():
     def gen_cd_hit_dict(self, filtered_domain_dict):
         # Loads the list of FASTA sequences generated by the CD-HIT web server
         fasta_list = []
-        with open('CATH_{}_resn_{}_rfac_{}_seqid_0.40_globalfilt.txt'.format(self.run, self.resn, self.rfac), 'r') as chain_entries_file:
+        with open(
+            'CATH_{}_resn_{}_rfac_{}_seqid_0.40_globalfilt_CD_HIT_output.txt'.format(
+                self.run, self.resn, self.rfac
+                ), 'r'
+            ) as chain_entries_file:
             for seq in chain_entries_file:
                 if not seq.startswith('>'):
                     fasta_list.append(seq.replace('\n', ''))
@@ -275,8 +293,9 @@ class beta_structure_coords():
         return cd_hit_domain_dict
 
     def get_xyz_coords(self, cd_hit_domain_dict):
-        # Extends the filtered (for resolution, Rfactor and sequence redundancy)
-        # dataframe to list the xyz coordinates of each segment sequence (SSEQS)
+        # Extends the filtered (for resolution, R_factor (working value) and
+        # sequence redundancy) dataframe to list the xyz coordinates of each
+        # segment sequence (SSEQS)
         domain_xyz = []
         unprocessed_list = []
         count = 0
@@ -284,15 +303,25 @@ class beta_structure_coords():
         for row in range(cd_hit_domain_dict.shape[0]):
             count = count + 1
 
-            print('Downloading {} from the RCSB PDB website'.format(cd_hit_domain_dict['PDB_CODE'][row]))
-            url = 'http://www.rcsb.org/pdb/files/{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row].upper())
-            pdb_file_lines = requests.get(url).text
-            pdb_file_lines = pdb_file_lines.split('\n')
-            pdb_file_lines = [line for line in pdb_file_lines
-                              if line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
+            # Downloads PDB file of the structure from the RCSB website
+            print('{}'.format((row/cd_hit_domain_dict.shape[0])*100))
+            print('Obtaining ATOM / HETATM records for {}'.format(cd_hit_domain_dict['PDB_CODE'][row]))
+
+            middle_characters = cd_hit_domain_dict['PDB_CODE'][row][1:3]
+            cwd = os.getcwd()
+            os.chdir('/Volumes/Seagate Backup Plus Drive/pdb/{}'.format(middle_characters))
+
+            with open('{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row]), 'r') as pdb_file:
+                pdb_file_lines = [line.strip('\n') for line in pdb_file if
+                                  line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))
 
+            os.chdir(cwd)
+
             xyz_segments = []
+            # For each segment sequence in the domain, makes a list of all
+            # sequences in the input PDB file that lie between the recorded
+            # start and stop residue numbers and have the same chain id
             for index_1, segment in enumerate(cd_hit_domain_dict['SSEQS'][row]):
                 sequences = []
                 indices = []
@@ -338,33 +367,33 @@ class beta_structure_coords():
                     similarity = SequenceMatcher(a=segment, b=sequence).ratio()
                     if similarity > 0.95:
                         sequence_identified = True
-                        pdb_file = open('PDB_files/{}_{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row],
-                                        count), 'a')
                         for index_4 in indices[index_3]:
-                            pdb_file.write('{}\n'.format(pdb_file_lines[index_4]))
                             x = float(pdb_file_lines[index_4][30:38].strip())
                             y = float(pdb_file_lines[index_4][38:46].strip())
                             z = float(pdb_file_lines[index_4][46:54].strip())
                             xyz.append([x, y, z])
-                        pdb_file.write('TER'.ljust(80)+'\n')
-                        pdb_file.close()
                         xyz_segments.append(xyz)
                         break
 
                 if sequence_identified is False:
-                    unprocessed_list.append('{}{}\n'.format(cd_hit_domain_dict['PDB_CODE'][row],
+                    unprocessed_list.append('{}_{}\n'.format(cd_hit_domain_dict['PDB_CODE'][row],
                                                             cd_hit_domain_dict['SEGMENT_ID'][row]))
                     xyz_segments.append(xyz)
 
             domain_xyz.append(xyz_segments)
 
+        # Lists all segment sequences that could not be processed owing to
+        # insufficient similarity between the FASTA sequence listed in the
+        # CATH_domain_desc_v_4_2_0.txt and the FASTA sequence extracted from
+        # the PDB file downloaded from the RCSB website in the unprocessed
+        # structures file
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'a') as unprocessed_file:
             unprocessed_file.write('\n\n')
             unprocessed_file.write('Dissimilar coordinates:\n')
             for pdb_file in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(pdb_file))
-            unprocessed_file.write('\n\n')
 
+        # Appends xyz coordinates column to dataframe
         domain_xyz = pd.DataFrame({'XYZ': domain_xyz})
         cd_hit_domain_dict_xyz = pd.concat([cd_hit_domain_dict, domain_xyz], axis=1)
         cd_hit_domain_dict_xyz.to_csv('CATH_{}_resn_{}_rfac_{}_filtered_xyz.csv'.format(self.run, self.resn, self.rfac))
@@ -372,19 +401,41 @@ class beta_structure_coords():
 
 
 class beta_structure_dssp_classification():
-    def __init__(self, run, resn, rfac, pdb_name, pdb_code):
+    import pandas as pd
+    import os
+    import copy
+    import string
+    import networkx as nx
+    import matplotlib.pyplot as plt
+
+    def __init__(self, run, resn, rfac, pdb_code):
         self.run = run
         self.resn = resn
         self.rfac = rfac
-        self.pdb_name = pdb_name
         self.pdb = pdb_code
 
-    def extract_dssp_secondary_structure(pdb_file_lines):
+    def extract_dssp_file_lines(dssp_file=dssp_file):
+        # Extracts list of file lines from input DSSP file
+        start = False
+        dssp_file_lines = []
+        with open('{}'.format(dssp_file), 'r') as dssp_file:
+            for line in dssp_file:
+                if start is True:
+                    if (line[5:11].replace(' ', '') in pdb_res_num
+                        and line[11:12].strip() in pdb_chains
+                        ):
+                        dssp_file_lines.append(line.strip('\n'))
+                if line.strip().startswith('#'):
+                    start = True
+        dssp_file_lines.append('TER'.ljust(136))
+        return dssp_file_lines
+
+    def x(dssp_file_lines):
         unprocessed_files = []
 
         pdb_res_num = []
         pdb_chains = []
-        for index, line in enumerate(pdb_file_lines):
+        for index, line in enumerate(dssp_file_lines):
             if index != (len(pdb_file_lines)-1):
                 if (line[0:3] != 'TER'
                     and line[21:27].replace(' ', '') != pdb_file_lines[index+1][21:27].replace(' ', '')
@@ -399,19 +450,7 @@ class beta_structure_dssp_classification():
         os.chdir('./../../shared/structural_bioinformatics/data/{}/{}/dssp/'.format(
             middle_characters, self.pdb))
 
-        # Generates list from DSSP file on Tombstone
-        start = False
-        dssp_file_lines = []
-        with open('{}_1.mmol.dssp'.format(self.pdb), 'r') as dssp_file:
-            for line in dssp_file:
-                if start is True:
-                    if (line[5:11].replace(' ', '') in pdb_res_num
-                        and line[11:12].strip() in pdb_chains
-                        ):
-                        dssp_file_lines.append(line.strip('\n'))
-                if line.strip().startswith('#'):
-                    start = True
-        dssp_file_lines.append('TER'.ljust(136))
+
 
         # Changes back to current working directory after DSSP file has been read
         os.chdir(cwd)
@@ -484,17 +523,20 @@ class beta_structure_dssp_classification():
         # Writes a PDB file of the residues that DSSP classifies as forming a
         # beta-strand (secondary structure code = 'E')
         with open('DSSP_PDB_files_{}/{}'.format(self.run, self.pdb_name), 'w') as pdb_file:
-            dssp_df_beta_structure = dssp_df[dssp_df['SHEET?']=='E']
-            for index, secondary_structure in enumerate(secondary_structure_assignment):
-                if secondary_structure == 'E':
-                    chain = pdb_chains[index]
-                    res_num = pdb_res_num[index]
+            strand_number_set = []
+            for number in strand_number_list:
+                if number not in strand_number_set and number != '':
+                    strand_number_set.append(number)
+            for strand in strand_number_set:
+                chain =
+                dssp_df_strand = dssp_df[dssp_df['STRAND_NUM']==strand].reset_index(drop=True)
+                for row in range(dssp_df_strand.shape[0]):
+                    chain = dssp_df_strand['CHAIN'][row]
+                    res_num = dssp_df_strand['RESNUM'][row]
                     for line in pdb_file_lines:
                         if line[21:22] == chain and line[22:27].replace(' ', '') == res_num:
                             pdb_file.write('{}\n'.format(line))
-                        elif line[0:3] == 'TER':
-                            pdb_file.write('{}\n'.format(line))
-                elif
+                pdb_file.write('TER\n'.ljust(80))
 
         # Merges sheet names of sheets that share strands
         sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
@@ -504,7 +546,7 @@ class beta_structure_dssp_classification():
                 str(strand) for strand in set(dssp_df[dssp_df['SHEET_NUM']==sheet]['STRAND_NUM'].tolist())
                 ]
             sheet_strands.append(locals()['sheet_{}_strands'.format(sheet)])
-            locals()['sheet_{}_strands'.format(sheet)] = []
+            del locals()['sheet_{}_strands'.format(sheet)]
 
         sheet_strand_numbers = [strand for strands in sheet_strands for strand in strands]
         count = 0
@@ -598,6 +640,8 @@ class beta_structure_dssp_classification():
             nx.draw_networkx(G, pos=pos, with_labels=True)
             nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=interacting_strands)
             plt.savefig('{}_sheet_{}_network.png'.format(self.pdb_name, sheet))
+
+            # Identify strands as nodes
 
 
 
