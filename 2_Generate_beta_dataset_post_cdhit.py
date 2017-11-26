@@ -23,6 +23,10 @@ print('Specify absolute file path of working directory')
 directory = input(prompt)
 os.chdir('{}'.format(directory))
 
+# Determines the absolute file path of the (locally saved) PDB database
+print('Specify absolute file path of PDB database')
+pdb_database = input(prompt)
+
 # Specifies the resolution and Rfactor (working value) cutoffs used in previous
 # steps
 print('Select resolution cutoff')
@@ -31,14 +35,15 @@ print('Select Rfactor (working value) cutoff')
 rfac = float(input(prompt))
 
 # Loads the dataframe generated in previous steps
-filtered_domain_dict = pd.read_pickle(
+filtered_domain_df = pd.read_pickle(
     'CATH_{}_resn_{}_rfac_{}_pre_cd_hit.pkl'.format(run, resn, rfac)
     )
 
 # Obtains xyz coordinates for the sequences output from CD-HIT
-beta_structure = exttract_beta_structure_coords(run=run, resn=resn, rfac=rfac)
-cd_hit_domain_dict = beta_structure.gen_cd_hit_dict(filtered_domain_dict)
-if os.path.isdir('PDB_files'):
-    shutil.rmtree('PDB_files')
-os.mkdir('PDB_files')
-beta_structure.get_xyz_coords(cd_hit_domain_dict)
+beta_structure = extract_beta_structure_coords(run=run, resn=resn, rfac=rfac,
+                                               pdb_database=pdb_database)
+cd_hit_domain_df = beta_structure.gen_cd_hit_dict(filtered_domain_df)
+if os.path.isdir('CD_HIT_DSEQS_PDB_files'):
+    shutil.rmtree('CD_HIT_DSEQS_PDB_files')
+os.mkdir('CD_HIT_DSEQS_PDB_files')
+beta_structure.get_xyz_coords(cd_hit_domain_df)

@@ -1,4 +1,16 @@
 
+import os
+import shutil
+import pandas as pd
+import copy
+import random
+import string
+import networkx as nx
+import matplotlib.pyplot as plt
+from difflib import SequenceMatcher
+from collections import OrderedDict
+
+
 # Defines dictionary of three- and one-letter codes of standard amino acids
 amino_acids_dict = {'ALA': 'A',
                     'ARG': 'R',
@@ -21,9 +33,8 @@ amino_acids_dict = {'ALA': 'A',
                     'TYR': 'Y',
                     'VAL': 'V'}
 
+
 class select_beta_structures():
-    import pandas as pd
-    import copy
 
     def __init__(self, run):
         self.run = run
@@ -111,7 +122,7 @@ class select_beta_structures():
                 domain_sseqs.append(sseqs_list)
                 domain_sseqs_start_stop.append(sseqs_start_stop_list)
 
-        domain_dict = pd.DataFrame({'PDB_CODE': domain_pdb_ids,
+        domain_df = pd.DataFrame({'PDB_CODE': domain_pdb_ids,
                                     'CHAIN': domain_chains,
                                     'CATHCODE': domain_cathcodes,
                                     'DSEQS': domain_dseqs,
@@ -119,19 +130,17 @@ class select_beta_structures():
                                     'SSEQS': domain_sseqs,
                                     'SSEQS_START_STOP': domain_sseqs_start_stop})
 
-        return domain_dict
+        return domain_df
 
 
 class filter_beta_structure():
-    import pandas as pd
-    import os
-    import copy
 
-    def __init__(self, run, resn, rfac, domain_dict):
+    def __init__(self, run, resn, rfac, domain_df, pdb_database):
         self.run = run
         self.resn = resn
         self.rfac = rfac
-        self.domain_dict = domain_dict
+        self.domain_df = domain_df
+        self.pdb_database = pdb_database
 
     # Downloads a copy of each beta-barrel / beta-sandwich PDB structure from
     # the RCSB PDB website, and extracts its experimental method, resolution
@@ -144,27 +153,30 @@ class filter_beta_structure():
         processed_list = []
         resolution_list = []
         rfactor_list = []
-        row_num = self.domain_dict.shape[0]
+        row_num = self.domain_df.shape[0]
 
         for row in range(row_num):
-            print('Obtaining header information for {}'.format(self.domain_dict['PDB_CODE'][row]))
+            print('Obtaining header information for {}'.format(self.domain_df['PDB_CODE'][row]))
             print('{}'.format((row/row_num)*100))
 
-            middle_characters = self.domain_dict['PDB_CODE'][row][1:3]
+            middle_characters = self.domain_df['PDB_CODE'][row][1:3]
             cwd = os.getcwd()
-            os.chdir('/Volumes/Seagate Backup Plus Drive/pdb/{}'.format(middle_characters))
+            os.chdir('/{}/{}'.format(self.pdb_database, middle_characters))
 
             filtered_pdb_lines = []
-            with open('{}.pdb'.format(self.domain_dict['PDB_CODE'][row]), 'r') as pdb_file:
-                remark_end = False
-                for line in pdb_file:
-                    if (line.replace(' ', ''))[0:7] == 'REMARK4':
-                        remark_end = True
+            try:
+                with open('{}.pdb'.format(self.domain_df['PDB_CODE'][row]), 'r') as pdb_file:
+                    remark_end = False
+                    for line in pdb_file:
+                        if (line.replace(' ', ''))[0:7] == 'REMARK4':
+                            remark_end = True
 
-                    if remark_end is True:
-                        break
-                    else:
-                        filtered_pdb_lines.append(line)
+                        if remark_end is True:
+                            break
+                        else:
+                            filtered_pdb_lines.append(line)
+            except FileNotFoundError:
+                unprocessed_list.append(self.domain_df['PDB_CODE'][row])
 
             os.chdir('{}'.format(cwd))
 
@@ -174,7 +186,7 @@ class filter_beta_structure():
                 whitespace_remv_line = line.replace(' ', '')
                 if whitespace_remv_line.startswith('EXPDTA'):
                     if not any(x in whitespace_remv_line for x in ['XRAYDIFFRACTION', 'X-RAYDIFFRACTION']):
-                        unprocessed_list.append(self.domain_dict['PDB_CODE'][row])
+                        unprocessed_list.append(self.domain_df['PDB_CODE'][row])
                         break
                 elif (whitespace_remv_line.startswith('REMARK2')
                     and 'ANGSTROMS' in whitespace_remv_line):
@@ -194,19 +206,19 @@ class filter_beta_structure():
                             rfactor = 0
 
             if resolution == 0 or rfactor == 0:
-                unprocessed_list.append(self.domain_dict['PDB_CODE'][row])
+                unprocessed_list.append(self.domain_df['PDB_CODE'][row])
             elif resolution <= self.resn and rfactor <= self.rfac:
-                processed_list.append(self.domain_dict['PDB_CODE'][row])
+                processed_list.append(self.domain_df['PDB_CODE'][row])
                 resolution_list.append(resolution)
                 rfactor_list.append(rfactor)
 
-        filtered_domain_dict_part_1 = self.domain_dict.loc[self.domain_dict['PDB_CODE'].isin(processed_list)]
-        filtered_domain_dict_part_1 = filtered_domain_dict_part_1.reset_index(drop=True)
-        filtered_domain_dict_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
+        filtered_domain_df_part_1 = self.domain_df.loc[self.domain_df['PDB_CODE'].isin(processed_list)]
+        filtered_domain_df_part_1 = filtered_domain_df_part_1.reset_index(drop=True)
+        filtered_domain_df_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
                                                     'RFACTOR': rfactor_list})
-        filtered_domain_dict = pd.concat([filtered_domain_dict_part_1, filtered_domain_dict_part_2], axis=1)
-        filtered_domain_dict.to_pickle('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.pkl'.format(self.run, self.resn, self.rfac))
-        filtered_domain_dict.to_csv('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.csv'.format(self.run, self.resn, self.rfac))
+        filtered_domain_df = pd.concat([filtered_domain_df_part_1, filtered_domain_df_part_2], axis=1)
+        filtered_domain_df.to_pickle('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.pkl'.format(self.run, self.resn, self.rfac))
+        filtered_domain_df.to_csv('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.csv'.format(self.run, self.resn, self.rfac))
 
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'w') as unprocessed_file:
             unprocessed_file.write('Not solved by X-ray diffraction\n'
@@ -217,14 +229,14 @@ class filter_beta_structure():
             unprocessed_list = set(unprocessed_list)
             for pdb in unprocessed_list:
                 unprocessed_file.write('{}\n'.format(pdb))
-        return filtered_domain_dict
+        return filtered_domain_df
 
     # Generates list of beta-structure chain entries for sequence redundancy
     # filtering using the cd_hit web server
-    def gen_cd_hit_list(self, filtered_domain_dict):
-        fasta = filtered_domain_dict.DSEQS.tolist()
-        pdb_ids = filtered_domain_dict.PDB_CODE.tolist()
-        pdb_chains = filtered_domain_dict.CHAIN.tolist()
+    def gen_cd_hit_list(self, filtered_domain_df):
+        fasta = filtered_domain_df.DSEQS.tolist()
+        pdb_ids = filtered_domain_df.PDB_CODE.tolist()
+        pdb_chains = filtered_domain_df.CHAIN.tolist()
 
         fasta_copy = copy.copy(fasta)
         fasta_repeat = []
@@ -250,17 +262,14 @@ class filter_beta_structure():
 
 
 class extract_beta_structure_coords():
-    import pandas as pd
-    import os
-    import random
-    from difflib import SequenceMatcher
 
-    def __init__(self, run, resn, rfac):
+    def __init__(self, run, resn, rfac, pdb_database):
         self.run = run
         self.resn = resn
         self.rfac = rfac
+        self.pdb_database = pdb_database
 
-    def gen_cd_hit_dict(self, filtered_domain_dict):
+    def gen_cd_hit_dict(self, filtered_domain_df):
         # Loads the list of FASTA sequences generated by the CD-HIT web server
         fasta_list = []
         with open(
@@ -278,8 +287,8 @@ class extract_beta_structure_coords():
         df_index_list = []
         for seq in fasta_list:
             df_index_sub_list = []
-            for row in range(filtered_domain_dict.shape[0]):
-                if seq == filtered_domain_dict['DSEQS'][row]:
+            for row in range(filtered_domain_df.shape[0]):
+                if seq == filtered_domain_df['DSEQS'][row]:
                     df_index_sub_list.append(row)
 
             rand_num = random.randint(0, len(df_index_sub_list)-1)
@@ -288,46 +297,48 @@ class extract_beta_structure_coords():
 
         # Filters dataframe further to retain only the domains selected in the previous
         # step
-        cd_hit_domain_dict = filtered_domain_dict.iloc[df_index_list]
-        cd_hit_domain_dict = cd_hit_domain_dict.reset_index(drop=True)
-        return cd_hit_domain_dict
+        cd_hit_domain_df = filtered_domain_df.iloc[df_index_list]
+        cd_hit_domain_df = cd_hit_domain_df.reset_index(drop=True)
+        return cd_hit_domain_df
 
-    def get_xyz_coords(self, cd_hit_domain_dict):
+    def get_xyz_coords(self, cd_hit_domain_df):
         # Extends the filtered (for resolution, R_factor (working value) and
         # sequence redundancy) dataframe to list the xyz coordinates of each
         # segment sequence (SSEQS)
         domain_xyz = []
+        domain_residue_list = []
         unprocessed_list = []
         count = 0
 
-        for row in range(cd_hit_domain_dict.shape[0]):
+        for row in range(cd_hit_domain_df.shape[0]):
+            xyz_segments = []
+            residue_list = []
             count = count + 1
 
             # Downloads PDB file of the structure from the RCSB website
-            print('{}'.format((row/cd_hit_domain_dict.shape[0])*100))
-            print('Obtaining ATOM / HETATM records for {}'.format(cd_hit_domain_dict['PDB_CODE'][row]))
+            print('{}'.format((row/cd_hit_domain_df.shape[0])*100))
+            print('Obtaining ATOM / HETATM records for {}'.format(cd_hit_domain_df['PDB_CODE'][row]))
 
-            middle_characters = cd_hit_domain_dict['PDB_CODE'][row][1:3]
+            middle_characters = cd_hit_domain_df['PDB_CODE'][row][1:3]
             cwd = os.getcwd()
-            os.chdir('/Volumes/Seagate Backup Plus Drive/pdb/{}'.format(middle_characters))
+            os.chdir('/{}/{}'.format(self.pdb_database, middle_characters))
 
-            with open('{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row]), 'r') as pdb_file:
+            with open('{}.pdb'.format(cd_hit_domain_df['PDB_CODE'][row]), 'r') as pdb_file:
                 pdb_file_lines = [line.strip('\n') for line in pdb_file if
                                   line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))
 
             os.chdir('{}'.format(cwd))
 
-            xyz_segments = []
             # For each segment sequence in the domain, makes a list of all
             # sequences in the input PDB file that lie between the recorded
             # start and stop residue numbers and have the same chain id
-            for index_1, segment in enumerate(cd_hit_domain_dict['SSEQS'][row]):
+            for index_1, segment in enumerate(cd_hit_domain_df['SSEQS'][row]):
                 sequences = []
                 indices = []
 
-                start = cd_hit_domain_dict['SSEQS_START_STOP'][row][index_1][0].replace('START=', '')
-                stop = cd_hit_domain_dict['SSEQS_START_STOP'][row][index_1][1].replace('STOP=', '')
+                start = cd_hit_domain_df['SSEQS_START_STOP'][row][index_1][0].replace('START=', '')
+                stop = cd_hit_domain_df['SSEQS_START_STOP'][row][index_1][1].replace('STOP=', '')
                 start_seq = False
                 stop_seq = False
                 sequence = ''
@@ -335,7 +346,7 @@ class extract_beta_structure_coords():
 
                 for index_2, line in enumerate(pdb_file_lines):
                     if index_2 != (len(pdb_file_lines)-1):
-                        if line[22:27].strip() == start and line[21:22] == cd_hit_domain_dict['CHAIN'][row]:
+                        if line[22:27].strip() == start and line[21:22] == cd_hit_domain_df['CHAIN'][row]:
                             start_seq = True
 
                         if start_seq is True and stop_seq is False:
@@ -355,7 +366,7 @@ class extract_beta_structure_coords():
 
                         if (pdb_file_lines[index_2+1][0:3] == 'TER'
                             or (line[22:27].strip() == stop
-                                and line[21:22] == cd_hit_domain_dict['CHAIN'][row]
+                                and line[21:22] == cd_hit_domain_df['CHAIN'][row]
                                 and pdb_file_lines[index_2+1][22:27].strip() != stop
                                 )
                             ):
@@ -367,24 +378,31 @@ class extract_beta_structure_coords():
                     similarity = SequenceMatcher(a=segment, b=sequence).ratio()
                     if similarity > 0.95:
                         sequence_identified = True
-                        pdb_file = open('PDB_files/{}_{}.pdb'.format(cd_hit_domain_dict['PDB_CODE'][row],
+                        pdb_file = open('CD_HIT_DSEQS_PDB_files/{}_{}.pdb'.format(cd_hit_domain_df['PDB_CODE'][row],
                                         count), 'a')
                         for index_4 in indices[index_3]:
                             x = float(pdb_file_lines[index_4][30:38].strip())
                             y = float(pdb_file_lines[index_4][38:46].strip())
                             z = float(pdb_file_lines[index_4][46:54].strip())
                             xyz.append([x, y, z])
+                            residue_list.append(pdb_file_lines[index_4][21:27].replace(' ', ''))
                         pdb_file.write('TER'.ljust(80)+'\n')
                         pdb_file.close()
                         xyz_segments.append(xyz)
                         break
 
                 if sequence_identified is False:
-                    unprocessed_list.append('{}_{}\n'.format(cd_hit_domain_dict['PDB_CODE'][row],
-                                                            cd_hit_domain_dict['SEGMENT_ID'][row]))
+                    unprocessed_list.append('{}_{}\n'.format(cd_hit_domain_df['PDB_CODE'][row],
+                                                            cd_hit_domain_df['SEGMENT_ID'][row]))
                     xyz_segments.append(xyz)
 
             domain_xyz.append(xyz_segments)
+
+            chain_num_list = []
+            for chain_num in residue_list:
+                if chain_num not in chain_num_list:
+                    chain_num_list.append(chain_num)
+            domain_residue_list.append(residue_list)
 
         # Lists all segment sequences that could not be processed owing to
         # insufficient similarity between the FASTA sequence listed in the
@@ -398,24 +416,27 @@ class extract_beta_structure_coords():
                 unprocessed_file.write('{}\n'.format(pdb_file))
 
         # Appends xyz coordinates column to dataframe
-        domain_xyz = pd.DataFrame({'XYZ': domain_xyz})
-        cd_hit_domain_dict_xyz = pd.concat([cd_hit_domain_dict, domain_xyz], axis=1)
-        cd_hit_domain_dict_xyz.to_csv('CATH_{}_resn_{}_rfac_{}_filtered_xyz.csv'.format(self.run, self.resn, self.rfac))
-        cd_hit_domain_dict_xyz.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered_xyz.pkl'.format(self.run, self.resn, self.rfac))
+        domain_xyz = pd.DataFrame({'XYZ': domain_xyz,
+                                   'CHAIN_NUM': domain_residue_list})
+        cd_hit_domain_df_xyz = pd.concat([cd_hit_domain_df, domain_xyz], axis=1)
+        cd_hit_domain_df_xyz.to_csv('CATH_{}_resn_{}_rfac_{}_filtered_xyz.csv'.format(
+            self.run, self.resn, self.rfac)
+            )
+        cd_hit_domain_df_xyz.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered_xyz.pkl'.format(
+            self.run, self.resn, self.rfac)
+            )
 
 
 class filter_dssp_database():
-    import pandas as pd
-    import os
-    import shutil
 
-    def __init__(self, run, resn, rfac):
+    def __init__(self, run, resn, rfac, dssp_database):
         self.run = run
         self.resn = resn
         self.rfac = rfac
+        self.dssp_database = dssp_database
 
 
-    def copy_files_from_dssp_database(pdb_list):
+    def copy_files_from_dssp_database(self, pdb_list, cd_hit_domain_df_xyz):
         # Generates list of all PDB accession codes to be extracted from the
         # DSSP database
         os.mkdir('DSSP_files')
@@ -423,148 +444,166 @@ class filter_dssp_database():
         # Copies DSSP files of listed PDB accession codes to current working
         # directory
         unprocessed_list = []
-        for pdb in pdb_list:
-            middle_characters = pdb[1:len(pdb)-1]
+        for pdb_code in pdb_list:
+            middle_characters = pdb_code[1:len(pdb_code)-1]
             cwd = os.getcwd()
 
             try:
                 shutil.copy2(
-                    '/Volumes/Seagate Backup Plus Drive/pdb/{}/{}.dssp'.format(middle_characters, pdb)
-                    '{}/DSSP_files/{}.dssp'.format(cwd, pdb))
+                    '/{}/{}.dssp'.format(self.dssp_database, pdb_code),
+                    '{}/DSSP_files/{}.dssp'.format(cwd, pdb_code))
             except FileNotFoundError:
-                unprocessed_list.append(pdb)
+                unprocessed_list.append(pdb_code)
 
         # Writes PDB accession codes that could not be processed to output file
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'a') as unprocessed_file:
             unprocessed_file.write('\n\n')
             unprocessed_file.write('Not in DSSP database:\n')
-            for pdb in unprocessed_list:
-                unprocessed_file.write('{}\n'.format(pdb))
+            for pdb_code in unprocessed_list:
+                unprocessed_file.write('{}\n'.format(pdb_code))
+
+        # Filters cd_hit_domain_df_xyz to remove entries not in the DSSP
+        # database
+        dssp_domain_df = cd_hit_domain_df_xyz[~cd_hit_domain_df_xyz['PDB_CODE'].isin(unprocessed_list)]
+        dssp_domain_df = dssp_domain_df.reset_index(drop=True)
+
+        return dssp_domain_df
 
 
 class beta_structure_dssp_classification():
-    import pandas as pd
-    import os
-    import copy
-    import string
-    import networkx as nx
-    import matplotlib.pyplot as plt
 
-    def __init__(self, run, resn, rfac, pdb_code):
+    def __init__(self, run, resn, rfac):
         self.run = run
         self.resn = resn
         self.rfac = rfac
-        self.pdb = pdb_code
 
-    def extract_dssp_file_lines():
-        # Extracts list of file lines from input DSSP file
+    def extract_dssp_file_lines(self, dssp_domain_df):
+        unprocessed_list = []
+
+        # Extracts list of file lines from input DSSP files
         start = False
         dssp_file_lines = []
-        with open('DSSP_files/{}.dssp'.format(self.pdb), 'r') as dssp_file:
-            for line in dssp_file:
-                if start is True:
-                    if (line[5:11].replace(' ', '') in pdb_res_num
-                        and line[11:12].strip() in pdb_chains
-                        ):
-                        dssp_file_lines.append(line.strip('\n'))
-                if line.strip().startswith('#'):
-                    start = True
-        dssp_file_lines.append('TER'.ljust(136))
-        return dssp_file_lines
 
-    def x(dssp_file_lines):
-        unprocessed_files = []
+        for row in range(dssp_domain_df.shape[0]):
+            dssp_indv_file_lines = []
+            chain_num_list = dssp_domain_df['CHAIN_NUM'][row]
 
-        pdb_res_num = []
-        pdb_chains = []
-        for index, line in enumerate(dssp_file_lines):
-            if index != (len(pdb_file_lines)-1):
-                if (line[0:3] != 'TER'
-                    and line[21:27].replace(' ', '') != pdb_file_lines[index+1][21:27].replace(' ', '')
-                    ):
-                    pdb_res_num.append(line[22:27].replace(' ', ''))
-                    pdb_chains.append(line[21:22])
+            with open('DSSP_files/{}.dssp'.format(dssp_domain_df['PDB_CODE'][row]), 'r') as dssp_file:
+                for line in dssp_file:
+                    if (line[11:12]+line[5:11].strip()) in chain_num_list:
+                        dssp_indv_file_lines.append(line.strip('\n'))
+                        index = chain_num_list.index((line[11:12]+line[5:11].strip()))
+                        chain_num_list[index] = ''
 
-        middle_characters = self.pdb[1:len(self.pdb)-1]
+            chain_num_list = [chain_num for chain_num in chain_num_list if chain_num != '']
+            if len(chain_num_list) == 0:
+                dssp_indv_file_lines.append('TER'.ljust(136))
+                dssp_file_lines.append(dssp_indv_file_lines)
+            elif len(chain_num_list) > 0:
+                unprocessed_list.append(dssp_domain_df['PDB_CODE'][row])
 
-        # Changes directory to open DSSP file
-        cwd = os.getcwd()
-        os.chdir('./../../shared/structural_bioinformatics/data/{}/{}/dssp/'.format(
-            middle_characters, self.pdb))
+        # Writes PDB accession codes that could not be processed to output file
+        with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'a') as unprocessed_file:
+            unprocessed_file.write('\n\n')
+            unprocessed_file.write('Coordinates missing from DSSP file:\n')
+            for pdb_code in unprocessed_list:
+                unprocessed_file.write('{}\n'.format(pdb_code))
 
+        # Filters dssp_domain_df to remove entries whose DSSP files have
+        # coordinates missing
+        dssp_domain_df = dssp_domain_df[~dssp_domain_df['PDB_CODE'].isin(unprocessed_list)]
+        dssp_domain_df = dssp_domain_df.reset_index(drop=True)
 
+        dssp_residues_dict = OrderedDict()
+        for index, sub_list in enumerate(dssp_file_lines):
+            dssp_residues_dict[dssp_domain_df['PDB_CODE'][index]] = sub_list
 
-        # Changes back to current working directory after DSSP file has been read
-        os.chdir('{}'.format(cwd))
+        return dssp_domain_df, dssp_residues_dict
 
-        # Checks that all required asymmetric unit chains are in the DSSP file
-        # opened on Tombstone (which are of the biological assemblies rather
-        # than the asymmetric unit)
-        dssp_chains = [line[11:12] for line in dssp_file_lines]
-        for chain in set(pdb_chains):
-            if chain not in dssp_chains:
-                unprocessed_files.append(self.pdb_name)
-
-
+    def get_dssp_sec_struct_df(self, dssp_residues_dict):
         # Generates dataframe of relevant information in DSSP file
-        dssp_num = []
-        secondary_structure_assignment = []
-        strand_number = 1
-        strand_number_list = []
-        sheet_number_list = []
-        orientation_list = []
-        bridge_pair_list = []
-        for index_1, res_num in enumerate(pdb_res_num):
-            for index_2, line in enumerate(dssp_file_lines):
-                if (index_2 != (len(dssp_file_lines)-1)
-                    and res_num == line[5:11].replace(' ', '')
-                    and pdb_chains[index_1] == line[11:12]
-                    ):
-                    dssp_num.append(line[0:5].strip())
-                    secondary_structure = line[16:17]
-                    if secondary_structure == 'E':
-                        secondary_structure_assignment.append(secondary_structure)
-                        strand_number_list.append(strand_number)
-                        if dssp_file_lines[index_2+1][16:17] != 'E':
-                            strand_number = strand_number + 1
-                        sheet_number_list.append(line[33:34])
-                        ladder_1 = line[23:24]
-                        if ladder_1 == ' ':
-                            ladder_1 = ''
-                        elif ladder_1.isupper():
-                            ladder_1 = 'A'
-                        elif ladder_1.islower():
-                            ladder_1 = 'P'
-                        ladder_2 = line[24:25]
-                        if ladder_2 == ' ':
-                            ladder_2 = ''
-                        elif ladder_2.isupper():
-                            ladder_2 = 'A'
-                        elif ladder_2.islower():
-                            ladder_2 = 'P'
-                        orientation_list.append([ladder_1,ladder_2])
-                        bridge_pair_list.append([line[25:29].strip(),
-                                                 line[29:33].strip()])
-                    elif secondary_structure != 'E':
-                        secondary_structure_assignment.append('')
-                        strand_number_list.append('')
-                        sheet_number_list.append('')
-                        orientation_list.append(['', ''])
-                        bridge_pair_list.append(['', ''])
-                    break
+        count = 0
+        for pdb_code, dssp_indv_file_lines in dssp_residues_dict.items():
+            count = count+1
 
-        dssp_df = pd.DataFrame({'RESNUM': pdb_res_num,
-                                'CHAIN': pdb_chains,
-                                'DSSP_NUM': dssp_num,
-                                'SHEET?': secondary_structure_assignment,
-                                'STRAND_NUM': strand_number_list,
-                                'SHEET_NUM': sheet_number_list,
-                                'ORIENTATION': orientation_list,
-                                'H-BONDS': bridge_pair_list})
+            res_num = []
+            chain = []
+            dssp_num = []
+            secondary_structure_assignment = []
+            strand_number = 1
+            strand_number_list = []
+            sheet_number_list = []
+            orientation_list = []
+            bridge_pair_list = []
 
+            for line in dssp_indv_file_lines:
+                res_num.append(line[5:11].strip())
+                chains.append(line[11:12])
+                dssp_num.append(line[0:5].strip())
+                secondary_structure = line[16:17]
+                if secondary_structure == 'E':
+                    secondary_structure_assignment.append(secondary_structure)
+                    strand_number_list.append(strand_number)
+                    if dssp_file_lines[index_2+1][16:17] != 'E':
+                        strand_number = strand_number + 1
+                    sheet_number_list.append(line[33:34])
+                    ladder_1 = line[23:24]
+                    if ladder_1 == ' ':
+                        ladder_1 = ''
+                    elif ladder_1.isupper():
+                        ladder_1 = 'A'
+                    elif ladder_1.islower():
+                        ladder_1 = 'P'
+                    ladder_2 = line[24:25]
+                    if ladder_2 == ' ':
+                        ladder_2 = ''
+                    elif ladder_2.isupper():
+                        ladder_2 = 'A'
+                    elif ladder_2.islower():
+                        ladder_2 = 'P'
+                    orientation_list.append([ladder_1,ladder_2])
+                    bridge_pair_list.append([line[25:29].strip(),
+                                             line[29:33].strip()])
+                elif secondary_structure != 'E':
+                    secondary_structure_assignment.append('')
+                    strand_number_list.append('')
+                    sheet_number_list.append('')
+                    orientation_list.append(['', ''])
+                    bridge_pair_list.append(['', ''])
+
+            dssp_df = pd.DataFrame({'RESNUM': res_num,
+                                    'CHAIN': chains,
+                                    'DSSP_NUM': dssp_num,
+                                    'SHEET?': secondary_structure_assignment,
+                                    'STRAND_NUM': strand_number_list,
+                                    'SHEET_NUM': sheet_number_list,
+                                    'ORIENTATION': orientation_list,
+                                    'H-BONDS': bridge_pair_list})
+
+            dssp_df.to_pickle('DSSP_filtered_DSEQS/{}_{}.pkl'.format(pdb_code,
+                                                                     count))
+
+    def write_dssp_sec_struct_pdb(self, dssp_residues_dict):  # Up to here!
         # Writes a PDB file of the residues that DSSP classifies as forming a
         # beta-strand (secondary structure code = 'E')
-        with open('DSSP_PDB_files_{}/{}'.format(self.run, self.pdb_name), 'w') as pdb_file:
+        count = 0
+        for pdb_code, dssp_indv_file_lines in dssp_residues_dict:
+            count = count + 1
+
+            with open('CD_HIT_DSEQS_PDB_files/{}_{}.pdb'.format(pdb_code, count), 'r') as pdb_file:
+                new_pdb_file_lines = []
+                for pdb_line in pdb_file:
+                    for dssp_line in dssp_indv_file_lines:
+                        if (pdb_line[22:27].strip() == dssp_line[5:11].strip()
+                            and pdb_line[21:22] == dssp_line[11:12]):
+                            new_pdb_file_lines.append('{}\n'.format(pdb_line))
+                            break
+
+            with open('DSSP_filtered_DSEQS/{}_{}.pdb'.format(pdb_code, count), 'w') as new_pdb_file:
+                for line in new_pdb_file_lines:
+                    new_pdb_file.write('{}\n'.format(line))
+
+            strand_number_list =
             strand_number_set = []
             for number in strand_number_list:
                 if number not in strand_number_set and number != '':
@@ -576,10 +615,11 @@ class beta_structure_dssp_classification():
                     chain = dssp_df_strand['CHAIN'][row]
                     res_num = dssp_df_strand['RESNUM'][row]
                     for line in pdb_file_lines:
-                        if line[21:22] == chain and line[22:27].replace(' ', '') == res_num:
+                        if line[21:22] == chain and line[22:27].strip() == res_num:
                             pdb_file.write('{}\n'.format(line))
                 pdb_file.write('TER\n'.ljust(80))
 
+    def merge_sheets(self):
         # Merges sheet names of sheets that share strands
         sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
         sheet_strands = []
@@ -684,37 +724,3 @@ class beta_structure_dssp_classification():
             plt.savefig('{}_sheet_{}_network.png'.format(self.pdb_name, sheet))
 
             # Identify strands as nodes
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
- g
