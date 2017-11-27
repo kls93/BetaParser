@@ -70,8 +70,8 @@ class select_beta_structures():
         domain_pdb_ids = []
         domain_chains = []
         domain_cathcodes = []
-        domain_dseqs = []
         domain_ids = []
+        domain_dseqs = []
         domain_sseqs = []
         domain_sseqs_start_stop = []
         for domain in domains_description:
@@ -120,12 +120,12 @@ class select_beta_structures():
                 domain_sseqs_start_stop.append(sseqs_start_stop_list)
 
         domain_df = pd.DataFrame({'PDB_CODE': domain_pdb_ids,
-                                    'CHAIN': domain_chains,
-                                    'CATHCODE': domain_cathcodes,
-                                    'DOMAIN_ID': domain_ids,
-                                    'DSEQS': domain_dseqs,
-                                    'SSEQS': domain_sseqs,
-                                    'SSEQS_START_STOP': domain_sseqs_start_stop})
+                                  'CHAIN': domain_chains,
+                                  'CATHCODE': domain_cathcodes,
+                                  'DOMAIN_ID': domain_ids,
+                                  'DSEQS': domain_dseqs,
+                                  'SSEQS': domain_sseqs,
+                                  'SSEQS_START_STOP': domain_sseqs_start_stop})
 
         return domain_df
 
@@ -161,7 +161,7 @@ class filter_beta_structure():
             cwd = os.getcwd()
             os.chdir('/{}/{}'.format(self.pdb_database, middle_characters))
 
-            filtered_pdb_lines = []
+            header_pdb_lines = []
             try:
                 with open('{}.pdb'.format(self.domain_df['PDB_CODE'][row]), 'r') as pdb_file:
                     remark_end = False
@@ -172,7 +172,7 @@ class filter_beta_structure():
                         if remark_end is True:
                             break
                         else:
-                            filtered_pdb_lines.append(line)
+                            header_pdb_lines.append(line)
             except FileNotFoundError:
                 unprocessed_list_1.append(self.domain_df['PDB_CODE'][row])
 
@@ -180,14 +180,14 @@ class filter_beta_structure():
 
             resolution = 0
             rfactor = 0
-            for line in filtered_pdb_lines:
+            for line in header_pdb_lines:
                 whitespace_remv_line = line.replace(' ', '')
                 if whitespace_remv_line.startswith('EXPDTA'):
                     if not any(x in whitespace_remv_line for x in ['XRAYDIFFRACTION', 'X-RAYDIFFRACTION']):
                         unprocessed_list_2.append(self.domain_df['PDB_CODE'][row])
                         break
                 elif (whitespace_remv_line.startswith('REMARK2')
-                    and 'ANGSTROMS' in whitespace_remv_line):
+                    and 'ANGSTROM' in whitespace_remv_line):
                         try:
                             resolution = float(line[23:30])
                         except:
@@ -210,7 +210,7 @@ class filter_beta_structure():
                 resolution_list.append(resolution)
                 rfactor_list.append(rfactor)
 
-        filtered_domain_df_part_1 = self.domain_df.loc[self.domain_df['PDB_CODE'].isin(processed_list)]
+        filtered_domain_df_part_1 = self.domain_df[self.domain_df['PDB_CODE'].isin(processed_list)]
         filtered_domain_df_part_1 = filtered_domain_df_part_1.reset_index(drop=True)
         filtered_domain_df_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
                                                     'RFACTOR': rfactor_list})
@@ -220,16 +220,15 @@ class filter_beta_structure():
 
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'w') as unprocessed_file:
             unprocessed_file.write('PDB accession code not in PDB database '
-                                   '(downloaded24/11/2017):\n')
+                                   '(downloaded 24/11/2017):\n')
             unprocessed_list_1 = set(unprocessed_list_1)
             for pdb in unprocessed_list_1:
                 unprocessed_file.write('{}\n'.format(pdb))
 
-            unprocessed_file.write('Not solved by X-ray diffraction\n'
-                                   'OR\n'
-                                   'Failed to extract value for resolution\n'
-                                   'OR\n'
-                                   'Failed to extract value for Rfactor (working value)\n')
+            unprocessed_file.write('\n\nNot solved by X-ray diffraction OR '
+                                   'failed to extract value for resolution OR '
+                                   'failed to extract value for Rfactor '
+                                   '(working value)\n')
             unprocessed_list_2 = set(unprocessed_list_2)
             for pdb in unprocessed_list_2:
                 unprocessed_file.write('{}\n'.format(pdb))
@@ -238,9 +237,9 @@ class filter_beta_structure():
     # Generates list of beta-structure chain entries for sequence redundancy
     # filtering using the cd_hit web server
     def gen_cd_hit_list(self, filtered_domain_df):
-        fasta = filtered_domain_df.DSEQS.tolist()
-        pdb_ids = filtered_domain_df.PDB_CODE.tolist()
-        pdb_chains = filtered_domain_df.CHAIN.tolist()
+        fasta = filtered_domain_df['DSEQS'].tolist()
+        pdb_ids = filtered_domain_df['PDB_CODE'].tolist()
+        pdb_chains = filtered_domain_df['CHAIN'].tolist()
 
         fasta_copy = copy.copy(fasta)
         fasta_repeat = []
@@ -256,11 +255,11 @@ class filter_beta_structure():
         pdb_ids = [pdb_id for pdb_id in pdb_ids if pdb_id is not None]
         pdb_chains = [chain for chain in pdb_chains if chain is not None]
 
-        count = len(fasta)
         with open(
-            'CATH_{}_{}_{}_domain_chain_entries_for_CD_HIT.txt'.format(self.run, self.resn, self.rfac), 'w'
+            'CATH_{}_resn_{}_rfac_{}_domain_chain_entries_for_CD_HIT.txt'.format(
+            self.run, self.resn, self.rfac), 'w'
             ) as chain_entries_file:
-            for num in range(count):
+            for num in range(len(fasta)):
                 chain_entries_file.write('>{}_{}\n'.format(pdb_ids[num], pdb_chains[num]))
                 chain_entries_file.write('{}\n'.format(fasta[num]))
 
@@ -412,8 +411,7 @@ class extract_beta_structure_coords():
         # the PDB file downloaded from the RCSB website in the unprocessed
         # structures file
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'a') as unprocessed_file:
-            unprocessed_file.write('\n\n')
-            unprocessed_file.write('Dissimilar coordinates:\n')
+            unprocessed_file.write('\n\nDissimilar coordinates:\n')
             for pdb_file in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(pdb_file))
 
@@ -444,7 +442,7 @@ class filter_dssp_database():
         if os.path.isdir('DSSP_files'):
             shutil.rmtree('DSSP_files')
         os.mkdir('DSSP_files')
-        pdb_list = cd_hit_domain_df_xyz.PDB_CODE.tolist()
+        pdb_list = cd_hit_domain_df_xyz['PDB_CODE'].tolist()
 
         # Copies DSSP files of listed PDB accession codes to current working
         # directory
@@ -464,8 +462,7 @@ class filter_dssp_database():
 
         # Writes PDB accession codes that could not be processed to output file
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'a') as unprocessed_file:
-            unprocessed_file.write('\n\n')
-            unprocessed_file.write('Not in DSSP database:\n')
+            unprocessed_file.write('\n\nNot in DSSP database:\n')
             for pdb_code in unprocessed_list:
                 unprocessed_file.write('{}\n'.format(pdb_code))
 
@@ -477,7 +474,7 @@ class filter_dssp_database():
         return dssp_domain_df
 
 
-class beta_structure_dssp_classification():
+class beta_structure_dssp_classification():  # Start checking here!
 
     def __init__(self, run, resn, rfac):
         self.run = run

@@ -6,32 +6,23 @@ from Subroutines import extract_beta_structure_coords
 prompt = '> '
 
 # Determines whether user wants to analyse beta-barrels or beta-sandwiches
-print('Beta-sandwiches or beta-barrels?')
-structure_type = input(prompt).lower()
-if structure_type in ['beta-barrels', 'barrels']:
-    run = '2.40'
-elif structure_type in ['beta-sandwiches', 'sandwiches']:
-    run = '2.60'
-else:
-    for char in structure_type:
-        if char.isdigit():
-            run = structure_type
-            break
+print('Specify CATHCODE')
+run = input(prompt)
 
 # Determines the absolute file path of the domain directory
-print('Specify absolute file path of working directory')
+print('Specify absolute file path of working directory:')
 directory = input(prompt)
 os.chdir('/{}/CATH_{}'.format(directory.strip('/'), run))
 
 # Determines the absolute file path of the (locally saved) PDB database
-print('Specify absolute file path of PDB database')
+print('Specify absolute file path of PDB database:')
 pdb_database = '{}'.format(input(prompt).strip('/'))
 
 # Specifies the resolution and Rfactor (working value) cutoffs used in previous
 # steps
-print('Select resolution cutoff')
+print('Select resolution cutoff:')
 resn = float(input(prompt))
-print('Select Rfactor (working value) cutoff')
+print('Select Rfactor (working value) cutoff:')
 rfac = float(input(prompt))
 
 # Loads the dataframe generated in previous steps
