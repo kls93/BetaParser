@@ -24,7 +24,7 @@ os.chdir('{}'.format(directory))
 
 # Determines the absolute file path of the (locally saved) PDB database
 print('Specify absolute file path of PDB database')
-pdb_database = input(prompt)
+pdb_database = '{}'.format(input(prompt).strip('/'))
 
 # Generates a list of the domain descriptions provided in
 # CATH_domain_description_v_4_2_0.txt. Then filters the domain descriptions

@@ -21,11 +21,11 @@ else:
 # Determines the absolute file path of the domain directory
 print('Specify absolute file path of working directory')
 directory = input(prompt)
-os.chdir('{}'.format(directory))
+os.chdir('/{}/CATH_{}'.format(directory.strip('/'), run))
 
 # Determines the absolute file path of the (locally saved) PDB database
 print('Specify absolute file path of PDB database')
-pdb_database = input(prompt)
+pdb_database = '{}'.format(input(prompt).strip('/'))
 
 # Specifies the resolution and Rfactor (working value) cutoffs used in previous
 # steps
