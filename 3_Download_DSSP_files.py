@@ -52,7 +52,7 @@ dssp_domain_df, dssp_residues_dict = beta_structure.extract_dssp_file_lines(
     )
 
 shutil.rmtree('DSSP_files')
-
+"""
 if os.path.isdir('DSSP_filtered_DSEQS'):
     shutil.rmtree('DSSP_filtered_DSEQS')
 os.mkdir('DSSP_filtered_DSEQS')
@@ -63,13 +63,8 @@ beta_structure.write_dssp_sec_struct_pdb(dssp_residues_dict=dssp_residues_dict)
 # Combines the beta-strands into sheets and translates the identified
 # beta-strand interactions into a network
 beta_structure = manipulate_beta_structure()
-beta_structure.merge_sheets(dssp_residues_dict=dssp_residues_dict,
-    dssp_domain_df=dssp_domain_df
-    )
-beta_structure.identify_strand_interactions(
-    dssp_residues_dict=dssp_residues_dict, dssp_domain_df=dssp_domain_df
-    )
+beta_structure.merge_sheets(dssp_residues_dict=dssp_residues_dict)
+beta_structure.identify_strand_interactions(dssp_residues_dict=dssp_residues_dict)
 
 # Idetifies strand interactions from the networks generated in previous steps
 # beta_structure = manipulate_beta_network()
-"""

@@ -511,7 +511,7 @@ class filter_dssp_database():
 
         # Filters cd_hit_domain_df_xyz to remove entries not in the DSSP
         # database
-        dssp_domain_df = cd_hit_domain_df_xyz[~cd_hit_domain_df_xyz['PDB_CODE'].isin(unprocessed_list)]
+        dssp_domain_df = cd_hit_domain_df[~cd_hit_domain_df['PDB_CODE'].isin(unprocessed_list)]
         dssp_domain_df = dssp_domain_df.reset_index(drop=True)
 
         return dssp_domain_df
@@ -623,17 +623,17 @@ class beta_structure_dssp_classification():  # Start checking here!
             pdb_df = pd.read_pickle('CD_HIT_DSEQS/{}.pkl'.format(domain_id))
             row_num = pdb_df.shape[0]
 
-            dssp_num_extnd_df = ['']*len(row_num)
-            secondary_structure_assignment_extnd_df = ['']*len(row_num)
-            strand_number_list_extnd_df = ['']*len(row_num)
-            sheet_number_list_extnd_df = ['']*len(row_num)
-            orientation_list_extnd_df = ['']*len(row_num)
-            bridge_pair_list_extnd_df = ['']*len(row_num)
+            dssp_num_extnd_df = ['']*row_num
+            secondary_structure_assignment_extnd_df = ['']*row_num
+            strand_number_list_extnd_df = ['']*row_num
+            sheet_number_list_extnd_df = ['']*row_num
+            orientation_list_extnd_df = ['']*row_num
+            bridge_pair_list_extnd_df = ['']*row_num
 
             for row in range(row_num):
                 if pdb_df['ATMNAME'][row] == 'N':
                     for index, line in enumerate(res_num):
-                        if ((pdb_df['RESNUM'][row].strip()+pdb_df['INSCODE'].strip()) == res_num[index]
+                        if ((str(pdb_df['RESNUM'][row])+pdb_df['INSCODE'][row]) == res_num[index]
                             and pdb_df['CHAIN'][row] == chain[index]
                             ):
                             dssp_num_extnd_df[row] = dssp_num[index]
@@ -656,11 +656,14 @@ class beta_structure_dssp_classification():  # Start checking here!
             dssp_df = dssp_df[cols]
 
             extnd_df = pd.concat([pdb_df, dssp_df], axis=1)
+            extnd_df.to_pickle('CD_HIT_DSEQS/{}_extnd.pkl'.format(domain_id))
 
-            extnd_df.to_pickle('CD_HIT_DSEQS/{}.pkl'.format(domain_id))
-            filtered_extnd_df = extnd_df[extnd_df['SHEET?']=='E']
+            retained_chains = extnd_df[extnd_df['SHEET?']=='E']['CHAIN'].tolist()
+            retained_resnum = extnd_df[extnd_df['SHEET?']=='E']['RESNUM'].tolist()
+            filtered_extnd_df = extnd_df[extnd_df['CHAIN'].isin(retained_chains)
+                                         & extnd_df['RESNUM'].isin(retained_resnum)]
             filtered_extnd_df = filtered_extnd_df.reset_index(drop=True)
-            filtered_extnd_df.to_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
+            filtered_extnd_df.to_pickle('DSSP_filtered_DSEQS/{}_extnd_dssp.pkl'.format(domain_id))
 
     def write_dssp_sec_struct_pdb(self, dssp_residues_dict):
         # Writes a PDB file of the residues that DSSP classifies as forming a
@@ -669,38 +672,34 @@ class beta_structure_dssp_classification():  # Start checking here!
         for domain_id in list(dssp_residues_dict.keys()):
             print('Writing PDB file of beta-strands in {}'.format(domain_id))
 
-            dssp_df = pd.read_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
+            dssp_df = pd.read_pickle('DSSP_filtered_DSEQS/{}_extnd_dssp.pkl'.format(domain_id))
             strand_number_set = [strand for strand in set(dssp_df['STRAND_NUM'].tolist())
                                  if strand != '']
 
-            with open('CD_HIT_DSEQS_PDB_files/{}.pdb'.format(domain_id), 'r') as pdb_file:
+            with open('CD_HIT_DSEQS/{}.pdb'.format(domain_id), 'r') as pdb_file:
                 pdb_file_lines = [line.strip('\n') for line in pdb_file
                                   if line[0:6].strip() in ['ATOM', 'HETATM']]
 
-            with open('DSSP_filtered_DSEQS/{}.pdb'.format(domain_id), 'w') as new_pdb_file:
+            with open('DSSP_filtered_DSEQS/{}_dssp.pdb'.format(domain_id), 'w') as new_pdb_file:
                 for strand in strand_number_set:
                     dssp_df_strand = dssp_df[dssp_df['STRAND_NUM']==strand]
                     dssp_df_strand = dssp_df_strand.reset_index(drop=True)
                     for row in range(dssp_df_strand.shape[0]):
                         chain = dssp_df_strand['CHAIN'][row]
-                        res_num = (dssp_df_strand['RESNUM'][row]+dssp_df_strand['INSCODE'][row])
+                        res_num = (str(dssp_df_strand['RESNUM'][row])+dssp_df_strand['INSCODE'][row])
                         for line in pdb_file_lines:
                             if line[21:22] == chain and line[22:27].strip() == res_num:
                                 new_pdb_file.write('{}\n'.format(line))
-                    new_pdb_file.write('TER\n'.ljust(80))
+                    new_pdb_file.write('TER'.ljust(80)+'\n')
 
 
 class manipulate_beta_structure():
 
-    def merge_sheets(self, dssp_residues_dict, dssp_domain_df):
+    def merge_sheets(self, dssp_residues_dict):
         # Merges sheet names of sheets that share strands
-        domain_ids = dssp_domain_df['DOMAIN_ID'].tolist()
-
-        for pdb_code in dssp_residues_dict:
-            index = list(dssp_residues_dict.keys()).index('{}'.format(pdb_code))
-            domain_id = domain_ids[index]
-
-            dssp_df = pd.read_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
+        for domain_id in list(dssp_residues_dict.keys()):
+            dssp_df = pd.read_pickle('DSSP_filtered_DSEQS/{}_extnd_dssp.pkl'.format(domain_id))
+            print('Merging sheets that share beta-strands in {}'.format(domain_id))
 
             sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
             sheet_strands = []
@@ -719,12 +718,12 @@ class manipulate_beta_structure():
                 count_2 = 1
                 sheet_strands_copy = copy.copy(sheet_strands)
                 for index in range(0, len(sheet_strands)):
-                    if count_1 != index:
+                    if count_1 != index and strands != '':
                         intersect = set(strands).intersection(set(sheet_strands[index]))
                         if len(intersect) > 0:
                             sheet_strands_copy[count_1] = list(set(sheet_strands[count_1])|set(sheet_strands[index]))
                             sheet_strands_copy[index] = ''
-                            sheet_strands = [x for x in sheet_strands_copy if x != '']
+                            sheet_strands = sheet_strands_copy
                             break
                         elif len(intersect) == 0:
                             count_2 = count_2 + 1
@@ -733,25 +732,21 @@ class manipulate_beta_structure():
                     count_2 = 0
                     count_1 = count_1 + 1
 
+            sheet_strands = [strands for strands in sheet_strands if strands != '']
+
             for row in range(dssp_df.shape[0]):
                 for strands in sheet_strands:
                     if str(dssp_df['STRAND_NUM'][row]) in strands:
-                        dssp_df['SHEET_NUM'][row] = (sheet_strands.index(strands)+1)
+                        dssp_df.loc[row, 'SHEET_NUM'] = (sheet_strands.index(strands)+1)
                         break
-            dssp_df.to_pickle('DSSP_filtered_DSEQS/{}_{}.pkl'.format(pdb_code,
-                                                                     domain_id))
+            dssp_df.to_pickle('DSSP_filtered_DSEQS/{}_merged_strands.pkl'.format(domain_id))
 
-    def identify_strand_interactions(self, dssp_residues_dict, dssp_domain_df):
+    def identify_strand_interactions(self, dssp_residues_dict):
         # Separates the beta-strands identified by DSSP into sheets, and works
         # out the strand interactions and thus loop connections both within and
         # between sheets
-        domain_ids = dssp_domain_df['DOMAIN_ID'].tolist()
-
-        for pdb_code in dssp_residues_dict:
-            index = list(dssp_residues_dict.keys()).index('{}'.format(pdb_code))
-            domain_id = domain_ids[index]
-
-            dssp_df = pd.read_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
+        for domain_id in list(dssp_residues_dict.keys()):
+            dssp_df = pd.read_pickle('DSSP_filtered_DSEQS/{}_merged_strands.pkl'.format(domain_id))
 
             sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
             for sheet in sheets:
