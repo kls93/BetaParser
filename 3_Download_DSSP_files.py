@@ -28,15 +28,19 @@ print('Select Rfactor (working value) cutoff:')
 rfac = float(input(prompt))
 
 # Makes a list of PDB accession codes from the CD-HIT filtered dataframe
-cd_hit_domain_df_xyz = pd.read_pickle(
-    'CATH_{}_resn_{}_rfac_{}_filtered_xyz.pkl'.format(run, resn, rfac)
+cd_hit_domain_df = pd.read_pickle(
+    'CATH_{}_resn_{}_rfac_{}_filtered.pkl'.format(run, resn, rfac)
     )
 
 # Copies required DSSP files from database (on hard drive) to local machine
+if os.path.isdir('DSSP_files'):
+    shutil.rmtree('DSSP_files')
+os.mkdir('DSSP_files')
+
 filtered_files = filter_dssp_database(run=run, resn=resn, rfac=rfac,
                                       dssp_database=dssp_database)
 dssp_domain_df = filtered_files.copy_files_from_dssp_database(
-    cd_hit_domain_df_xyz=cd_hit_domain_df_xyz
+    cd_hit_domain_df=cd_hit_domain_df
     )
 
 # Extracts beta-strands (as classified by DSSP) from the beta-structure domains
@@ -47,17 +51,15 @@ dssp_domain_df, dssp_residues_dict = beta_structure.extract_dssp_file_lines(
     dssp_domain_df=dssp_domain_df
     )
 
+shutil.rmtree('DSSP_files')
+
 if os.path.isdir('DSSP_filtered_DSEQS'):
     shutil.rmtree('DSSP_filtered_DSEQS')
 os.mkdir('DSSP_filtered_DSEQS')
 
-beta_structure.get_dssp_sec_struct_df(dssp_residues_dict=dssp_residues_dict,
-    dssp_domain_df=dssp_domain_df
-    )
-beta_structure.write_dssp_sec_struct_pdb(dssp_residues_dict=dssp_residues_dict,
-    dssp_domain_df=dssp_domain_df
-    )
-
+beta_structure.get_dssp_sec_struct_df(dssp_residues_dict=dssp_residues_dict)
+beta_structure.write_dssp_sec_struct_pdb(dssp_residues_dict=dssp_residues_dict)
+"""
 # Combines the beta-strands into sheets and translates the identified
 # beta-strand interactions into a network
 beta_structure = manipulate_beta_structure()
@@ -70,3 +72,4 @@ beta_structure.identify_strand_interactions(
 
 # Idetifies strand interactions from the networks generated in previous steps
 # beta_structure = manipulate_beta_network()
+"""

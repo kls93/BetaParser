@@ -308,13 +308,26 @@ class extract_beta_structure_coords():
         # Extends the filtered (for resolution, R_factor (working value) and
         # sequence redundancy) dataframe to list the xyz coordinates of each
         # segment sequence (SSEQS)
-        domain_xyz = []
         domain_residue_list = []
         unprocessed_list = []
 
         for row in range(cd_hit_domain_df.shape[0]):
-            xyz_segments = []
             residue_list = []
+            rec = []
+            atmnum = []
+            atmname = []
+            conformer = []
+            resname = []
+            chain = []
+            resnum = []
+            insertion = []
+            xpos = []
+            ypos = []
+            zpos = []
+            occ = []
+            bfac = []
+            element = []
+            charge = []
 
             # Downloads PDB file of the structure from the RCSB website
             print('{}'.format((row/cd_hit_domain_df.shape[0])*100))
@@ -373,37 +386,71 @@ class extract_beta_structure_coords():
                             ):
                                 stop_seq = True
 
-                xyz = []
                 sequence_identified = False
                 for index_3, sequence in enumerate(sequences):
                     similarity = SequenceMatcher(a=segment, b=sequence).ratio()
                     if similarity > 0.95:
                         sequence_identified = True
-                        pdb_file = open('CD_HIT_DSEQS_PDB_files/{}.pdb'.format(
+
+                        pdb_file = open('CD_HIT_DSEQS/{}.pdb'.format(
                             cd_hit_domain_df['DOMAIN_ID'][row]), 'a')
+
                         for index_4 in indices[index_3]:
-                            pdb_file.write('{}\n'.format(pdb_file_lines[index_4]))
-                            x = float(pdb_file_lines[index_4][30:38].strip())
-                            y = float(pdb_file_lines[index_4][38:46].strip())
-                            z = float(pdb_file_lines[index_4][46:54].strip())
-                            xyz.append([x, y, z])
                             residue_list.append(pdb_file_lines[index_4][21:27].replace(' ', ''))
+
+                            pdb_file.write('{}\n'.format(pdb_file_lines[index_4]))
+
+                            rec.append(pdb_file_lines[index_4][0:6].strip())
+                            atmnum.append(int(pdb_file_lines[index_4][6:11].strip()))
+                            atmname.append(pdb_file_lines[index_4][12:16].strip())
+                            conformer.append(pdb_file_lines[index_4][16:17].strip())
+                            resname.append(pdb_file_lines[index_4][17:20].strip())
+                            chain.append(pdb_file_lines[index_4][21:22].strip())
+                            resnum.append(int(pdb_file_lines[index_4][22:26].strip()))
+                            insertion.append(pdb_file_lines[index_4][26:27].strip())
+                            xpos.append(float(pdb_file_lines[index_4][30:38].strip()))
+                            ypos.append(float(pdb_file_lines[index_4][38:46].strip()))
+                            zpos.append(float(pdb_file_lines[index_4][46:54].strip()))
+                            occ.append(float(pdb_file_lines[index_4][54:60].strip()))
+                            bfac.append(float(pdb_file_lines[index_4][60:66].strip()))
+                            element.append(pdb_file_lines[index_4][76:78].strip())
+                            charge.append(pdb_file_lines[index_4][78:80].strip())
+
                         pdb_file.write('TER'.ljust(80)+'\n')
                         pdb_file.close()
-                        xyz_segments.append(xyz)
                         break
+
+                pdb_df = pd.DataFrame({'REC': rec,
+                                       'ATMNUM': atmnum,
+                                       'ATMNAME': atmname,
+                                       'CONFORMER': conformer,
+                                       'RESNAME': resname,
+                                       'CHAIN': chain,
+                                       'RESNUM': resnum,
+                                       'INSCODE': insertion,
+                                       'XPOS': xpos,
+                                       'YPOS': ypos,
+                                       'ZPOS': zpos,
+                                       'OCC': occ,
+                                       'BFAC': bfac,
+                                       'ELEMENT': element,
+                                       'CHARGE': charge})
+                cols = pdb_df.columns.tolist()
+                cols = ([cols[9]] + [cols[1]] + [cols[0]] + [cols[5]]
+                        + [cols[10]] + [cols[3]] + [cols[11]] + [cols[7]]
+                        + [cols[12]] + [cols[13]] + [cols[14]] + [cols[8]]
+                        + [cols[2]] + [cols[6]] + [cols[4]])
+                pdb_df = pdb_df[cols]
+                pdb_df.to_pickle('CD_HIT_DSEQS/{}.pkl'.format(cd_hit_domain_df['DOMAIN_ID'][row]))
 
                 if sequence_identified is False:
                     unprocessed_list.append('{}\n'.format(cd_hit_domain_df['DOMAIN_ID'][row]))
-                    xyz_segments.append(xyz)
-
-            domain_xyz.append(xyz_segments)
 
             chain_num_list = []
             for chain_num in residue_list:
                 if chain_num not in chain_num_list:
                     chain_num_list.append(chain_num)
-            domain_residue_list.append(residue_list)
+            domain_residue_list.append(chain_num_list)
 
         # Lists all segment sequences that could not be processed owing to
         # insufficient similarity between the FASTA sequence listed in the
@@ -416,13 +463,12 @@ class extract_beta_structure_coords():
                 unprocessed_file.write('{}\n'.format(pdb_file))
 
         # Appends xyz coordinates column to dataframe
-        domain_xyz = pd.DataFrame({'XYZ': domain_xyz,
-                                   'CHAIN_NUM': domain_residue_list})
-        cd_hit_domain_df_xyz = pd.concat([cd_hit_domain_df, domain_xyz], axis=1)
-        cd_hit_domain_df_xyz.to_csv('CATH_{}_resn_{}_rfac_{}_filtered_xyz.csv'.format(
+        domain_residue_df = pd.DataFrame({'CHAIN_NUM': domain_residue_list})
+        cd_hit_domain_df = pd.concat([cd_hit_domain_df, domain_residue_df], axis=1)
+        cd_hit_domain_df.to_csv('CATH_{}_resn_{}_rfac_{}_filtered.csv'.format(
             self.run, self.resn, self.rfac)
             )
-        cd_hit_domain_df_xyz.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered_xyz.pkl'.format(
+        cd_hit_domain_df.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered.pkl'.format(
             self.run, self.resn, self.rfac)
             )
 
@@ -436,13 +482,10 @@ class filter_dssp_database():
         self.dssp_database = dssp_database
 
 
-    def copy_files_from_dssp_database(self, cd_hit_domain_df_xyz):
+    def copy_files_from_dssp_database(self, cd_hit_domain_df):
         # Generates list of all PDB accession codes to be extracted from the
         # DSSP database
-        if os.path.isdir('DSSP_files'):
-            shutil.rmtree('DSSP_files')
-        os.mkdir('DSSP_files')
-        pdb_list = cd_hit_domain_df_xyz['PDB_CODE'].tolist()
+        pdb_list = cd_hit_domain_df['PDB_CODE'].tolist()
 
         # Copies DSSP files of listed PDB accession codes to current working
         # directory
@@ -489,8 +532,7 @@ class beta_structure_dssp_classification():  # Start checking here!
 
         for row in range(dssp_domain_df.shape[0]):
             dssp_indv_file_lines = []
-            chain_num_list = [chain_num for chain_num in
-                              set(dssp_domain_df['CHAIN_NUM'][row])]
+            chain_num_list = dssp_domain_df['CHAIN_NUM'][row]
 
             with open('DSSP_files/{}.dssp'.format(dssp_domain_df['PDB_CODE'][row]), 'r') as dssp_file:
                 print('Processing {}.dssp'.format(dssp_domain_df['PDB_CODE'][row]))
@@ -505,41 +547,35 @@ class beta_structure_dssp_classification():  # Start checking here!
                 dssp_indv_file_lines.append('TER'.ljust(136))
                 dssp_file_lines.append(dssp_indv_file_lines)
             elif len(chain_num_list) > 0:
-                unprocessed_list.append(dssp_domain_df['PDB_CODE'][row])
+                unprocessed_list.append(dssp_domain_df['DOMAIN_ID'][row])
 
         # Writes PDB accession codes that could not be processed to output file
         with open('Unprocessed_CATH_{}_PDB_files.txt'.format(self.run), 'a') as unprocessed_file:
             unprocessed_file.write('\n\n')
             unprocessed_file.write('Coordinates missing from DSSP file:\n')
-            for pdb_code in unprocessed_list:
-                unprocessed_file.write('{}\n'.format(pdb_code))
+            for domain_id in unprocessed_list:
+                unprocessed_file.write('{}\n'.format(domain_id))
 
         # Filters dssp_domain_df to remove entries whose DSSP files have
         # coordinates missing
-        dssp_domain_df = dssp_domain_df[~dssp_domain_df['PDB_CODE'].isin(unprocessed_list)]
+        dssp_domain_df = dssp_domain_df[~dssp_domain_df['DOMAIN_ID'].isin(unprocessed_list)]
         dssp_domain_df = dssp_domain_df.reset_index(drop=True)
 
         dssp_residues_dict = OrderedDict()
         for index, sub_list in enumerate(dssp_file_lines):
-            if sub_list != '':
-                dssp_residues_dict[dssp_domain_df['PDB_CODE'][index]] = sub_list
+            dssp_residues_dict[dssp_domain_df['DOMAIN_ID'][index]] = sub_list
 
         return dssp_domain_df, dssp_residues_dict
 
-    def get_dssp_sec_struct_df(self, dssp_residues_dict, dssp_domain_df):
+    def get_dssp_sec_struct_df(self, dssp_residues_dict):
         # Generates dataframe of relevant information in DSSP file
-        domain_ids = dssp_domain_df['DOMAIN_ID'].tolist()
+        for domain_id in list(dssp_residues_dict.keys()):
+            dssp_indv_file_lines = dssp_residues_dict[domain_id]
 
-        for pdb_code in dssp_residues_dict:
-            index_1 = list(dssp_residues_dict.keys()).index('{}'.format(pdb_code))
-            domain_id = domain_ids[index_1]
-
-            dssp_indv_file_lines = dssp_residues_dict[pdb_code]
-
-            print('Generating dataframe summarising DSSP info for {}'.format(pdb_code))
+            print('Generating dataframe summarising DSSP info for {}'.format(domain_id))
 
             res_num = []
-            chains = []
+            chain = []
             dssp_num = []
             secondary_structure_assignment = []
             strand_number = 1
@@ -551,7 +587,7 @@ class beta_structure_dssp_classification():  # Start checking here!
             for index_2, line in enumerate(dssp_indv_file_lines):
                 if not line.startswith('TER'):
                     res_num.append(line[5:11].strip())
-                    chains.append(line[11:12])
+                    chain.append(line[11:12])
                     dssp_num.append(line[0:5].strip())
                     secondary_structure = line[16:17]
                     if secondary_structure == 'E':
@@ -584,28 +620,54 @@ class beta_structure_dssp_classification():  # Start checking here!
                         orientation_list.append(['', ''])
                         bridge_pair_list.append(['', ''])
 
-            dssp_df = pd.DataFrame({'RESNUM': res_num,
-                                    'CHAIN': chains,
-                                    'DSSP_NUM': dssp_num,
-                                    'SHEET?': secondary_structure_assignment,
-                                    'STRAND_NUM': strand_number_list,
-                                    'SHEET_NUM': sheet_number_list,
-                                    'ORIENTATION': orientation_list,
-                                    'H-BONDS': bridge_pair_list})
+            pdb_df = pd.read_pickle('CD_HIT_DSEQS/{}.pkl'.format(domain_id))
+            row_num = pdb_df.shape[0]
 
-            dssp_df.to_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
+            dssp_num_extnd_df = ['']*len(row_num)
+            secondary_structure_assignment_extnd_df = ['']*len(row_num)
+            strand_number_list_extnd_df = ['']*len(row_num)
+            sheet_number_list_extnd_df = ['']*len(row_num)
+            orientation_list_extnd_df = ['']*len(row_num)
+            bridge_pair_list_extnd_df = ['']*len(row_num)
 
-    def write_dssp_sec_struct_pdb(self, dssp_residues_dict, dssp_domain_df):
+            for row in range(row_num):
+                if pdb_df['ATMNAME'][row] == 'N':
+                    for index, line in enumerate(res_num):
+                        if ((pdb_df['RESNUM'][row].strip()+pdb_df['INSCODE'].strip()) == res_num[index]
+                            and pdb_df['CHAIN'][row] == chain[index]
+                            ):
+                            dssp_num_extnd_df[row] = dssp_num[index]
+                            secondary_structure_assignment_extnd_df[row] = secondary_structure_assignment[index]
+                            strand_number_list_extnd_df[row] = strand_number_list[index]
+                            sheet_number_list_extnd_df[row] = sheet_number_list[index]
+                            orientation_list_extnd_df[row] = orientation_list[index]
+                            bridge_pair_list_extnd_df[row] = bridge_pair_list[index]
+                            break
+
+            dssp_df = pd.DataFrame({'DSSP_NUM': dssp_num_extnd_df,
+                                    'SHEET?': secondary_structure_assignment_extnd_df,
+                                    'STRAND_NUM': strand_number_list_extnd_df,
+                                    'SHEET_NUM': sheet_number_list_extnd_df,
+                                    'ORIENTATION': orientation_list_extnd_df,
+                                    'H-BONDS': bridge_pair_list_extnd_df})
+            cols = dssp_df.columns.tolist()
+            cols = ([cols[0]] + [cols[3]] + [cols[5]] + [cols[4]] + [cols[2]]
+                    + [cols[1]])
+            dssp_df = dssp_df[cols]
+
+            extnd_df = pd.concat([pdb_df, dssp_df], axis=1)
+
+            extnd_df.to_pickle('CD_HIT_DSEQS/{}.pkl'.format(domain_id))
+            filtered_extnd_df = extnd_df[extnd_df['SHEET?']=='E']
+            filtered_extnd_df = filtered_extnd_df.reset_index(drop=True)
+            filtered_extnd_df.to_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
+
+    def write_dssp_sec_struct_pdb(self, dssp_residues_dict):
         # Writes a PDB file of the residues that DSSP classifies as forming a
         # beta-strand (secondary structure code = 'E'). Individual beta-strands
         # are separated by 'TER' cards
-        domain_ids = dssp_domain_df['DOMAIN_ID'].tolist()
-
-        for pdb_code in dssp_residues_dict:
-            index = list(dssp_residues_dict.keys()).index('{}'.format(pdb_code))
-            domain_id = domain_ids[index]
-
-            print('Writing PDB file of beta-strands in {}'.format(pdb_code))
+        for domain_id in list(dssp_residues_dict.keys()):
+            print('Writing PDB file of beta-strands in {}'.format(domain_id))
 
             dssp_df = pd.read_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
             strand_number_set = [strand for strand in set(dssp_df['STRAND_NUM'].tolist())
@@ -617,10 +679,11 @@ class beta_structure_dssp_classification():  # Start checking here!
 
             with open('DSSP_filtered_DSEQS/{}.pdb'.format(domain_id), 'w') as new_pdb_file:
                 for strand in strand_number_set:
-                    dssp_df_strand = dssp_df[dssp_df['STRAND_NUM']==strand].reset_index(drop=True)
+                    dssp_df_strand = dssp_df[dssp_df['STRAND_NUM']==strand]
+                    dssp_df_strand = dssp_df_strand.reset_index(drop=True)
                     for row in range(dssp_df_strand.shape[0]):
                         chain = dssp_df_strand['CHAIN'][row]
-                        res_num = dssp_df_strand['RESNUM'][row]
+                        res_num = (dssp_df_strand['RESNUM'][row]+dssp_df_strand['INSCODE'][row])
                         for line in pdb_file_lines:
                             if line[21:22] == chain and line[22:27].strip() == res_num:
                                 new_pdb_file.write('{}\n'.format(line))

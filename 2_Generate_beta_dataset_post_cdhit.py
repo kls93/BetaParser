@@ -34,7 +34,7 @@ filtered_domain_df = pd.read_pickle(
 beta_structure = extract_beta_structure_coords(run=run, resn=resn, rfac=rfac,
                                                pdb_database=pdb_database)
 cd_hit_domain_df = beta_structure.gen_cd_hit_dict(filtered_domain_df)
-if os.path.isdir('CD_HIT_DSEQS_PDB_files'):
-    shutil.rmtree('CD_HIT_DSEQS_PDB_files')
-os.mkdir('CD_HIT_DSEQS_PDB_files')
+if os.path.isdir('CD_HIT_DSEQS'):
+    shutil.rmtree('CD_HIT_DSEQS')
+os.mkdir('CD_HIT_DSEQS')
 beta_structure.get_xyz_coords(cd_hit_domain_df)
