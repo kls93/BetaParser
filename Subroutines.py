@@ -678,6 +678,7 @@ class beta_structure_dssp_classification():
             filtered_extnd_df = extnd_df[extnd_df['CHAIN'].isin(retained_chains)
                                          & extnd_df['RESNUM'].isin(retained_resnum)]
             filtered_extnd_df = filtered_extnd_df.reset_index(drop=True)
+            filtered_extnd_df.to_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
             dssp_dfs_dict[domain_id] = filtered_extnd_df
 
         return dssp_dfs_dict
@@ -711,60 +712,6 @@ class beta_structure_dssp_classification():
 
 
 class manipulate_beta_structure():
-
-    def merge_sheets(self, dssp_residues_dict, dssp_dfs_dict):
-        # Merges sheet names of sheets that share strands
-        dssp_dfs_merged_sheets_dict = OrderedDict()
-
-        for domain_id in list(dssp_residues_dict.keys()):
-            dssp_df = dssp_dfs_dict[domain_id]
-            print('Merging sheets that share beta-strands in {}'.format(domain_id))
-
-            sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
-            sheet_strands = []
-            for sheet in sheets:
-                locals()['sheet_{}_strands'.format(sheet)] = []
-                for strand in dssp_df[dssp_df['SHEET_NUM']==sheet]['STRAND_NUM'].tolist():
-                    if strand not in locals()['sheet_{}_strands'.format(sheet)]:
-                        locals()['sheet_{}_strands'.format(sheet)].append(strand)
-                sheet_strands.append(locals()['sheet_{}_strands'.format(sheet)])
-                del locals()['sheet_{}_strands'.format(sheet)]
-
-            sheet_strand_numbers = [strand for strands in sheet_strands for strand in strands]
-            count_1 = 0
-            while len(sheet_strand_numbers) != len(set(sheet_strand_numbers)):
-                strands = sheet_strands[count_1]
-                sheet_strands_copy = copy.copy(sheet_strands)
-
-                count_2 = 1
-                restart = True
-                while restart is True:
-                    strands = sheet_strands[count_1]
-                    for index in range(0, len(sheet_strands)):
-                        if index == len(sheet_strands) - 1:
-                            restart = False
-                        if count_1 != index and strands != '':
-                            intersect = set(strands).intersection(set(sheet_strands[index]))
-                            if len(intersect) > 0:
-                                sheet_strands_copy[count_1] = list(set(sheet_strands[count_1])|set(sheet_strands[index]))
-                                sheet_strands_copy[index] = ''
-                                sheet_strands = sheet_strands_copy
-                                restart = True
-
-                sheet_strand_numbers = [strand for strands in sheet_strands for strand in strands]
-
-            sheet_strands = [strands for strands in sheet_strands if len(strands) > 2]
-
-            for row in range(dssp_df.shape[0]):
-                for strands in sheet_strands:
-                    if str(dssp_df['STRAND_NUM'][row]) in strands:
-                        dssp_df.loc[row, 'SHEET_NUM'] = (sheet_strands.index(strands)+1)
-                        break
-
-            dssp_dfs_merged_sheets_dict[domain_id] = dssp_df
-            dssp_df.to_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
-
-        return dssp_dfs_merged_sheets_dict
 
     def identify_strand_interactions(self, dssp_residues_dict,
                                      dssp_dfs_dict):
@@ -831,17 +778,19 @@ class manipulate_beta_structure():
                 for pair in interacting_strands:
                     G.add_edge(pair[0], pair[1], attr=interacting_strands[pair])
                 pos = nx.circular_layout(G)
-                domain_networks_dict[domain_id] = G
 
-                # Draws plot of the network of interacting strands
-                plt.clf()
-                nx.draw_networkx(G, pos=pos, with_labels=True)
-                nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=interacting_strands)
-                plt.savefig(
-                    'DSSP_filtered_DSEQS/{}_sheet_{}_network.png'.format(
-                        domain_id, sheet
+                if nx.number_of_nodes(G) > 2:
+                    domain_networks_dict['{}_sheet_{}'.format(domain_id, sheet)] = G
+
+                    # Draws plot of the network of interacting strands
+                    plt.clf()
+                    nx.draw_networkx(G, pos=pos, with_labels=True)
+                    nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=interacting_strands)
+                    plt.savefig(
+                        'DSSP_filtered_DSEQS/{}_sheet_{}_network.png'.format(
+                            domain_id, sheet
+                            )
                         )
-                    )
 
         return domain_networks_dict
 

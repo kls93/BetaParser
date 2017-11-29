@@ -86,9 +86,6 @@ beta_structure.write_dssp_sec_struct_pdb(
 # Combines the beta-strands into sheets and translates the identified
 # beta-strand interactions into a network
 beta_structure = manipulate_beta_structure()
-"""dssp_dfs_merged_sheets_dict = beta_structure.merge_sheets(
-    dssp_residues_dict=dssp_residues_dict, dssp_dfs_dict=dssp_dfs_dict
-    )"""
 domain_networks_dict = beta_structure.identify_strand_interactions(
     dssp_residues_dict=dssp_residues_dict, dssp_dfs_dict=dssp_dfs_dict
     )
