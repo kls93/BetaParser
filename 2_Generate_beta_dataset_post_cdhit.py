@@ -91,4 +91,4 @@ domain_networks_dict = beta_structure.identify_strand_interactions(
     )
 
 # Idetifies strand interactions from the networks generated in previous steps
-# beta_structure = manipulate_beta_network(domain_networks_dict)
+beta_structure = manipulate_beta_network(domain_networks_dict)

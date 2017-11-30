@@ -646,7 +646,7 @@ class beta_structure_dssp_classification():
             bridge_pair_list_extnd_df = ['']*row_num
 
             for row in range(row_num):
-                if pdb_df['ATMNAME'][row] == 'N':
+                if pdb_df['ATMNAME'][row] == 'CA':
                     for index, line in enumerate(res_num):
                         if ((str(pdb_df['RESNUM'][row])+pdb_df['INSCODE'][row]) == res_num[index]
                             and pdb_df['CHAIN'][row] == chain[index]
@@ -796,4 +796,6 @@ class manipulate_beta_structure():
 
 
 class manipulate_beta_network():
-    pass
+
+    def __init__(self, domain_networks_dict):
+        self.networks_dict = domain_networks_dict
