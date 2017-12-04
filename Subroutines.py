@@ -7,6 +7,7 @@ import random
 import string
 import networkx as nx
 import netgraph
+import pickle
 import matplotlib.pyplot as plt
 from difflib import SequenceMatcher
 from collections import OrderedDict
@@ -599,6 +600,8 @@ class beta_structure_dssp_classification():
             sheet_number_list = []
             orientation_list = []
             bridge_pair_list = []
+            phi_list = []
+            psi_list = []
 
             for index_2, line in enumerate(dssp_indv_file_lines):
                 if not line.startswith('TER'):
@@ -606,6 +609,8 @@ class beta_structure_dssp_classification():
                     chain.append(line[11:12])
                     dssp_num.append(line[0:5].strip())
                     secondary_structure = line[16:17]
+                    phi_list.append(float(line[91:97]))
+                    psi_list.append(float(line[97:103]))
                     if secondary_structure == 'E':
                         sec_struct_assignment.append(secondary_structure)
                         strand_number_list.append(strand_number)
@@ -644,6 +649,8 @@ class beta_structure_dssp_classification():
             sheet_number_list_extnd_df = ['']*row_num
             orientation_list_extnd_df = ['']*row_num
             bridge_pair_list_extnd_df = ['']*row_num
+            phi_list_extnd_df = ['']*row_num
+            psi_list_extnd_df = ['']*row_num
 
             for row in range(row_num):
                 if pdb_df['ATMNAME'][row] == 'CA':
@@ -657,6 +664,8 @@ class beta_structure_dssp_classification():
                             sheet_number_list_extnd_df[row] = sheet_number_list[index]
                             orientation_list_extnd_df[row] = orientation_list[index]
                             bridge_pair_list_extnd_df[row] = bridge_pair_list[index]
+                            phi_list_extnd_df[row] = phi_list[index]
+                            psi_list_extnd_df[row] = psi_list[index]
                             break
 
             dssp_df = pd.DataFrame({'DSSP_NUM': dssp_num_extnd_df,
@@ -664,10 +673,12 @@ class beta_structure_dssp_classification():
                                     'STRAND_NUM': strand_number_list_extnd_df,
                                     'SHEET_NUM': sheet_number_list_extnd_df,
                                     'ORIENTATION': orientation_list_extnd_df,
-                                    'H-BONDS': bridge_pair_list_extnd_df})
+                                    'H-BONDS': bridge_pair_list_extnd_df,
+                                    'PHI': phi_list_extnd_df,
+                                    'PSI': psi_list_extnd_df})
             cols = dssp_df.columns.tolist()
-            cols = ([cols[0]] + [cols[3]] + [cols[5]] + [cols[4]] + [cols[2]]
-                    + [cols[1]])
+            cols = ([cols[0]] + [cols[5]] + [cols[7]] + [cols[6]] + [cols[2]]
+                    + [cols[1]] + [cols[3]] + [cols[4]])
             dssp_df = dssp_df[cols]
 
             extnd_df = pd.concat([pdb_df, dssp_df], axis=1)
@@ -713,19 +724,27 @@ class beta_structure_dssp_classification():
 
 class manipulate_beta_structure():
 
+    def __init__(self, run, resn, rfac):
+        self.run = run
+        self.resn = resn
+        self.rfac = rfac
+
     def identify_strand_interactions(self, dssp_residues_dict,
                                      dssp_dfs_dict):
         # Separates the beta-strands identified by DSSP into sheets, and works
         # out the strand interactions and thus loop connections both within and
         # between sheets
+        domain_sheets_dict = OrderedDict()
         domain_networks_dict = OrderedDict()
 
         for domain_id in list(dssp_residues_dict.keys()):
             dssp_df = dssp_dfs_dict[domain_id]
+            edge_labels = {}
 
             sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
             for sheet in sheets:
                 sheet_df = dssp_df[dssp_df['SHEET_NUM']==sheet]
+                sheet_df = sheet_df.reset_index(drop=True)
 
                 strands_dict = {}
                 strands = [int(strand) for strand in set(sheet_df['STRAND_NUM'].tolist())]
@@ -768,32 +787,127 @@ class manipulate_beta_structure():
                         strand_pair = [strand_1, strand_3]
                         strand_pairs[(min(strand_pair), max(strand_pair))] = orientation_3
 
+                # Writes pdb file of individual sheets
+                print('Writing PDB file of {} sheet {}'.format(domain_id, sheet))
+                with open('DSSP_filtered_DSEQS/{}.pdb'.format(domain_id), 'r') as pdb_file:
+                    pdb_file_lines = [line.strip('\n') for line in pdb_file
+                                      if line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
+
+                with open('DSSP_filtered_DSEQS/{}_sheet_{}.pdb'.format(domain_id, sheet), 'w') as sheet_pdb_file:
+                    for row in range(sheet_df.shape[0]):
+                        chain = sheet_df['CHAIN'][row]
+                        resnum = str(sheet_df['RESNUM'][row])+sheet_df['INSCODE'][row]
+                        for index, line in enumerate(pdb_file_lines):
+                            if line[21:22] == chain and line[22:27].replace(' ', '') == resnum:
+                                sheet_pdb_file.write('{}\n'.format(line))
+                            elif (index != len(pdb_file_lines)-1
+                                and line[0:3] == 'TER'
+                                and pdb_file_lines[index+1][0:6].strip() in ['ATOM', 'HETATM']
+                                ):
+                                sheet_pdb_file.write('{}\n'.format(line))
+                    sheet_pdb_file.write('TER'.ljust(80)+'\n')
+
+                # Creates network of the interacting strands in the sheet
                 interacting_strands = {}
                 for key in strand_pairs:
                     if key not in interacting_strands:
                         interacting_strands[key] = strand_pairs[key]
 
-                # Creates network of the interacting strands in the sheet
                 G = nx.Graph()
                 for pair in interacting_strands:
                     G.add_edge(pair[0], pair[1], attr=interacting_strands[pair])
-                pos = nx.circular_layout(G)
 
+                # Discards sheets with less than 3 beta-strands
                 if nx.number_of_nodes(G) > 2:
-                    domain_networks_dict['{}_sheet_{}'.format(domain_id, sheet)] = G
+                    domain_sheets_dict['{}_sheet_{}'.format(domain_id, sheet)] = G
+                    for key in strand_pairs:
+                        if key not in edge_labels:
+                            edge_labels[key] = strand_pairs[key]
 
-                    # Draws plot of the network of interacting strands
-                    plt.clf()
-                    nx.draw_networkx(G, pos=pos, with_labels=True)
-                    nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=interacting_strands)
-                    plt.savefig(
-                        'DSSP_filtered_DSEQS/{}_sheet_{}_network.png'.format(
-                            domain_id, sheet
-                            )
-                        )
+            # Draws plot of the network of interacting strands
+            print('Plotting network of interacting beta-strands in {}'.format(domain_id))
+            interacting_sheets = {key: value for key, value in domain_sheets_dict.items()
+                                  if domain_id in key}
+            if len(interacting_sheets) > 1:
+                sheet_1 = list(interacting_sheets.keys())[0]
+                sheets_2_to_n = list(interacting_sheets.keys())[1:]
+                G = interacting_sheets[sheet_1]
+                for sheet_n in sheets_2_to_n:
+                    H = interacting_sheets[sheet_n]
+                    G = nx.compose(G, H)
+            else:
+                G = interacting_sheets[list(interacting_sheets.keys())[0]]
+            pos = nx.circular_layout(G)
 
-        return domain_networks_dict
+            plt.clf()
+            nx.draw_networkx(G, pos=pos, with_labels=True, node_shape='v')
+            nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=edge_labels)
+            plt.savefig(
+                'DSSP_filtered_DSEQS/{}_network.png'.format(domain_id)
+                )
 
+        with open(
+            'CATH_{}_resn_{}_rfac_{}_domain_networks_dict.pkl'.format(
+                self.run, self.resn, self.rfac
+                ), 'wb'
+            ) as pickle_file:
+            pickle.dump((dssp_dfs_dict, domain_networks_dict,
+                         domain_sheets_dict), pickle_file)
+
+
+class calculate_solvent_accessible_surface_area():
+
+    def __init__(self, run, resn, rfac, dssp_dfs_dict, domain_networks_dict,
+                 domain_sheets_dict):
+        self.run = run
+        self.resn = resn
+        self.rfac = rfac
+        self.dssp_dfs_dict = dssp_dfs_dict
+        self.networks_dict = domain_networks_dict
+        self.sheets_dict = domain_sheets_dict
+
+    def run_naccess(self):
+        import isambard_dev.external_programs.naccess as naccess
+
+        confirmed_sandwiches_dict = OrderedDict()
+        for domain_id in list(self.networks_dict.keys()):
+            naccess_out = naccess.run_naccess('{}.pdb'.format(domain_id),
+                                              'rsa', include_hetatms=True)
+            naccess_out = naccess_out.split('\n')
+            naccess_out = [line for line in naccess_out if line != '']
+            domain_solv_acsblty = naccess_out[-1]
+            domain_solv_acsblty = float(domain_solv_acsblty.split()[1])
+
+            sheets = [key for key in list(self.sheets_dict.keys())
+                      if domain_id in key]
+            sum_sheet_solv_acsblty = 0
+            for sheet_id in sheets:
+                naccess_out = naccess.run_naccess('{}.pdb'.format(sheet_id),
+                                                  'rsa', include_hetatms=True)
+                naccess_out = naccess_out.split('\n')
+                naccess_out = [line for line in naccess_out if line != '']
+                sheet_solv_acsblty = naccess_out[-1]
+                sheet_solv_acsblty = float(sheet_solv_acsblty.split()[1])
+                sum_sheet_solv_acsblty += sheet_solv_acsblty
+
+            solv_acsblty_ratio = sum_sheet_solv_acsblty / domain_solv_acsblty
+            if solv_acsblty_ratio > 0.5:
+                confirmed_sandwiches_dict[domain_id] = solv_acsblty_ratio
+
+        fltrd_dssp_dfs_dict = {key: value for key, value in self.dssp_dfs_dict
+                               if domain_id in key}
+        fltrd_networks_dict = {key: value for key, value in self.networks_dict
+                               if domain_id in key}
+        fltrd_sheets_dict = {key: value for key, value in self.sheets_dict if
+                             domain_id in key}
+
+        with open(
+            'CATH_{}_resn_{}_rfac_{}_filtered_domain_networks_dict.pkl'.format(
+                self.run, self.resn, self.rfac
+                ), 'wb'
+            ) as f:
+            pickle.dump((fltrd_dssp_dfs_dict, fltrd_networks_dict,
+                         fltrd_sheets_dict, confirmed_sandwiches_dict), pickle_file)
 
 class manipulate_beta_network():
 

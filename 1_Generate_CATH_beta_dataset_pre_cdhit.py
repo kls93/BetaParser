@@ -11,11 +11,13 @@ run = input(prompt)
 # Determines the absolute file path of the domain descriptions file
 print('Specify absolute file path of domains description file:')
 directory = input(prompt)
+directory = 'Users/ks17361/Lab_work_DW/Beta_structure/Bioinformatics/CATH_database'
 os.chdir('{}'.format(directory))
 
 # Determines the absolute file path of the (locally saved) PDB database
 print('Specify absolute file path of PDB database:')
 pdb_database = '{}'.format(input(prompt).strip('/'))
+pdb_database = 'Volumes/Seagate_Backup_Plus_Drive/pdb'
 
 # Generates a list of the domain descriptions provided in
 # CATH_domain_description_v_4_2_0.txt. Then filters the domain descriptions
