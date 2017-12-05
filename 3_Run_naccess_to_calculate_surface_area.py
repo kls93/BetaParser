@@ -1,26 +1,11 @@
 
 import pickle
 from Subroutines import calculate_solvent_accessible_surface_area
+prompt = '> '
 
 # Determines whether user wants to analyse beta-barrels or beta-sandwiches
 print('Specify CATHCODE')
 run = input(prompt)
-
-# Determines the absolute file path of the domain directory
-print('Specify absolute file path of working directory:')
-# directory = input(prompt).strip('/')
-directory = 'Users/ks17361/Lab_work_DW/Beta_structure/Bioinformatics/CATH_database'
-os.chdir('/{}/CATH_{}'.format(directory.strip('/'), run))
-
-# Determines the absolute file path of the (locally saved) PDB database
-print('Specify absolute file path of PDB database:')
-# pdb_database = '{}'.format(input(prompt).strip('/'))
-pdb_database = 'Volumes/Seagate_Backup_Plus_Drive/pdb'
-
-# Determines the absolute file path of the (locally saved) DSSP database
-print('Specify absolute file path of DSSP database:')
-# dssp_database = '{}'.format(input(prompt).strip('/'))
-dssp_database = 'Volumes/Seagate_Backup_Plus_Drive/dssp'
 
 # Specifies the resolution and Rfactor (working value) cutoffs used in previous
 # steps
@@ -40,7 +25,7 @@ with open(
     (dssp_dfs_dict, domain_networks_dict, domain_sheets_dict) = pickle.load(pickle_file)
 
 beta_structure = calculate_solvent_accessible_surface_area(
-    run=run, resn=resn, rfac=rfac, dssp_dfs_dict,
+    run=run, resn=resn, rfac=rfac, dssp_dfs_dict=dssp_dfs_dict,
     domain_networks_dict=domain_networks_dict,
     domain_sheets_dict=domain_sheets_dict
     )

@@ -84,13 +84,9 @@ os.mkdir('DSSP_filtered_DSEQS')
 dssp_dfs_dict = beta_structure.get_dssp_sec_struct_df(
     dssp_residues_dict=dssp_residues_dict, pdb_dfs_dict=pdb_dfs_dict
     )
-beta_structure.write_dssp_sec_struct_pdb(
-    dssp_residues_dict=dssp_residues_dict, dssp_dfs_dict=dssp_dfs_dict
-    )
+beta_structure.write_dssp_sec_struct_pdb(dssp_dfs_dict=dssp_dfs_dict)
 
 # Combines the beta-strands into sheets and translates the identified
 # beta-strand interactions into a network
 beta_structure = manipulate_beta_structure(run=run, resn=resn, rfac=rfac)
-beta_structure.identify_strand_interactions(
-    dssp_residues_dict=dssp_residues_dict, dssp_dfs_dict=dssp_dfs_dict
-    )
+beta_structure.identify_strand_interactions(dssp_dfs_dict=dssp_dfs_dict)
