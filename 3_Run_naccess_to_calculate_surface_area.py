@@ -26,7 +26,6 @@ with open(
 
 beta_structure = calculate_solvent_accessible_surface_area(
     run=run, resn=resn, rfac=rfac, dssp_dfs_dict=dssp_dfs_dict,
-    domain_networks_dict=domain_networks_dict,
     domain_sheets_dict=domain_sheets_dict
     )
 beta_structure.run_naccess()
