@@ -5,34 +5,30 @@ import pandas as pd
 
 class filter_beta_structure():
 
-    def __init__(self, run, resn, rfac, domain_df, pdb_database):
-        self.run = run
+    def __init__(self, resn, rfac, domain_df, pdb_database):
         self.resn = resn
         self.rfac = rfac
         self.domain_df = domain_df
         self.pdb_database = pdb_database
 
-    # Downloads a copy of each beta-barrel / beta-sandwich PDB structure from
-    # the RCSB PDB website, and extracts its experimental method, resolution
-    # and R_factor (working value) from the header information. The structures
-    # are filtered to only retain those determined by X-ray diffraction to a
-    # resolution of 1.6 Angstroms or higher with an R_factor (working value)
-    # of 0.20 or lower.
+    # Filters the all-beta structures extracted from the CATH / SCOPe database
+    # to retain only those determined by X-ray diffraction of resolution and
+    # Rfactor (working value) below the user-specified cutoff values.
+    # (Recommended: resolution < 1.6 Angstroms, Rfactor (working value) < 0.20)
     def resn_rfac_filter(self):
         unprocessed_list_1 = []
         unprocessed_list_2 = []
         processed_list = []
         resolution_list = []
         rfactor_list = []
-        row_num = self.domain_df.shape[0]
 
-        for row in range(row_num):
+        for row in range(self.domain_df.shape[0]):
             print('Obtaining header information for {}'.format(self.domain_df['PDB_CODE'][row]))
-            print('{}'.format((row/row_num)*100))
+            print('{}'.format((row/self.domain_df.shape[0])*100))
 
             middle_characters = self.domain_df['PDB_CODE'][row][1:3]
             cwd = os.getcwd()
-            os.chdir('/{}/{}'.format(self.pdb_database, middle_characters))
+            os.chdir('{}{}'.format(self.pdb_database, middle_characters))
 
             header_pdb_lines = []
             try:
@@ -63,8 +59,7 @@ class filter_beta_structure():
                     and 'ANGSTROM' in whitespace_remv_line):
                         try:
                             resolution = float(line[23:30])
-                        except:
-                            ValueError
+                        except ValueError:
                             resolution = 0
                 elif whitespace_remv_line.startswith('REMARK3RVALUE'):
                     if any(x in whitespace_remv_line for x in ['(WORKINGSET)', '(WORKINGSET,NOCUTOFF)']):
@@ -72,8 +67,7 @@ class filter_beta_structure():
                         try:
                             rfactor = float(rfactor[len(rfactor)-1])
                             break
-                        except:
-                            ValueError
+                        except ValueError:
                             rfactor = 0
 
             if resolution == 0 or rfactor == 0:
@@ -88,10 +82,10 @@ class filter_beta_structure():
         filtered_domain_df_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
                                                     'RFACTOR': rfactor_list})
         filtered_domain_df = pd.concat([filtered_domain_df_part_1, filtered_domain_df_part_2], axis=1)
-        filtered_domain_df.to_pickle('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.pkl'.format(self.run, self.resn, self.rfac))
-        filtered_domain_df.to_csv('CATH_{}_resn_{}_rfac_{}_pre_cd_hit.csv'.format(self.run, self.resn, self.rfac))
+        filtered_domain_df.to_pickle('Filtered_datasets_pre_cd_hit.pkl')
+        filtered_domain_df.to_csv('Filtered_datasets_pre_cd_hit.csv')
 
-        with open('Unprocessed_CATH_{}.txt'.format(self.run), 'w') as unprocessed_file:
+        with open('Unprocessed_domains.txt', 'w') as unprocessed_file:
             unprocessed_file.write('PDB accession code not in PDB database '
                                    '(downloaded 24/11/2017):\n')
             unprocessed_list_1 = set(unprocessed_list_1)
@@ -111,27 +105,21 @@ class filter_beta_structure():
     # filtering using the cd_hit web server
     def gen_cd_hit_list(self, filtered_domain_df):
         fasta = filtered_domain_df['DSEQS'].tolist()
-        pdb_ids = filtered_domain_df['PDB_CODE'].tolist()
-        pdb_chains = filtered_domain_df['CHAIN'].tolist()
+        domain_ids = filtered_domain_df['DOMAIN_ID'].tolist()
 
         fasta_copy = copy.copy(fasta)
         fasta_repeat = []
         for index, seq in enumerate(fasta_copy):
             if seq in fasta_repeat:
                 fasta[index] = None
-                pdb_ids[index] = None
-                pdb_chains[index] = None
+                domain_ids[index] = None
             elif seq not in fasta_repeat:
                 fasta_repeat.append(seq)
 
         fasta = [seq for seq in fasta if seq is not None]
-        pdb_ids = [pdb_id for pdb_id in pdb_ids if pdb_id is not None]
-        pdb_chains = [chain for chain in pdb_chains if chain is not None]
+        domain_ids = [domain_id for domain_id in domain_ids if domain_id is not None]
 
-        with open(
-            'CATH_{}_resn_{}_rfac_{}_domain_chain_entries_for_CD_HIT.txt'.format(
-            self.run, self.resn, self.rfac), 'w'
-            ) as chain_entries_file:
+        with open('Filtered_datasets_pre_cd_hit.txt', 'w') as chain_entries_file:
             for num in range(len(fasta)):
-                chain_entries_file.write('>{}_{}\n'.format(pdb_ids[num], pdb_chains[num]))
+                chain_entries_file.write('>{}\n'.format(domain_ids[num]))
                 chain_entries_file.write('{}\n'.format(fasta[num]))
