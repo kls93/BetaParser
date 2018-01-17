@@ -3,7 +3,10 @@ import os
 import shutil
 import pandas as pd
 from collections import OrderedDict
-from subroutines.run_stages import run_stages
+if __name__ == 'subroutines.DSSP':
+    from subroutines.run_stages import run_stages
+else:
+    from datagen.subroutines.run_stages import run_stages
 
 class filter_dssp_database(run_stages):
 

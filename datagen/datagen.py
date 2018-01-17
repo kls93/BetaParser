@@ -8,8 +8,14 @@ import argparse
 # the dataset (for e.g. further bioinformatics analysis) is also generated.
 
 def main():
-    from subroutines.run_stages import (gen_run_parameters, find_cd_hit_input,
-                                        run_stages)
+    if __name__ == '__main__':
+        from subroutines.run_stages import (
+            gen_run_parameters, find_cd_hit_input, run_stages
+            )
+    else:
+        from datagen.subroutines.run_stages import (
+            gen_run_parameters, find_cd_hit_input, run_stages
+            )
     orig_dir = os.getcwd()
 
     # Reads in command line inputs

@@ -241,18 +241,19 @@ def find_cd_hit_input(stage, args):
             elif input_file[-4:] == '.txt':
                 cdhit_output = input_file
         if not os.path.isfile(cdhit_entries):
-            print('Absolute file path to CDHIT output txt file not recognised')
+            print('Absolute path to CDHIT input pkl file not recognised')
             cdhit_entries = ''
         if not os.path.isfile(cdhit_output):
-            print('Absolute path to CDHIT input pkl file not recognised')
+            print('Absolute file path to CDHIT output txt file not recognised')
             cdhit_output = ''
+
     else:
         cdhit_entries = ''
         cdhit_output = ''
 
     while not os.path.isfile(cdhit_entries):
-        print('Specify absolute file path of txt file of filtered FASTA '
-             'sequences output from CDHIT')
+        print('Specify absolute file path of input pkl file of FASTA '
+              'sequences fed into CDHIT')
         cdhit_entries = '/{}'.format(input(prompt).strip('/'))
         if not os.path.isfile(cdhit_entries):
             print('Specified file path not recognised')
@@ -260,8 +261,8 @@ def find_cd_hit_input(stage, args):
             break
 
     while not os.path.isfile(cdhit_output):
-        print('Specify absolute file path of input pkl file of FASTA '
-              'sequences fed into CDHIT')
+        print('Specify absolute file path of txt file of filtered FASTA '
+             'sequences output from CDHIT')
         cdhit_output = '/{}'.format(input(prompt).strip('/'))
         if not os.path.isfile(cdhit_output):
             print('Specified file path not recognised')
@@ -284,8 +285,16 @@ class run_stages():
     def run_stage_1_cath(self, orig_dir):
         # Runs stage 1 of the DataGen pipeline, extracting sequences of the
         # structural domain of interest from the CATH database
-        from subroutines.CATH import gen_domain_desc_list, domain_desc_filter
-        from subroutines.CDHIT import filter_beta_structure
+        if __name__ == 'subroutines.run_stages':
+            from subroutines.CATH import (
+                gen_domain_desc_list, domain_desc_filter
+                )
+            from subroutines.CDHIT import filter_beta_structure
+        else:
+            from datagen.subroutines.CATH import (
+                gen_domain_desc_list, domain_desc_filter
+                )
+            from datagen.subroutines.CDHIT import filter_beta_structure
 
         # Generates a list of the domain descriptions provided in
         # CATH_domain_description_v_4_2_0.txt. Then filters the domain
@@ -309,10 +318,18 @@ class run_stages():
 
 
     def run_stage_2(self, cdhit_entries, cdhit_output):
-        from subroutines.extract_coordinates import extract_beta_structure_coords
-        from subroutines.DSSP import (filter_dssp_database,
-                                      beta_structure_dssp_classification)
-        from subroutines.generate_network import manipulate_beta_structure
+        if __name__ == 'subroutines.run_stages':
+            from subroutines.extract_coordinates import extract_beta_structure_coords
+            from subroutines.DSSP import (
+                filter_dssp_database, beta_structure_dssp_classification
+                )
+            from subroutines.generate_network import manipulate_beta_structure
+        else:
+            from datagen.subroutines.extract_coordinates import extract_beta_structure_coords
+            from datagen.subroutines.DSSP import (
+                filter_dssp_database, beta_structure_dssp_classification
+                )
+            from datagen.subroutines.generate_network import manipulate_beta_structure
 
         # Loads the dataframe generated in previous steps
         filtered_domain_df = pd.read_pickle(cdhit_entries)

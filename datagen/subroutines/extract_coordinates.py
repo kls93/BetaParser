@@ -4,7 +4,10 @@ import random
 import pandas as pd
 from collections import OrderedDict
 from difflib import SequenceMatcher
-from subroutines.run_stages import run_stages
+if __name__ == 'subroutines.extract_coordinates':
+    from subroutines.run_stages import run_stages
+else:
+    from datagen.subroutines.run_stages import run_stages
 
 # Defines dictionary of three- and one-letter codes of standard amino acids
 amino_acids_dict = {'ALA': 'A',

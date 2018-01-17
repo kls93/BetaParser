@@ -4,7 +4,10 @@ import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import OrderedDict
-from subroutines.run_stages import run_stages
+if __name__ == 'subroutines.generate_network':
+    from subroutines.run_stages import run_stages
+else:
+    from datagen.subroutines.run_stages import run_stages
 
 class manipulate_beta_structure(run_stages):
 

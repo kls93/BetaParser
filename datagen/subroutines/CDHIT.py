@@ -2,7 +2,10 @@
 import os
 import copy
 import pandas as pd
-from subroutines.run_stages import run_stages
+if __name__ == 'subroutines.CDHIT':
+    from subroutines.run_stages import run_stages
+else:
+    from datagen.subroutines.run_stages import run_stages
 
 class filter_beta_structure(run_stages):
 
