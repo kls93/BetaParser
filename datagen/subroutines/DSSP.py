@@ -1,6 +1,7 @@
 
 import os
 import shutil
+import copy
 import pandas as pd
 from collections import OrderedDict
 if __name__ == 'subroutines.DSSP':
@@ -61,7 +62,7 @@ class beta_structure_dssp_classification(run_stages):
 
         for row in range(dssp_domain_df.shape[0]):
             dssp_indv_file_lines = []
-            chain_num_list = dssp_domain_df['CHAIN_NUM'][row]
+            chain_num_list = copy.copy(dssp_domain_df['CHAIN_NUM'][row])
 
             with open('DSSP_files/{}.dssp'.format(dssp_domain_df['PDB_CODE'][row]), 'r') as dssp_file:
                 print('Processing {}.dssp'.format(dssp_domain_df['PDB_CODE'][row]))
