@@ -17,5 +17,5 @@ setup(name='datagen',
       install_requires=['pandas', 'matplotlib', 'networkx'],
       package_data={'CATH_domains_desc': [''],
                     'SCOP_domains_desc': ['']},
-      entry_points={'console_scripts': ['datagen.datagen:main']
+      entry_points={'console_scripts': ['datagen.datagen:main']}
 )

@@ -8,13 +8,18 @@ import argparse
 # the dataset (for e.g. further bioinformatics analysis) is also generated.
 
 def main():
-    from subroutines.run_stages import gen_run_parameters, run_stages
+    from subroutines.run_stages import (gen_run_parameters, find_cd_hit_input,
+                                        run_stages)
     orig_dir = os.getcwd()
 
     # Reads in command line inputs
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--input_file', help='Specifies an input file '
-                        'listing run parameters')
+    parser.add_argument('-i', '--input_file', help='Specifies the absolute '
+                        'file path of an input file listing run parameters')
+    parser.add_argument('-s', '--sequences', nargs='+', help='Specifies the '
+                        'absolute file path of an input file of CDHIT '
+                        'filtered FASTA sequences required for stage 2 of the '
+                        'analysis pipeline')
     args = parser.parse_args()
 
     # Initialises run_stages object and extracts run parameters
@@ -34,7 +39,8 @@ def main():
     # Extracts PDB structures and structural information for each of the
     # sequences listed in a CDHIT output txt file
     elif stage in ['2']:
-        analysis.run_stage_2()
+        cdhit_entries, cdhit_output = find_cd_hit_input(stage, args)
+        analysis.run_stage_2(cdhit_entries, cdhit_output)
     # Runs naccess upon each structure to calculate the solvent accessible
     # surface area of its beta-sheets and thus identify those which interact
     elif stage in ['3']:

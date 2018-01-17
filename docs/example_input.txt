@@ -1,0 +1,7 @@
+Structure database: CATH
+ID: 2.110
+Working directory: /Users/ks17361/Documents/
+PDB database: /Volumes/Seagate_Backup_Plus_Drive/pdb
+DSSP database: /Volumes/Seagate_Backup_Plus_Drive/dssp
+Resolution: 2.2
+Rfactor: 0.23

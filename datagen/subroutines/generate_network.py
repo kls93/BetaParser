@@ -4,13 +4,12 @@ import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import OrderedDict
+from subroutines.run_stages import run_stages
 
-class manipulate_beta_structure():
+class manipulate_beta_structure(run_stages):
 
-    def __init__(self, run, resn, rfac):
-        self.run = run
-        self.resn = resn
-        self.rfac = rfac
+    def __init__(self, run_parameters):
+        run_stages.__init__(self, run_parameters)
 
     def identify_strand_interactions(self, dssp_dfs_dict):
         # Separates the beta-strands identified by DSSP into sheets, and works
@@ -73,7 +72,7 @@ class manipulate_beta_structure():
                         strand_pairs[(min(strand_pair), max(strand_pair))] = orientation_3
 
                 # Writes pdb file of individual sheets
-                with open('DSSP_filtered_DSEQS/{}_sheet_{}.pdb'.format(domain_id, sheet), 'w') as sheet_pdb_file:
+                with open('Beta_strands/{}_sheet_{}.pdb'.format(domain_id, sheet), 'w') as sheet_pdb_file:
                     for strand in strands:
                         strand_df = sheet_df[sheet_df['STRAND_NUM']==strand]
                         chain = strand_df['CHAIN'].tolist()
@@ -125,10 +124,10 @@ class manipulate_beta_structure():
                 nx.draw_networkx(G, pos=pos, with_labels=True, node_shape='v')
                 nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=edge_labels)
                 plt.savefig(
-                    'DSSP_filtered_DSEQS/{}_network.png'.format(domain_id)
+                    'Beta_strands/{}_network.png'.format(domain_id)
                     )
 
-        with open('Unprocessed_CATH_{}.txt'.format(self.run), 'a') as unprocessed_file:
+        with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nFewer than 2 beta-sheets of > 2 '
                                    'strands identified in the domain:\n')
             for domain_id in set(unprocessed_list):
@@ -137,10 +136,6 @@ class manipulate_beta_structure():
         dssp_dfs_dict = {key: value for key, value in dssp_dfs_dict.items() if key not
                          in unprocessed_list}
 
-        with open(
-            'CATH_{}_resn_{}_rfac_{}_domain_networks_dict.pkl'.format(
-                self.run, self.resn, self.rfac
-                ), 'wb'
-            ) as pickle_file:
+        with open('Domain_networks_dict.pkl', 'wb') as pickle_file:
             pickle.dump((dssp_dfs_dict, domain_networks_dict,
                          domain_sheets_dict), pickle_file)

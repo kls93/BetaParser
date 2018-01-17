@@ -2,37 +2,35 @@
 import os
 import copy
 import pandas as pd
+from subroutines.run_stages import run_stages
 
-class filter_beta_structure():
+class filter_beta_structure(run_stages):
 
-    def __init__(self, resn, rfac, domain_df, pdb_database):
-        self.resn = resn
-        self.rfac = rfac
-        self.domain_df = domain_df
-        self.pdb_database = pdb_database
+    def __init__(self, run_parameters):
+        run_stages.__init__(self, run_parameters)
 
     # Filters the all-beta structures extracted from the CATH / SCOPe database
     # to retain only those determined by X-ray diffraction of resolution and
     # Rfactor (working value) below the user-specified cutoff values.
     # (Recommended: resolution < 1.6 Angstroms, Rfactor (working value) < 0.20)
-    def resn_rfac_filter(self):
+    def resn_rfac_filter(self, domain_df):
         unprocessed_list_1 = []
         unprocessed_list_2 = []
         processed_list = []
         resolution_list = []
         rfactor_list = []
 
-        for row in range(self.domain_df.shape[0]):
-            print('Obtaining header information for {}'.format(self.domain_df['PDB_CODE'][row]))
-            print('{}'.format((row/self.domain_df.shape[0])*100))
+        for row in range(domain_df.shape[0]):
+            print('Obtaining header information for {}'.format(domain_df['PDB_CODE'][row]))
+            print('{}'.format((row/domain_df.shape[0])*100))
 
-            middle_characters = self.domain_df['PDB_CODE'][row][1:3]
+            middle_characters = domain_df['PDB_CODE'][row][1:3]
             cwd = os.getcwd()
             os.chdir('{}{}'.format(self.pdb_database, middle_characters))
 
             header_pdb_lines = []
             try:
-                with open('{}.pdb'.format(self.domain_df['PDB_CODE'][row]), 'r') as pdb_file:
+                with open('{}.pdb'.format(domain_df['PDB_CODE'][row]), 'r') as pdb_file:
                     remark_end = False
                     for line in pdb_file:
                         if (line.replace(' ', ''))[0:7] == 'REMARK4':
@@ -43,7 +41,7 @@ class filter_beta_structure():
                         else:
                             header_pdb_lines.append(line)
             except FileNotFoundError:
-                unprocessed_list_1.append(self.domain_df['PDB_CODE'][row])
+                unprocessed_list_1.append(domain_df['PDB_CODE'][row])
 
             os.chdir('{}'.format(cwd))
 
@@ -53,7 +51,7 @@ class filter_beta_structure():
                 whitespace_remv_line = line.replace(' ', '')
                 if whitespace_remv_line.startswith('EXPDTA'):
                     if not any(x in whitespace_remv_line for x in ['XRAYDIFFRACTION', 'X-RAYDIFFRACTION']):
-                        unprocessed_list_2.append(self.domain_df['PDB_CODE'][row])
+                        unprocessed_list_2.append(domain_df['PDB_CODE'][row])
                         break
                 elif (whitespace_remv_line.startswith('REMARK2')
                     and 'ANGSTROM' in whitespace_remv_line):
@@ -71,19 +69,19 @@ class filter_beta_structure():
                             rfactor = 0
 
             if resolution == 0 or rfactor == 0:
-                unprocessed_list_2.append(self.domain_df['PDB_CODE'][row])
+                unprocessed_list_2.append(domain_df['PDB_CODE'][row])
             elif resolution <= self.resn and rfactor <= self.rfac:
-                processed_list.append(self.domain_df['PDB_CODE'][row])
+                processed_list.append(domain_df['PDB_CODE'][row])
                 resolution_list.append(resolution)
                 rfactor_list.append(rfactor)
 
-        filtered_domain_df_part_1 = self.domain_df[self.domain_df['PDB_CODE'].isin(processed_list)]
+        filtered_domain_df_part_1 = domain_df[domain_df['PDB_CODE'].isin(processed_list)]
         filtered_domain_df_part_1 = filtered_domain_df_part_1.reset_index(drop=True)
         filtered_domain_df_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
                                                     'RFACTOR': rfactor_list})
         filtered_domain_df = pd.concat([filtered_domain_df_part_1, filtered_domain_df_part_2], axis=1)
-        filtered_domain_df.to_pickle('Filtered_datasets_pre_cd_hit.pkl')
-        filtered_domain_df.to_csv('Filtered_datasets_pre_cd_hit.csv')
+        filtered_domain_df.to_pickle('CDHIT_entries.pkl')
+        filtered_domain_df.to_csv('CDHIT_entries.csv')
 
         with open('Unprocessed_domains.txt', 'w') as unprocessed_file:
             unprocessed_file.write('PDB accession code not in PDB database '
@@ -119,7 +117,7 @@ class filter_beta_structure():
         fasta = [seq for seq in fasta if seq is not None]
         domain_ids = [domain_id for domain_id in domain_ids if domain_id is not None]
 
-        with open('Filtered_datasets_pre_cd_hit.txt', 'w') as chain_entries_file:
+        with open('CDHIT_entries.txt', 'w') as chain_entries_file:
             for num in range(len(fasta)):
                 chain_entries_file.write('>{}\n'.format(domain_ids[num]))
                 chain_entries_file.write('{}\n'.format(fasta[num]))

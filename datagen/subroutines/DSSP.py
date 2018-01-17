@@ -3,15 +3,12 @@ import os
 import shutil
 import pandas as pd
 from collections import OrderedDict
+from subroutines.run_stages import run_stages
 
-class filter_dssp_database():
+class filter_dssp_database(run_stages):
 
-    def __init__(self, run, resn, rfac, dssp_database):
-        self.run = run
-        self.resn = resn
-        self.rfac = rfac
-        self.dssp_database = dssp_database
-
+    def __init__(self, run_parameters):
+        run_stages.__init__(self, run_parameters)
 
     def copy_files_from_dssp_database(self, cd_hit_domain_df):
         # Generates list of all PDB accession codes to be extracted from the
@@ -35,7 +32,7 @@ class filter_dssp_database():
                 unprocessed_list.append(pdb_code)
 
         # Writes PDB accession codes that could not be processed to output file
-        with open('Unprocessed_CATH_{}.txt'.format(self.run), 'a') as unprocessed_file:
+        with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nNot in DSSP database:\n')
             for pdb_code in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(pdb_code))
@@ -48,12 +45,10 @@ class filter_dssp_database():
         return dssp_domain_df
 
 
-class beta_structure_dssp_classification():
+class beta_structure_dssp_classification(run_stages):
 
-    def __init__(self, run, resn, rfac):
-        self.run = run
-        self.resn = resn
-        self.rfac = rfac
+    def __init__(self, run_parameters):
+        run_stages.__init__(self, run_parameters)
 
     def extract_dssp_file_lines(self, dssp_domain_df):
         unprocessed_list = []
@@ -81,7 +76,7 @@ class beta_structure_dssp_classification():
                 unprocessed_list.append(dssp_domain_df['DOMAIN_ID'][row])
 
         # Writes PDB accession codes that could not be processed to output file
-        with open('Unprocessed_CATH_{}.txt'.format(self.run), 'a') as unprocessed_file:
+        with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nCoordinates missing from DSSP file:\n')
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))
@@ -91,12 +86,8 @@ class beta_structure_dssp_classification():
         dssp_domain_df = dssp_domain_df[~dssp_domain_df['DOMAIN_ID'].isin(unprocessed_list)]
         dssp_domain_df = dssp_domain_df.reset_index(drop=True)
 
-        dssp_domain_df.to_csv('CATH_{}_resn_{}_rfac_{}_filtered.csv'.format(
-            self.run, self.resn, self.rfac)
-            )
-        dssp_domain_df.to_pickle('CATH_{}_resn_{}_rfac_{}_filtered.pkl'.format(
-            self.run, self.resn, self.rfac)
-            )
+        dssp_domain_df.to_csv('Final_filtered_dataset.csv')
+        dssp_domain_df.to_pickle('Final_filtered_dataset.pkl')
 
         dssp_residues_dict = OrderedDict()
         for index, sub_list in enumerate(dssp_file_lines):
@@ -206,7 +197,7 @@ class beta_structure_dssp_classification():
             dssp_df = dssp_df[cols]
 
             extnd_df = pd.concat([pdb_df, dssp_df], axis=1)
-            extnd_df.to_pickle('CD_HIT_DSEQS/{}.pkl'.format(domain_id))
+            extnd_df.to_pickle('Entire_domains/{}.pkl'.format(domain_id))
 
             retained_chains = extnd_df[extnd_df['SHEET?']=='E']['CHAIN'].tolist()
             retained_res_num = extnd_df[extnd_df['SHEET?']=='E']['RESNUM'].tolist()
@@ -220,7 +211,7 @@ class beta_structure_dssp_classification():
                     extnd_df.loc[row, 'REC'] = None
             filtered_extnd_df = extnd_df[extnd_df['REC'].notnull()]
             filtered_extnd_df = filtered_extnd_df.reset_index(drop=True)
-            filtered_extnd_df.to_pickle('DSSP_filtered_DSEQS/{}.pkl'.format(domain_id))
+            filtered_extnd_df.to_pickle('Beta_strands/{}.pkl'.format(domain_id))
             dssp_dfs_dict[domain_id] = filtered_extnd_df
 
         return dssp_dfs_dict
@@ -235,7 +226,7 @@ class beta_structure_dssp_classification():
             strand_number_set = [strand for strand in set(dssp_df['STRAND_NUM'].tolist())
                                  if strand != '']
 
-            with open('DSSP_filtered_DSEQS/{}.pdb'.format(domain_id), 'w') as new_pdb_file:
+            with open('Beta_strands/{}.pdb'.format(domain_id), 'w') as new_pdb_file:
                 for strand in strand_number_set:
                     dssp_df_strand = dssp_df[dssp_df['STRAND_NUM']==strand]
                     chain = dssp_df_strand['CHAIN'].tolist()
