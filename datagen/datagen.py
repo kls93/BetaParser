@@ -28,7 +28,7 @@ def main():
                         'analysis pipeline')
     args = parser.parse_args()
 
-    # Initialises run_stages object and extracts run parameters
+    # Extracts run parameters and initialises run_stages object
     stage, run_parameters = gen_run_parameters(args)
     analysis = run_stages(run_parameters)
 
@@ -37,9 +37,9 @@ def main():
     if stage in ['1']:
         # Determines whether the user wants to extract structures from the CATH
         # or from the SCOPe structural database
-        if run_parameters['structuredatabase'] == 'cath':
+        if run_parameters['structuredatabase'] == 'CATH':
             analysis.run_stage_1_cath(orig_dir)
-        elif run_parameters['structuredatabase'] == 'scope':
+        elif run_parameters['structuredatabase'] == 'SCOP':
             analysis.run_stage_1_scope(orig_dir)
 
     # Extracts PDB structures and structural information for each of the

@@ -20,11 +20,11 @@ def gen_run_parameters(args):
         else:
             break
 
-    # Sets run parameters
+    # Sets as many run parameters as possible from the input file (if provided)
     run_parameters = {}
     if vars(args)['input_file']:
         try:
-            with open('{}'.format(vars(args)['input_file']), 'r') as input_file:
+            with open('/{}'.format(vars(args)['input_file'].strip('/')), 'r') as input_file:
                 for line in input_file:
                     key = line.split(':')[0].replace(' ', '').lower()
                     value = line.split(':')[1].replace('\n', '').strip()
@@ -38,38 +38,44 @@ def gen_run_parameters(args):
             sys.exit('Absolute path to input file not recognised')
 
     # Requires user input if the structural database (CATH or SCOPe) is not
-    # specified in the input file
+    # specified in the input file / is not recognised
     if 'structuredatabase' in run_parameters:
-        if run_parameters['structuredatabase'] not in ['cath', 'scope']:
-            print('DataGen can currently only parse the CATH and SCOPe databases\n'
+        if run_parameters['structuredatabase'].upper() not in ['CATH', 'SCOP']:
+            print('DataGen can currently only parse the CATH and SCOP databases\n'
                   '- please select one of these databases to continue')
             run_parameters.pop('structuredatabase')
     if not 'structuredatabase' in run_parameters:
-        print('CATH or SCOPe database?')
+        print('CATH or SCOP database?')
         database = ''
-        while database not in ['cath', 'scope']:
-            database = input(prompt).lower()
-            if not database in ['cath', 'scope']:
+        while database not in ['CATH', 'SCOP']:
+            database = input(prompt).upper()
+            if not database in ['CATH', 'SCOP']:
                 print('DataGen can currently only parse the CATH and '
-                      'SCOPe databases\n'
+                      'SCOP databases\n'
                       '- please select one of these databases to continue')
             else:
                 run_parameters['structuredatabase'] = database
                 break
+    # Ensures database name is uppercase (required for consistent directory naming)
+    run_parameters['structuredatabase'] = run_parameters['structuredatabase'].upper()
 
     # Requires user input if the (all-beta) structural domain the user wishes
-    # to analyse is not specified in the input file
+    # to analyse is not specified in the input file / is not recognised
     if 'id' in run_parameters:
-        if run_parameters['structuredatabase'] == 'cath' and not run_parameters['id'].startswith('2'):
+        if (run_parameters['structuredatabase'] == 'CATH'
+            and not run_parameters['id'].startswith('2')
+            ):
             print('DataGen is currently only suitable for generation and '
                   'analysis of\nall-beta structures')
             run_parameters.pop('id')
-        elif run_parameters['structuredatabase'] == 'scope' and not run_parameters['id'].startswith('b'):
+        elif (run_parameters['structuredatabase'] == 'SCOP'
+            and not run_parameters['id'].startswith('b')
+            ):
             print('DataGen is currently only suitable for generation and '
                   'analysis of\nall-beta structures')
             run_parameters.pop('id')
     if not 'id' in run_parameters:
-        if run_parameters['structuredatabase'] == 'cath':
+        if run_parameters['structuredatabase'] == 'CATH':
             print('Specify CATHCODE:')
             run = ''
             while not run.startswith('2'):
@@ -80,8 +86,8 @@ def gen_run_parameters(args):
                 else:
                     print('DataGen is currently only suitable for '
                           'generation and analysis of\nall-beta structures')
-        elif run_parameters['structuredatabase'] == 'scope':
-            print('Specify SCOPe code:')
+        elif run_parameters['structuredatabase'] == 'SCOP':
+            print('Specify SCOP code:')
             run = ''
             while not run.startswith('b'):
                 run = input(prompt).lower()
@@ -93,7 +99,7 @@ def gen_run_parameters(args):
                           'generation and analysis of\nall-beta structures')
 
     # Requires user input if the absolute file path of the working directory is
-    # not specified in the input file
+    # not specified in the input file / is not recognised
     if 'workingdirectory' in run_parameters:
         if not os.path.isdir(run_parameters['workingdirectory']):
             print('Specified working directory not recognised')
@@ -110,7 +116,7 @@ def gen_run_parameters(args):
                 break
 
     # Requires user input if the absolute file path of the (locally saved) PDB
-    # database is not specified in the input file
+    # database is not specified in the input file / is not recognised
     if 'pdbdatabase' in run_parameters:
         if not os.path.isdir(run_parameters['pdbdatabase']):
             print('Specified directory for PDB database not recognised')
@@ -127,7 +133,7 @@ def gen_run_parameters(args):
                 break
 
     # Requires user input if the absolute file path of the (locally saved) DSSP
-    # database is not specified in the input file
+    # database is not specified in the input file / is not recognised
     if 'dsspdatabase' in run_parameters:
         if not os.path.isdir(run_parameters['dsspdatabase']):
             print('Specified directory for DSSP database not recognised')
@@ -144,7 +150,7 @@ def gen_run_parameters(args):
                 break
 
     # Requires user input if the resolution threshold for the dataset to be
-    # generated is not specified in the input file
+    # generated is not specified in the input file / is not recognised
     if 'resolution' in run_parameters:
         try:
             resn = float(run_parameters['resolution'])
@@ -162,17 +168,18 @@ def gen_run_parameters(args):
             try:
                 resn = float(resn)
                 if resn <= 0:
-                    resn = 0
                     print('Specified resolution cutoff must be greater than 0')
+                    resn = 0
                 else:
                     run_parameters['resolution'] = resn
                     break
             except ValueError:
-                resn = 0
                 print('Specified resolution cutoff must be a number')
+                resn = 0
 
     # Requires user input if the R_factor (working value) threshold for the
-    # dataset to be generated is not specified in the input file
+    # dataset to be generated is not specified in the input file / is not
+    # recognised
     if 'rfactor' in run_parameters:
         try:
             rfac = float(run_parameters['rfactor'])
@@ -235,18 +242,19 @@ def find_cd_hit_input(stage, args):
     if vars(args)['sequences']:
         files = ['/{}'.format(input_file.strip('/')) for input_file in
                  vars(args)['sequences']]
+        cdhit_entries = ''
+        cdhit_output = ''
         for input_file in files:
             if input_file[-4:] == '.pkl':
                 cdhit_entries = input_file
             elif input_file[-4:] == '.txt':
                 cdhit_output = input_file
-        if not os.path.isfile(cdhit_entries):
+        if cdhit_entries != '' and not os.path.isfile(cdhit_entries):
             print('Absolute path to CDHIT input pkl file not recognised')
             cdhit_entries = ''
-        if not os.path.isfile(cdhit_output):
+        if cdhit_output != '' and not os.path.isfile(cdhit_output):
             print('Absolute file path to CDHIT output txt file not recognised')
             cdhit_output = ''
-
     else:
         cdhit_entries = ''
         cdhit_output = ''
@@ -343,11 +351,12 @@ class run_stages():
         cd_hit_domain_df = beta_structure.gen_cd_hit_dict(
             cdhit_output, filtered_domain_df
             )
-        cd_hit_domain_df, pdb_dfs_dict = beta_structure.get_xyz_coords(
+        cd_hit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
             cd_hit_domain_df
             )
 
-        # Copies required DSSP files from database (on hard drive) to local machine
+        # Copies required DSSP files from database (on hard drive) to local
+        # machine
         if os.path.isdir('DSSP_files'):
             shutil.rmtree('DSSP_files')
         os.mkdir('DSSP_files')
@@ -355,7 +364,8 @@ class run_stages():
         filtered_files = filter_dssp_database(self.run_parameters)
         dssp_domain_df = filtered_files.copy_files_from_dssp_database(cd_hit_domain_df)
 
-        # Extracts beta-strands (as classified by DSSP) from the beta-structure domains
+        # Extracts beta-strands (as classified by DSSP) from the beta-structure
+        # domains
         beta_structure = beta_structure_dssp_classification(self.run_parameters)
         dssp_residues_dict = beta_structure.extract_dssp_file_lines(dssp_domain_df)
 
@@ -365,15 +375,15 @@ class run_stages():
             shutil.rmtree('Beta_strands')
         os.mkdir('Beta_strands')
 
-        dssp_dfs_dict = beta_structure.get_dssp_sec_struct_df(
-            dssp_residues_dict, pdb_dfs_dict
+        all_atoms_dfs_dict, sec_struct_dfs_dict = beta_structure.get_dssp_sec_struct_df(
+            dssp_residues_dict, all_atoms_dfs_dict
             )
-        beta_structure.write_dssp_sec_struct_pdb(dssp_dfs_dict)
+        beta_structure.write_dssp_sec_struct_pdb(sec_struct_dfs_dict)
 
         # Combines the beta-strands into sheets and translates the identified
         # beta-strand interactions into a network
         beta_structure = manipulate_beta_structure(self.run_parameters)
-        beta_structure.identify_strand_interactions(dssp_dfs_dict)
+        beta_structure.identify_strand_interactions(sec_struct_dfs_dict)
 
 
     def run_stage_3(self):
@@ -382,10 +392,10 @@ class run_stages():
                 run, resn, rfac
                 ), 'rb'
             ) as pickle_file:
-            (dssp_dfs_dict, domain_networks_dict, domain_sheets_dict) = pickle.load(pickle_file)
+            (sec_struct_dfs_dict, domain_networks_dict, domain_sheets_dict) = pickle.load(pickle_file)
 
         beta_structure = calculate_solvent_accessible_surface_area(
-            run=run, resn=resn, rfac=rfac, dssp_dfs_dict=dssp_dfs_dict,
+            run=run, resn=resn, rfac=rfac, sec_struct_dfs_dict=sec_struct_dfs_dict,
             domain_sheets_dict=domain_sheets_dict
             )
         beta_structure.run_naccess()

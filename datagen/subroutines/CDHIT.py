@@ -7,6 +7,7 @@ if __name__ == 'subroutines.CDHIT':
 else:
     from datagen.subroutines.run_stages import run_stages
 
+
 class filter_beta_structure(run_stages):
 
     def __init__(self, run_parameters):
@@ -25,7 +26,7 @@ class filter_beta_structure(run_stages):
 
         for row in range(domain_df.shape[0]):
             print('Obtaining header information for {}'.format(domain_df['PDB_CODE'][row]))
-            print('{}'.format((row/domain_df.shape[0])*100))
+            print('{:0.2f}%'.format(((row+1)/domain_df.shape[0])*100))
 
             middle_characters = domain_df['PDB_CODE'][row][1:3]
             cwd = os.getcwd()
@@ -62,6 +63,7 @@ class filter_beta_structure(run_stages):
                             resolution = float(line[23:30])
                         except ValueError:
                             resolution = 0
+                            break
                 elif whitespace_remv_line.startswith('REMARK3RVALUE'):
                     if any(x in whitespace_remv_line for x in ['(WORKINGSET)', '(WORKINGSET,NOCUTOFF)']):
                         rfactor = whitespace_remv_line.split(':')
@@ -81,7 +83,7 @@ class filter_beta_structure(run_stages):
         filtered_domain_df_part_1 = domain_df[domain_df['PDB_CODE'].isin(processed_list)]
         filtered_domain_df_part_1 = filtered_domain_df_part_1.reset_index(drop=True)
         filtered_domain_df_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
-                                                    'RFACTOR': rfactor_list})
+                                                  'RFACTOR': rfactor_list})
         filtered_domain_df = pd.concat([filtered_domain_df_part_1, filtered_domain_df_part_2], axis=1)
         filtered_domain_df.to_pickle('CDHIT_entries.pkl')
         filtered_domain_df.to_csv('CDHIT_entries.csv')

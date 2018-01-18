@@ -9,7 +9,8 @@ if __name__ == 'subroutines.extract_coordinates':
 else:
     from datagen.subroutines.run_stages import run_stages
 
-# Defines dictionary of three- and one-letter codes of standard amino acids
+# Defines dictionary of three- and one-letter codes of the standard 20 amino
+# acids
 amino_acids_dict = {'ALA': 'A',
                     'ARG': 'R',
                     'ASN': 'N',
@@ -30,6 +31,7 @@ amino_acids_dict = {'ALA': 'A',
                     'TRP': 'W',
                     'TYR': 'Y',
                     'VAL': 'V'}
+
 
 class extract_beta_structure_coords(run_stages):
 
@@ -58,8 +60,8 @@ class extract_beta_structure_coords(run_stages):
             index = df_index_sub_list[rand_num]
             df_index_list.append(index)
 
-        # Filters dataframe further to retain only the domains selected in the previous
-        # step
+        # Filters dataframe further to retain only the domains selected in the
+        # previous step
         cd_hit_domain_df = filtered_domain_df.iloc[df_index_list]
         cd_hit_domain_df = cd_hit_domain_df.reset_index(drop=True)
         return cd_hit_domain_df
@@ -68,7 +70,7 @@ class extract_beta_structure_coords(run_stages):
         # Extends the filtered (for resolution, R_factor (working value) and
         # sequence redundancy) dataframe to list the xyz coordinates of each
         # segment sequence (SSEQS)
-        pdb_dfs_dict = OrderedDict()
+        all_atoms_dfs_dict = OrderedDict()
         domain_residue_list = []
         unprocessed_list = []
 
@@ -94,12 +96,12 @@ class extract_beta_structure_coords(run_stages):
             # Copies PDB file of input structure from hard drive
             pdb_code = cd_hit_domain_df['PDB_CODE'][row]
 
-            print('{}'.format((row/cd_hit_domain_df.shape[0])*100))
             print('Obtaining ATOM / HETATM records for {}'.format(pdb_code))
+            print('{:0.2f}%'.format(((row+1)/cd_hit_domain_df.shape[0])*100))
 
             middle_characters = pdb_code[1:3]
             cwd = os.getcwd()
-            os.chdir('/{}/{}'.format(self.pdb_database, middle_characters))
+            os.chdir('{}{}'.format(self.pdb_database, middle_characters))
 
             with open('{}.pdb'.format(pdb_code), 'r') as pdb_file:
                 pdb_file_lines = [line.strip('\n') for line in pdb_file if
@@ -124,15 +126,18 @@ class extract_beta_structure_coords(run_stages):
 
                 for index_2, line in enumerate(pdb_file_lines):
                     if index_2 != (len(pdb_file_lines)-1):
-                        if line[22:27].strip() == start and line[21:22] == cd_hit_domain_df['CHAIN'][row]:
+                        if (line[22:27].strip() == start
+                            and line[21:22] == cd_hit_domain_df['CHAIN'][row]
+                            ):
                             start_seq = True
 
                         if start_seq is True and stop_seq is False:
                             index.append(index_2)
                             if (line[22:27].strip() != pdb_file_lines[index_2+1][22:27].strip()
-                                or pdb_file_lines[index_2+1][0:3] == 'TER'):
-                                    if line[17:20].strip() in amino_acids_dict:
-                                        sequence = sequence + amino_acids_dict[line[17:20].strip()]
+                                or pdb_file_lines[index_2+1][0:3] == 'TER'
+                                ):
+                                if line[17:20].strip() in amino_acids_dict:
+                                    sequence = sequence + amino_acids_dict[line[17:20].strip()]
                         elif stop_seq is True:
                             sequences.append(sequence)
                             indices.append(index)
@@ -150,11 +155,14 @@ class extract_beta_structure_coords(run_stages):
                             ):
                                 stop_seq = True
 
+                # Selects the first identified sequence from the input PDB that
+                # shares greater than 95% sequence similarity with the domain
+                # segment sequence in question
                 sequence_identified = False
                 for index_3, sequence in enumerate(sequences):
                     sseqs_list = []
                     similarity = SequenceMatcher(a=segment, b=sequence).ratio()
-                    if similarity > 0.95:
+                    if similarity >= 0.95:
                         sequence_identified = True
 
                         pdb_file = open('Entire_domains/{}.pdb'.format(
@@ -185,42 +193,47 @@ class extract_beta_structure_coords(run_stages):
                         pdb_file.write('TER'.ljust(80)+'\n')
                         pdb_file.close()
 
-                        pdb_df = pd.DataFrame({'FILE_LINES': lines,
-                                               'REC': rec,
-                                               'ATMNUM': atmnum,
-                                               'ATMNAME': atmname,
-                                               'CONFORMER': conformer,
-                                               'RESNAME': resname,
-                                               'CHAIN': chain,
-                                               'RESNUM': resnum,
-                                               'INSCODE': insertion,
-                                               'XPOS': xpos,
-                                               'YPOS': ypos,
-                                               'ZPOS': zpos,
-                                               'OCC': occ,
-                                               'BFAC': bfac,
-                                               'ELEMENT': element,
-                                               'CHARGE': charge})
-                        cols = pdb_df.columns.tolist()
-                        cols = ([cols[7]] + [cols[10]] + [cols[1]] + [cols[0]]
-                                + [cols[5]] + [cols[11]] + [cols[3]] + [cols[12]]
-                                + [cols[8]] + [cols[13]] + [cols[14]] + [cols[15]]
-                                + [cols[9]] + [cols[2]] + [cols[6]] + [cols[4]])
-                        pdb_df = pdb_df[cols]
-                        pdb_dfs_dict[cd_hit_domain_df['DOMAIN_ID'][row]] = pdb_df
-
                         residue_list.extend(sseqs_list)
-
                         break
 
                 if sequence_identified is False:
                     unprocessed_list.append('{}'.format(cd_hit_domain_df['DOMAIN_ID'][row]))
+                    break
 
+            # Makes a dataframe of the PDB information for the domain sequence
+            # if each of its SSEQS were identified in the input PDB file
+            if not cd_hit_domain_df['DOMAIN_ID'][row] in unprocessed_list:
+                pdb_df = pd.DataFrame({'FILE_LINES': lines,
+                                       'REC': rec,
+                                       'ATMNUM': atmnum,
+                                       'ATMNAME': atmname,
+                                       'CONFORMER': conformer,
+                                       'RESNAME': resname,
+                                       'CHAIN': chain,
+                                       'RESNUM': resnum,
+                                       'INSCODE': insertion,
+                                       'XPOS': xpos,
+                                       'YPOS': ypos,
+                                       'ZPOS': zpos,
+                                       'OCC': occ,
+                                       'BFAC': bfac,
+                                       'ELEMENT': element,
+                                       'CHARGE': charge})
+                cols = pdb_df.columns.tolist()
+                cols = ([cols[7]] + [cols[10]] + [cols[1]] + [cols[0]]
+                        + [cols[5]] + [cols[11]] + [cols[3]] + [cols[12]]
+                        + [cols[8]] + [cols[13]] + [cols[14]] + [cols[15]]
+                        + [cols[9]] + [cols[2]] + [cols[6]] + [cols[4]])
+                pdb_df = pdb_df[cols]
+                all_atoms_dfs_dict[cd_hit_domain_df['DOMAIN_ID'][row]] = pdb_df
+
+            # Makes a list of residue numbers of the domain sequence if
+            # successfully identified in the input PDB file
             chain_num_list = []
             for chain_num in residue_list:
                 if chain_num not in chain_num_list:
                     chain_num_list.append(chain_num)
-            if len(chain_num_list) > 0:
+            if not cd_hit_domain_df['DOMAIN_ID'][row] in unprocessed_list:
                 domain_residue_list.append(chain_num_list)
 
         # Lists all segment sequences that could not be processed owing to
@@ -228,15 +241,16 @@ class extract_beta_structure_coords(run_stages):
         # CATH_domain_desc_v_4_2_0.txt and the FASTA sequence extracted from
         # the PDB file in the unprocessed structures file
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nDissimilar coordinates:\n')
+            unprocessed_file.write('\n\n{} domain unable to be identified in '
+                                   'PDB file:\n'.format(self.code))
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
         cd_hit_domain_df = cd_hit_domain_df[~cd_hit_domain_df['DOMAIN_ID'].isin(unprocessed_list)]
         cd_hit_domain_df = cd_hit_domain_df.reset_index(drop=True)
 
-        # Appends xyz coordinates column to dataframe
+        # Appends column of residue numbers to the input dataframe
         domain_residue_df = pd.DataFrame({'CHAIN_NUM': domain_residue_list})
         cd_hit_domain_df = pd.concat([cd_hit_domain_df, domain_residue_df], axis=1)
 
-        return cd_hit_domain_df, pdb_dfs_dict
+        return cd_hit_domain_df, all_atoms_dfs_dict

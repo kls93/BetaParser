@@ -6,12 +6,12 @@ from collections import OrderedDict
 
 class calculate_solvent_accessible_surface_area():
 
-    def __init__(self, run, resn, rfac, dssp_dfs_dict, domain_networks_dict,
+    def __init__(self, run, resn, rfac, sec_struct_dfs_dict, domain_networks_dict,
                  domain_sheets_dict):
         self.run = run
         self.resn = resn
         self.rfac = rfac
-        self.dssp_dfs_dict = dssp_dfs_dict
+        self.sec_struct_dfs_dict = sec_struct_dfs_dict
         self.sheets_dict = domain_sheets_dict
 
     def run_naccess(self):
@@ -19,7 +19,7 @@ class calculate_solvent_accessible_surface_area():
 
         unprocessed_list = []
 
-        for domain_id in list(self.dssp_dfs_dict.keys()):
+        for domain_id in list(self.sec_struct_dfs_dict.keys()):
             sheets = [key for key in list(self.sheets_dict.keys())
                       if domain_id in key]
             combinations = list(itertools.combinations(sheets, 2))
@@ -60,7 +60,7 @@ class calculate_solvent_accessible_surface_area():
             # area of the individual sheets
             if min(list(solv_acsblty_dict.keys())) > 0.9:
                 unprocessed_list.append(domain_id)
-                self.dssp_dfs_dict[domain_id] = None
+                self.sec_struct_dfs_dict[domain_id] = None
                 for sheet_id in sheets:
                     self.sheets_dict[sheet_id] = None
             else:
@@ -70,7 +70,7 @@ class calculate_solvent_accessible_surface_area():
                     if sheet_id not in sandwich:
                         self.sheets_dict[sheet_id] = None
 
-                dssp_df = self.dssp_dfs_dict[domain_id]
+                dssp_df = self.sec_struct_dfs_dict[domain_id]
                 sheets_retained = [sheet_id.strip('{}_sheet_'.format(domain_id))
                                    for sheet_id in sandwich]
                 sub_dssp_df = dssp_df[dssp_df['SHEET_NUM'].isin(sheets_retained)]
@@ -86,9 +86,9 @@ class calculate_solvent_accessible_surface_area():
                         dssp_df.loc[row, 'REC'] = None
                 dssp_df = dssp_df[dssp_df['REC'].notnull()]
                 dssp_df = dssp_df.reset_index(drop=True)
-                self.dssp_dfs_dict[domain_id] = dssp_df
+                self.sec_struct_dfs_dict[domain_id] = dssp_df
 
-        fltrd_dssp_dfs_dict = {key: value for key, value in self.dssp_dfs_dict.items()
+        fltrd_sec_struct_dfs_dict = {key: value for key, value in self.sec_struct_dfs_dict.items()
                                if value is not None}
         fltrd_sheets_dict = {key: value for key, value in self.sheets_dict.items()
                              if value is not None}
@@ -98,4 +98,4 @@ class calculate_solvent_accessible_surface_area():
                 self.run, self.resn, self.rfac
                 ), 'wb'
             ) as pickle_file:
-            pickle.dump((fltrd_dssp_dfs_dict, fltrd_sheets_dict), pickle_file)
+            pickle.dump((fltrd_sec_struct_dfs_dict, fltrd_sheets_dict), pickle_file)
