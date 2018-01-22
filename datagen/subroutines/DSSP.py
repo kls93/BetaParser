@@ -15,10 +15,10 @@ class filter_dssp_database(run_stages):
     def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
 
-    def copy_files_from_dssp_database(self, cd_hit_domain_df):
+    def copy_files_from_dssp_database(self, cdhit_domain_df):
         # Generates list of all PDB accession codes to be extracted from the
         # DSSP database
-        pdb_list = set(cd_hit_domain_df['PDB_CODE'].tolist())
+        pdb_list = set(cdhit_domain_df['PDB_CODE'].tolist())
 
         # Copies DSSP files of listed PDB accession codes to current working
         # directory
@@ -42,9 +42,9 @@ class filter_dssp_database(run_stages):
             for pdb_code in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(pdb_code))
 
-        # Filters cd_hit_domain_df_xyz to remove entries not in the DSSP
+        # Filters cdhit_domain_df_xyz to remove entries not in the DSSP
         # database
-        dssp_domain_df = cd_hit_domain_df[~cd_hit_domain_df['PDB_CODE'].isin(unprocessed_list)]
+        dssp_domain_df = cdhit_domain_df[~cdhit_domain_df['PDB_CODE'].isin(unprocessed_list)]
         dssp_domain_df = dssp_domain_df.reset_index(drop=True)
 
         return dssp_domain_df
@@ -119,6 +119,7 @@ class beta_structure_dssp_classification(run_stages):
             bridge_pair_list = []
             phi = []
             psi = []
+            lines = []
 
             # Extracts secondary structure information from the DSSP file lines
             for index_2, line in enumerate(dssp_indv_file_lines):
@@ -129,6 +130,7 @@ class beta_structure_dssp_classification(run_stages):
                     secondary_structure = line[16:17]
                     phi.append(float(line[91:97]))
                     psi.append(float(line[97:103]))
+                    lines.append(line.strip('\n'))
                     if secondary_structure == 'E':
                         sec_struct_assignment.append(secondary_structure)
                         strand_number_list.append(strand_number)
@@ -171,6 +173,7 @@ class beta_structure_dssp_classification(run_stages):
             bridge_pair_list_extnd_df = ['']*row_num
             phi_extnd_df = ['']*row_num
             psi_extnd_df = ['']*row_num
+            lines_extnd_df = ['']*row_num
 
             # Fills lists created in the previous step
             for row in range(row_num):
@@ -189,6 +192,7 @@ class beta_structure_dssp_classification(run_stages):
                             bridge_pair_list_extnd_df[row] = bridge_pair_list[index_3]
                             phi_extnd_df[row] = phi[index_3]
                             psi_extnd_df[row] = psi[index_3]
+                            lines_extnd_df[row] = lines[index_3]
                             break
 
             # Appends DSSP info to dataframe of PDB info
@@ -199,10 +203,11 @@ class beta_structure_dssp_classification(run_stages):
                                     'ORIENTATION': orientation_list_extnd_df,
                                     'H-BONDS': bridge_pair_list_extnd_df,
                                     'PHI': phi_extnd_df,
-                                    'PSI': psi_extnd_df})
+                                    'PSI': psi_extnd_df,
+                                    'DSSP_FILE_LINES': lines_extnd_df})
             cols = dssp_df.columns.tolist()
-            cols = ([cols[0]] + [cols[5]] + [cols[7]] + [cols[6]] + [cols[2]]
-                    + [cols[1]] + [cols[3]] + [cols[4]])
+            cols = ([cols[0]] + [cols[1]] + [cols[6]] + [cols[8]] + [cols[7]]
+                    + [cols[3]] + [cols[2]] + [cols[4]] + [cols[5]])
             dssp_df = dssp_df[cols]
 
             extnd_df = pd.concat([pdb_df, dssp_df], axis=1)
@@ -249,6 +254,6 @@ class beta_structure_dssp_classification(run_stages):
                         if ((dssp_df['CHAIN'][row] + str(dssp_df['RESNUM'][row])
                             + dssp_df['INSCODE'][row]) in chain_res_num
                             ):
-                            new_pdb_file.write('{}\n'.format(dssp_df['FILE_LINES'][row]))
+                            new_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
 
                     new_pdb_file.write('TER'.ljust(80)+'\n')

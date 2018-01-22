@@ -105,8 +105,8 @@ class filter_beta_structure(run_stages):
         return filtered_domain_df
 
     # Generates list of beta-structure chain entries for sequence redundancy
-    # filtering using the cd_hit web server
-    def gen_cd_hit_list(self, filtered_domain_df):
+    # filtering using the CD-HIT web server
+    def gen_cdhit_list(self, filtered_domain_df):
         fasta = filtered_domain_df['DSEQS'].tolist()
         domain_ids = filtered_domain_df['DOMAIN_ID'].tolist()
 

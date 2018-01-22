@@ -9,13 +9,15 @@ import argparse
 
 def main():
     if __name__ == '__main__':
-        from subroutines.run_stages import (
-            gen_run_parameters, find_cd_hit_input, run_stages
+        from subroutines.run_parameters import (
+            gen_run_parameters, find_cdhit_input
             )
+        from subroutines.run_stages import run_stages
     else:
-        from datagen.subroutines.run_stages import (
-            gen_run_parameters, find_cd_hit_input, run_stages
+        from datagen.subroutines.run_parameters import (
+            gen_run_parameters, find_cdhit_input
             )
+        from datagen.subroutines.run_stages import run_stages
     orig_dir = os.getcwd()
 
     # Reads in command line inputs
@@ -45,7 +47,7 @@ def main():
     # Extracts PDB structures and structural information for each of the
     # sequences listed in a CDHIT output txt file
     elif stage in ['2']:
-        cdhit_entries, cdhit_output = find_cd_hit_input(stage, args)
+        cdhit_entries, cdhit_output = find_cdhit_input(stage, args)
         analysis.run_stage_2(cdhit_entries, cdhit_output)
     # Runs naccess upon each structure to calculate the solvent accessible
     # surface area of its beta-sheets and thus identify those which interact

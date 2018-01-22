@@ -20,7 +20,6 @@ class manipulate_beta_structure(run_stages):
         # out the strand interactions and thus loop connections both within and
         # between sheets
         domain_sheets_dict = OrderedDict()
-        domain_networks_dict = OrderedDict()
 
         for domain_id, dssp_df in sec_struct_dfs_dict.items():
             edge_labels = {}
@@ -122,7 +121,7 @@ class manipulate_beta_structure(run_stages):
                             if ((dssp_df['CHAIN'][row] + str(dssp_df['RESNUM'][row])
                                 + dssp_df['INSCODE'][row]) in chain_res_num
                                 ):
-                                sheet_pdb_file.write('{}\n'.format(dssp_df['FILE_LINES'][row]))
+                                sheet_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
                         sheet_pdb_file.write('TER'.ljust(80)+'\n')
 
                 # Creates network of the interacting strands in the sheet
@@ -149,7 +148,6 @@ class manipulate_beta_structure(run_stages):
             for sheet_n in sheets_2_to_n:
                 H = domain_sheets[sheet_n]
                 G = nx.compose(G, H)
-            domain_networks_dict[domain_id] = G
 
             pos = nx.circular_layout(G)
             plt.clf()
@@ -167,5 +165,6 @@ class manipulate_beta_structure(run_stages):
         # sheet solvent accessibilities to work out which sheets interact with
         # one another
         with open('Domain_networks_dict.pkl', 'wb') as pickle_file:
-            pickle.dump((sec_struct_dfs_dict, domain_networks_dict,
-                         domain_sheets_dict), pickle_file)
+            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
+
+        return domain_sheets_dict
