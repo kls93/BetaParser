@@ -60,7 +60,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
 
             # Calculates solvent accessibility of individual residues (in the
             # context of the parent CATH / SCOPe domain)
-            res_solv_acsblty = {}
+            res_solv_acsblty = OrderedDict()
             with open('Entire_domains/{}.pdb'.format(domain_id), 'r') as pdb_file:
                 sheet_string = ''.join(pdb_file.readlines())
             naccess_out = naccess.run_naccess(sheet_string, 'rsa', path=False,
@@ -89,7 +89,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
                     if sheet_id not in sandwich:
                         domain_sheets_dict[sheet_id] = None
 
-                sheets_retained = [sheet_id.strip('{}_sheet_'.format(domain_id))
+                sheets_retained = [sheet_id.replace('{}_sheet_'.format(domain_id), '')
                                    for sheet_id in sandwich]
                 sub_sec_struct_df = sec_struct_df[sec_struct_df['SHEET_NUM'].isin(sheets_retained)]
                 chain = sub_sec_struct_df['CHAIN'].tolist()
@@ -108,7 +108,9 @@ class calculate_solvent_accessible_surface_area(run_stages):
                         ):
                         solv_acsblty_list[row] = res_solv_acsblty[chain_res_num]
                 solv_acsblty_df = pd.DataFrame({'SOLV_ACSBLTY': solv_acsblty_list})
-                sec_struct_df = pd.concat([sec_struct_df, solv_acsblty_df], axis=1)
+                chain_res_num_df = pd.DataFrame({'RES_ID': chain_res_num_list})
+                sec_struct_df = pd.concat([sec_struct_df, solv_acsblty_df,
+                                          chain_res_num_df], axis=1)
                 sec_struct_df = sec_struct_df[sec_struct_df['REC'].notnull()]
                 sec_struct_df = sec_struct_df.reset_index(drop=True)
                 sec_struct_dfs_dict[domain_id] = sec_struct_df
@@ -120,9 +122,67 @@ class calculate_solvent_accessible_surface_area(run_stages):
 
         return sec_struct_dfs_dict, domain_sheets_dict
 
+    def identify_int_ext(self, sec_struct_dfs_dict, domain_sheets_dict):
+        # Calculates the sum of the solvent accessibilities of every other
+        # residue, and from this determines which face towards the interior
+        # of the sandwich and which towards the exterior
+        import isambard.external_programs.naccess as naccess
 
+        for domain_id in list(sec_struct_dfs_dict.keys()):
+            sec_struct_df = sec_struct_dfs_dict[domain_id]
+            sheets = [key for key in list(domain_sheets_dict.keys()) if
+                      domain_id in key]
+            int_ext_list = ['']*sec_struct_df.shape[0]
+            int_ext_dict = OrderedDict()
+            if len(sheets) > 2:
+                sys.exit('Error - more than 2 sheets retained following '
+                         'solvent accessibility calculation')
+            # Calculates solvent accessibility of both sheets in pair
+            print('Calculating solvent accessible surface area for {}'.format(domain_id))
+            sheet_string = ''
+            for sheet_id in sheets:
+                with open('Beta_strands/{}.pdb'.format(sheet_id), 'r') as pdb_file:
+                    sheet_string += ''.join(pdb_file.readlines())
+            naccess_out = naccess.run_naccess(sheet_string, 'rsa', path=False,
+                                              include_hetatms=True)
+            naccess_out = naccess_out.split('\n')
+            naccess_out = [line for line in naccess_out if line != '']
+            for line in naccess_out:
+                if line[0:3] == 'RES':
+                    chain = line[8:9].strip()
+                    res_num = line[9:13].strip()
+                    ins_code = line[13:14].strip()
+                    chain_res_num = chain + res_num + ins_code
+                    int_ext_dict[chain_res_num] = float(line[14:22])
+            face_1_res = [value for value in list(int_ext_dict.values())[::2]]
+            face_2_res = [value for value in list(int_ext_dict.values())[1::2]]
+            face_1_solv_acsblty = sum(face_1_res)
+            face_2_solv_acsblty = sum(face_2_res)
+            if face_1_solv_acsblty > face_2_solv_acsblty:
+                ext_chain_res_num = list(int_ext_dict.keys())[::2]
+                int_chain_res_num = list(int_ext_dict.keys())[1::2]
+            elif face_1_solv_acsblty < face_2_solv_acsblty:
+                ext_chain_res_num = list(int_ext_dict.keys())[1::2]
+                int_chain_res_num = list(int_ext_dict.keys())[::2]
+            else:
+                sys.exit('Solvent accessibilities of two faces of {} are equal - '
+                         'something has gone wrong with the analysis'.format(sheet_id))
+            for chain_res_num in ext_chain_res_num:
+                int_ext_dict[chain_res_num] = 'exterior'
+            for chain_res_num in int_chain_res_num:
+                int_ext_dict[chain_res_num] = 'interior'
 
-    def identify_int_ext(self):
-        # Uses solvent accessibility to identify the interior and exterior face
-        # of each strand
+            for row in range(sec_struct_df.shape[0]):
+                chain_res_num = (sec_struct_df['CHAIN'][row]
+                                 +str(sec_struct_df['RESNUM'][row])
+                                 +sec_struct_df['INSCODE'][row])
+                if (chain_res_num in list(int_ext_dict.keys())
+                    and sec_struct_df['ATMNAME'][row] == 'CA'
+                    ):
+                    int_ext_list[row] = int_ext_dict[chain_res_num]
+            int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
+            sec_struct_df = pd.concat([sec_struct_df, int_ext_df], axis=1)
+            sec_struct_df = sec_struct_df.reset_index(drop=True)
+            sec_struct_dfs_dict[domain_id] = sec_struct_df
+
         return sec_struct_dfs_dict

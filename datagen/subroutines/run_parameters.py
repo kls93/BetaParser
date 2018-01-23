@@ -3,6 +3,7 @@ import os
 import sys
 import shutil
 import pandas as pd
+from collections import OrderedDict
 
 prompt = '> '
 
@@ -21,7 +22,7 @@ def gen_run_parameters(args):
             break
 
     # Sets as many run parameters as possible from the input file (if provided)
-    run_parameters = {}
+    run_parameters = OrderedDict()
     if vars(args)['input_file']:
         try:
             with open('/{}'.format(vars(args)['input_file'].strip('/')), 'r') as input_file:

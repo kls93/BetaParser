@@ -1,6 +1,7 @@
 
 import networkx as nx
 import pandas as pd
+from collections import OrderedDict
 if __name__ == 'subroutines.output_dataframe':
     from subroutines.run_stages import run_stages
     from subroutines.variables import gen_amino_acids_dict
@@ -25,7 +26,7 @@ class gen_output(run_stages):
                 G = nx.compose(G, H)
             sec_struct_df = sec_struct_dfs_dict[domain_id]
 
-            edge_or_central = {}
+            edge_or_central = OrderedDict()
             strands = set(sec_struct_df['STRAND_NUM'].tolist())
             for strand_num in strands:
                 if strand_num in G:
@@ -53,6 +54,7 @@ class gen_output(run_stages):
         amino_acids_dict = gen_amino_acids_dict()
 
         domain_strand_ids = []
+        res_ids = []
         edge_or_central = []
         residues = []
         int_ext = []
@@ -66,10 +68,13 @@ class gen_output(run_stages):
 
             for strand_num in strands_list:
                 strand_df = sec_struct_df[sec_struct_df['STRAND_NUM']==strand_num]
-                stranddf = strand_df.reset_index(drop=True)
+                strand_df = strand_df.reset_index(drop=True)
 
                 # Gives strand a unique ID
                 domain_strand_ids.append('{}_strand_{}'.format(domain_id, strand_num))
+
+                # Lists residue IDs in strand
+                res_ids.append(set(strand_df['RES_ID'].tolist()))
 
                 # Determines whether the strand is an edge or central strand
                 edge_or_central.append(set(strand_df['EDGE_OR_CNTRL'].tolist()))
@@ -80,7 +85,7 @@ class gen_output(run_stages):
 
                 # Generates list of interior and exterior facing residues in
                 # the strand
-                # int_ext.append(strand_df['INT_OR_EXT'].tolist())
+                int_ext.append(strand_df['INT_EXT'].tolist())
 
                 # Generates list of phi and psi angles along the strand
                 phi = strand_df['PHI'].tolist()
@@ -94,18 +99,21 @@ class gen_output(run_stages):
                 solv_ascblty.append(strand_df['SOLV_ACSBLTY'].tolist())
 
         beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
+                                        'RES_ID': res_ids,
                                         'EDGE_OR_CNTRL': edge_or_central,
                                         'RESIDUES': residues,
+                                        'INT_EXT': int_ext,
                                         'BCKBN_GEOM': bckbn_phi_psi,
                                         'SOLV_ACSBLTY': solv_ascblty})
         beta_strands_df.to_pickle('Beta_strands_dataframe.pkl')
         beta_strands_df.to_csv('Beta_strands_dataframe.csv')
 
-        """
         int_indices = [index for index, value in enumerate(int_ext) if
                        value == 'interior']
         int_domain_strand_ids = [value for index, value in enumerate(domain_strand_ids)
                                  if index in int_indices]
+        int_res_ids = [value for index, value in enumerate(res_ids)
+                       if index in int_indices]
         int_edge_or_central = [value for index, value in enumerate(edge_or_central)
                                if index in int_indices]
         int_residues = [value for index, value in enumerate(residues)
@@ -117,6 +125,7 @@ class gen_output(run_stages):
         int_solv_ascblty = [value for index, value in enumerate(solv_ascblty)
                             if index in int_indices]
         int_beta_strands_df = pd.DataFrame({'STRAND_ID': int_domain_strand_ids,
+                                            'RES_ID': int_res_ids,
                                             'EDGE_OR_CNTRL': int_edge_or_central,
                                             'RESIDUES': int_residues,
                                             'INT_EXT': interior,
@@ -129,6 +138,8 @@ class gen_output(run_stages):
                        value == 'exterior']
         ext_domain_strand_ids = [value for index, value in enumerate(domain_strand_ids)
                                  if index in ext_indices]
+        ext_res_ids = [value for index, value in enumerate(res_ids)
+                       if index in ext_indices]
         ext_edge_or_central = [value for index, value in enumerate(edge_or_central)
                                if index in ext_indices]
         ext_residues = [value for index, value in enumerate(residues)
@@ -140,6 +151,7 @@ class gen_output(run_stages):
         ext_solv_ascblty = [value for index, value in enumerate(solv_ascblty)
                             if index in ext_indices]
         ext_beta_strands_df = pd.DataFrame({'STRAND_ID': ext_domain_strand_ids,
+                                            'RES_ID': ext_res_ids,
                                             'EDGE_OR_CNTRL': ext_edge_or_central,
                                             'RESIDUES': ext_residues,
                                             'INT_EXT': exterior,
@@ -147,4 +159,3 @@ class gen_output(run_stages):
                                             'SOLV_ACSBLTY': ext_solv_ascblty})
         ext_beta_strands_df.to_pickle('Exterior_beta_strands_dataframe.pkl')
         ext_beta_strands_df.to_csv('Exterior_beta_strands_dataframe.csv')
-        """

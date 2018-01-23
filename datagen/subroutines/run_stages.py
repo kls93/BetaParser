@@ -132,6 +132,9 @@ class run_stages():
         sec_struct_dfs_dict, domain_sheets_dict = beta_structure.run_naccess(
             sec_struct_dfs_dict, domain_sheets_dict
             )
+        sec_struct_dfs_dict = beta_structure.identify_int_ext(
+            sec_struct_dfs_dict, domain_sheets_dict
+            )
 
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
