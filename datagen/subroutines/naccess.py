@@ -23,6 +23,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
             sheets = {key: value for key, value in domain_sheets_dict.items()
                       if domain_id in key}
             combinations = list(itertools.combinations(list(sheets.keys()), 2))
+            res_id_list = ['']*sec_struct_df.shape[0]
             solv_acsblty_list = ['']*sec_struct_df.shape[0]
             solv_acsblty_dict = OrderedDict()
             for sheet_pair in combinations:
@@ -103,14 +104,18 @@ class calculate_solvent_accessible_surface_area(run_stages):
                                      +sec_struct_df['INSCODE'][row])
                     if chain_res_num not in chain_res_num_list:
                         sec_struct_df.loc[row, 'REC'] = None
+                    elif (chain_res_num in chain_res_num_list and
+                        sec_struct_df['ATMNAME'][row] == 'CA'
+                        ):
+                        res_id_list[row] = chain_res_num
                     if (chain_res_num in list(res_solv_acsblty.keys())
                         and sec_struct_df['ATMNAME'][row] == 'CA'
                         ):
                         solv_acsblty_list[row] = res_solv_acsblty[chain_res_num]
                 solv_acsblty_df = pd.DataFrame({'SOLV_ACSBLTY': solv_acsblty_list})
-                chain_res_num_df = pd.DataFrame({'RES_ID': chain_res_num_list})
+                res_id_df = pd.DataFrame({'RES_ID': res_id_list})
                 sec_struct_df = pd.concat([sec_struct_df, solv_acsblty_df,
-                                          chain_res_num_df], axis=1)
+                                          res_id_df], axis=1)
                 sec_struct_df = sec_struct_df[sec_struct_df['REC'].notnull()]
                 sec_struct_df = sec_struct_df.reset_index(drop=True)
                 sec_struct_dfs_dict[domain_id] = sec_struct_df

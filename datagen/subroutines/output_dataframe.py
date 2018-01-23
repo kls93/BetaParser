@@ -74,10 +74,10 @@ class gen_output(run_stages):
                 domain_strand_ids.append('{}_strand_{}'.format(domain_id, strand_num))
 
                 # Lists residue IDs in strand
-                res_ids.append(set(strand_df['RES_ID'].tolist()))
+                res_ids.append(strand_df['RES_ID'].tolist())
 
                 # Determines whether the strand is an edge or central strand
-                edge_or_central.append(set(strand_df['EDGE_OR_CNTRL'].tolist()))
+                edge_or_central.append(strand_df['EDGE_OR_CNTRL'].tolist()[0])
 
                 # Generates FASTA sequence of strand
                 residues.append([amino_acids_dict[residue] for residue in
