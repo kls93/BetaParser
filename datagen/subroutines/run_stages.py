@@ -57,13 +57,13 @@ class run_stages():
             from subroutines.DSSP import (
                 filter_dssp_database, beta_structure_dssp_classification
                 )
-            from subroutines.generate_network import manipulate_beta_structure
+            from subroutines.generate_network import calculate_beta_network
         else:
             from datagen.subroutines.extract_coordinates import extract_beta_structure_coords
             from datagen.subroutines.DSSP import (
                 filter_dssp_database, beta_structure_dssp_classification
                 )
-            from datagen.subroutines.generate_network import manipulate_beta_structure
+            from datagen.subroutines.generate_network import calculate_beta_network
 
         # Loads the dataframe generated in previous steps
         filtered_domain_df = pd.read_pickle(cdhit_entries)
@@ -110,7 +110,7 @@ class run_stages():
 
         # Combines the beta-strands into sheets and translates the identified
         # beta-strand interactions into a network
-        beta_structure = manipulate_beta_structure(self.run_parameters)
+        beta_structure = calculate_beta_network(self.run_parameters)
         domain_sheets_dict = beta_structure.identify_strand_interactions(
             sec_struct_dfs_dict
             )
@@ -139,10 +139,12 @@ class run_stages():
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
 
-    def run_stage_4(self):
+    def run_stage_4(self, orig_dir):
         if __name__ == 'subroutines.run_stages':
+            from subroutines.OPM import extract_strand_tilt_and_TM_regions
             from subroutines.output_dataframe import gen_output
         else:
+            from datagen.subroutines.OPM import extract_strand_tilt_and_TM_regions
             from datagen.subroutines.output_dataframe import gen_output
 
         with open('Output_ISAMBARD_variables.pkl', 'rb') as pickle_file:

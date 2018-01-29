@@ -56,7 +56,7 @@ def main():
     # Analyses the summary of structural characteristics of the dataset via
     # random forest machine learning
     elif stage in ['4']:
-        analysis.run_stage_4()
+        analysis.run_stage_4(orig_dir)
 
 # Calls 'main' function if datagen.py is run as a script
 if __name__ == '__main__':

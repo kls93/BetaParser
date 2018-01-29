@@ -10,7 +10,7 @@ else:
     from datagen.subroutines.run_stages import run_stages
 
 
-class manipulate_beta_structure(run_stages):
+class calculate_beta_network(run_stages):
 
     def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
@@ -19,9 +19,12 @@ class manipulate_beta_structure(run_stages):
         # Separates the beta-strands identified by DSSP into sheets, and works
         # out the strand interactions and thus loop connections both within and
         # between sheets
+        import copy
+
+        sec_struct_dfs_dict_copy = copy.copy(sec_struct_dfs_dict)
         domain_sheets_dict = OrderedDict()
 
-        for domain_id, dssp_df in sec_struct_dfs_dict.items():
+        for domain_id, dssp_df in sec_struct_dfs_dict_copy.items():
             edge_labels = {}
             domain_sheets = {}
 
@@ -161,6 +164,8 @@ class manipulate_beta_structure(run_stages):
                 plt.savefig(
                     'Beta_strands/{}_network.png'.format(domain_id)
                     )
+            else:
+                sec_struct_dfs_dict[domain_id] = None
 
         # Pickles dictionaries of: 1) dataframes of atoms in residues of the
         # selected secondary structure type (currently restricted to
@@ -169,6 +174,8 @@ class manipulate_beta_structure(run_stages):
         # of ISAMBARD, in which I can run naccess to calculate residue and
         # sheet solvent accessibilities to work out which sheets interact with
         # one another
+        sec_struct_dfs_dict = {key: value for key, value in
+                               sec_struct_dfs_dict.items() if value is not None}
         with open('Domain_networks_dict.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
 
