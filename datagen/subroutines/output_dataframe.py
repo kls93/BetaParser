@@ -49,15 +49,19 @@ class gen_output(run_stages):
 
         return sec_struct_dfs_dict
 
-    def write_beta_strand_dataframe(self, sec_struct_dfs_dict):
+    def write_beta_strand_dataframe(self, sec_struct_dfs_dict, tilt_angles):
         # Generates dataframe of beta-strands
         amino_acids_dict = gen_amino_acids_dict()
 
         domain_strand_ids = []
+        tilt_angle = []
+        strand_number = []
+        shear_number = []
         res_ids = []
         edge_or_central = []
         residues = []
         int_ext = []
+        tm_ext = []
         bckbn_phi_psi = []
         solv_ascblty = []
 
@@ -73,19 +77,43 @@ class gen_output(run_stages):
                 # Gives strand a unique ID
                 domain_strand_ids.append('{}_strand_{}'.format(domain_id, strand_num))
 
+                # Lists tilt angle of strand
+                if self.code[0:4] in ['2.40']:
+                    tilt_angle.append(tilt_angles[domain_id])
+
+                # Lists number of strands in barrel
+                if self.code[0:4] in ['2.40']:
+                    strand_number.append('')
+
+                # Lists barrel shear number
+                if self.code[0:4] in ['2.40']:
+                    shear_number.append('')
+
                 # Lists residue IDs in strand
                 res_ids.append(strand_df['RES_ID'].tolist())
 
                 # Determines whether the strand is an edge or central strand
-                edge_or_central.append(strand_df['EDGE_OR_CNTRL'].tolist()[0])
+                if self.code in ['2.60']:
+                    edge_or_central.append(strand_df['EDGE_OR_CNTRL'].tolist()[0])
 
                 # Generates FASTA sequence of strand
-                residues.append([amino_acids_dict[residue] for residue in
-                                strand_df['RESNAME'].tolist()])
+                res_list = strand_df['RESNAME'].tolist()
+                sequence = ''
+                for res in res_list:
+                    if res in list(amino_acids_dict.keys()):
+                        sequence += amino_acids_dict[res]
+                    else:
+                        sequence += 'X'
+                residues.append(sequence)
 
                 # Generates list of interior and exterior facing residues in
                 # the strand
                 int_ext.append(strand_df['INT_EXT'].tolist())
+
+                # Generates list of transmembrane and exterior residues in the
+                # strand
+                if self.code[0:4] in ['2.40']:
+                    tm_ext.append(strand_df['TM_OR_EXT'].tolist())
 
                 # Generates list of phi and psi angles along the strand
                 phi = strand_df['PHI'].tolist()
@@ -98,16 +126,38 @@ class gen_output(run_stages):
                 # strand
                 solv_ascblty.append(strand_df['SOLV_ACSBLTY'].tolist())
 
-        beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
-                                        'RES_ID': res_ids,
-                                        'EDGE_OR_CNTRL': edge_or_central,
-                                        'RESIDUES': residues,
-                                        'INT_EXT': int_ext,
-                                        'BCKBN_GEOM': bckbn_phi_psi,
-                                        'SOLV_ACSBLTY': solv_ascblty})
-        beta_strands_df.to_pickle('Beta_strands_dataframe.pkl')
-        beta_strands_df.to_csv('Beta_strands_dataframe.csv')
+                # Determines strand orientation
 
+        if self.code[0:4] in ['2.60']:
+            beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
+                                            'TILT_ANGLE': tilt_angle,
+                                            'RES_ID': res_ids,
+                                            'EDGE_OR_CNTRL': edge_or_central,
+                                            'RESIDUES': residues,
+                                            'INT_EXT': int_ext,
+                                            'BCKBN_GEOM': bckbn_phi_psi,
+                                            'SOLV_ACSBLTY': solv_ascblty})
+            beta_strands_df.to_pickle('Beta_strands_dataframe.pkl')
+            beta_strands_df.to_csv('Beta_strands_dataframe.csv')
+
+        elif self.code[0:4] in ['2.40']:
+            beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
+                                            'TILT_ANGLE': tilt_angle,
+                                            'STRAND_NUMBER': strand_number,
+                                            'SHEAR_NUMBER': shear_number,
+                                            'RES_ID': res_ids,
+                                            'TM_OR_EXT': tm_ext,
+                                            'RESIDUES': residues,
+                                            'INT_EXT': int_ext,
+                                            'BCKBN_GEOM': bckbn_phi_psi,
+                                            'SOLV_ACSBLTY': solv_ascblty})
+            beta_strands_df.to_pickle('Beta_strands_dataframe.pkl')
+            beta_strands_df.to_csv('Beta_strands_dataframe.csv')
+
+        else:
+            return
+
+        """
         int_indices = [index for index, value in enumerate(int_ext) if
                        value == 'interior']
         int_domain_strand_ids = [value for index, value in enumerate(domain_strand_ids)
@@ -159,3 +209,4 @@ class gen_output(run_stages):
                                             'SOLV_ACSBLTY': ext_solv_ascblty})
         ext_beta_strands_df.to_pickle('Exterior_beta_strands_dataframe.pkl')
         ext_beta_strands_df.to_csv('Exterior_beta_strands_dataframe.csv')
+        """

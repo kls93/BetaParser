@@ -1,5 +1,6 @@
 
-import
+import pandas as pd
+from collections import OrderedDict
 if __name__ == 'subroutines.OPM':
     from subroutines.run_stages import run_stages
 else:
@@ -7,7 +8,7 @@ else:
 
 class extract_strand_tilt_and_TM_regions(run_stages):
 
-    def __init__(self, run_paramters):
+    def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
 
     def parse_opm(self, orig_dir):
@@ -16,7 +17,7 @@ class extract_strand_tilt_and_TM_regions(run_stages):
         pdb_codes = []
         chains = []
         tilt_angles = []
-        tm_residues = []
+        tm_lists = []
         with open('{}/docs/OPM_TM_subunits.txt'.format(orig_dir), 'r') as opm_file:
             for line in opm_file:
                 line_segments = line.split('-')
@@ -26,31 +27,34 @@ class extract_strand_tilt_and_TM_regions(run_stages):
                 tilt_angle = line_segments[1].replace('Tilt:', '')
                 tilt_angle = tilt_angle.replace('°', '')
                 tilt_angles.append(tilt_angle.strip())
-                tm_list = []
-                tm_segments = ''.join(line_segments[2:])
+                tm_segments = '-'.join(line_segments[2:])
                 tm_segments = tm_segments.replace('Segments:', '')
                 tm_segments = tm_segments.split(',')
+                tm_residues = []
                 for segment in tm_segments:
+                    tm_range = ''
                     start = False
-                    stop = True
+                    stop = False
                     for char in list(segment):
+                        if char == ')':
+                            stop = True
+
+                        if start is True and stop is False:
+                            tm_range += char
+
                         if char == '(':
                             start = True
-                        elif char == ')':
-                            stop = False
-                        if start is True and stop is False:
-                            tm_list.append(char)
-                            break
-                    res_min = int(tm_list.split('-')[0])
-                    res_max = int(tm_list.split('-')[1])
-                    tm_range = [chain+str(num) for num in range(res_min, res_max+1)]
-                    for residue in tm_range:
-                        tm_residues.append(residue)
 
-        opm_df = pd.DataFrame({'PDB_CODE': pdb_code,
-                               'CHAIN': chain,
+                    res_min = int(tm_range.split('-')[0])
+                    res_max = int(tm_range.split('-')[1])
+                    tm_residues = tm_residues + [chain+str(num) for num in
+                                                 range(res_min, res_max+1)]
+                tm_lists.append(tm_residues)
+
+        opm_df = pd.DataFrame({'PDB_CODE': pdb_codes,
+                               'CHAIN': chains,
                                'TILT_ANGLE': tilt_angles,
-                               'TM_RANGE':})
+                               'TM_RANGE': tm_lists})
 
         return opm_df
 
@@ -68,12 +72,13 @@ class extract_strand_tilt_and_TM_regions(run_stages):
                 tilt_angles[domain_id] = tilt_angle
 
             else:
-                # unprocessed_list
+                tilt_angles[domain_id] = 'Undefined'
 
         return tilt_angles
 
     def find_strand_TM_regions(self, sec_struct_dfs_dict, opm_df):
         # Determines strand TM regions
+        pdb_codes_list = opm_df['PDB_CODE'].tolist()
         for domain_id in list(sec_struct_dfs_dict.keys()):
             sec_struct_df = sec_struct_dfs_dict[domain_id]
             pdb_code = domain_id[0:4]
@@ -92,11 +97,9 @@ class extract_strand_tilt_and_TM_regions(run_stages):
                             tm_or_ext[row] = 'transmembrane'
                         else:
                             tm_or_ext[row] = 'external'
-            else:
-                # unprocessed_list
 
             tm_or_ext_df = pd.DataFrame({'TM_OR_EXT': tm_or_ext})
-            sec_struct_df = pd.concat([sec_struct_df, tm_or_ext], axis=1)
+            sec_struct_df = pd.concat([sec_struct_df, tm_or_ext_df], axis=1)
             sec_struct_dfs_dict[domain_id] = sec_struct_df
 
         return sec_struct_dfs_dict
