@@ -105,25 +105,6 @@ class manipulate_beta_structure(run_stages):
                         if strand_pair not in strand_pairs:
                             strand_pairs[strand_pair] = orientation_3
 
-                # Writes pdb file of individual sheets
-                print('Writing PDB file of beta-strands in {} sheet {}'.format(
-                      domain_id, sheet))
-                with open('Beta_strands/{}_sheet_{}.pdb'.format(domain_id, sheet), 'w') as sheet_pdb_file:
-                    for strand in strands:
-                        strand_df = sheet_df[sheet_df['STRAND_NUM']==strand]
-                        chain = strand_df['CHAIN'].tolist()
-                        res_num = strand_df['RESNUM'].tolist()
-                        inscode = strand_df['INSCODE'].tolist()
-                        chain_res_num = [chain[index]+str(res_num[index])
-                                         +inscode[index] for index, value in
-                                         enumerate(chain)]
-                        for row in range(dssp_df.shape[0]):
-                            if ((dssp_df['CHAIN'][row] + str(dssp_df['RESNUM'][row])
-                                + dssp_df['INSCODE'][row]) in chain_res_num
-                                ):
-                                sheet_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
-                        sheet_pdb_file.write('TER'.ljust(80)+'\n')
-
                 # Creates network of the interacting strands in the sheet
                 G = nx.Graph()
                 for pair in strand_pairs:
@@ -139,23 +120,47 @@ class manipulate_beta_structure(run_stages):
                         if key not in edge_labels:
                             edge_labels[key] = strand_pairs[key]
 
-            # Draws plot of the network of interacting strands (all retained
-            # sheets in a domain are plotted on the same graph)
-            print('Plotting network of interacting beta-strands in {}'.format(domain_id))
-            sheet_1 = list(domain_sheets.keys())[0]
-            sheets_2_to_n = list(domain_sheets.keys())[1:]
-            G = domain_sheets[sheet_1]
-            for sheet_n in sheets_2_to_n:
-                H = domain_sheets[sheet_n]
-                G = nx.compose(G, H)
+            if domain_sheets:
+                # Writes pdb file of individual sheets
+                for sheet in list(domain_sheets.keys()):
+                    sheet = sheet.replace('{}_sheet_'.format(domain_id), '')
+                    print('Writing PDB file of beta-strands in {} sheet {}'.format(
+                          domain_id, sheet))
+                    with open(
+                        'Beta_strands/{}_sheet_{}.pdb'.format(domain_id, sheet), 'w'
+                        ) as sheet_pdb_file:
+                        for strand in strands:
+                            strand_df = sheet_df[sheet_df['STRAND_NUM']==strand]
+                            chain = strand_df['CHAIN'].tolist()
+                            res_num = strand_df['RESNUM'].tolist()
+                            inscode = strand_df['INSCODE'].tolist()
+                            chain_res_num = [chain[index]+str(res_num[index])
+                                             +inscode[index] for index, value in
+                                             enumerate(chain)]
+                            for row in range(dssp_df.shape[0]):
+                                if ((dssp_df['CHAIN'][row] + str(dssp_df['RESNUM'][row])
+                                    + dssp_df['INSCODE'][row]) in chain_res_num
+                                    ):
+                                    sheet_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
+                            sheet_pdb_file.write('TER'.ljust(80)+'\n')
 
-            pos = nx.circular_layout(G)
-            plt.clf()
-            nx.draw_networkx(G, pos=pos, with_labels=True, node_shape='v')
-            nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=edge_labels)
-            plt.savefig(
-                'Beta_strands/{}_network.png'.format(domain_id)
-                )
+                # Draws plot of the network of interacting strands (all
+                # retained sheets in a domain are plotted on the same graph)
+                print('Plotting network of interacting beta-strands in {}'.format(domain_id))
+                sheet_1 = list(domain_sheets.keys())[0]
+                sheets_2_to_n = list(domain_sheets.keys())[1:]
+                G = domain_sheets[sheet_1]
+                for sheet_n in sheets_2_to_n:
+                    H = domain_sheets[sheet_n]
+                    G = nx.compose(G, H)
+
+                pos = nx.circular_layout(G)
+                plt.clf()
+                nx.draw_networkx(G, pos=pos, with_labels=True, node_shape='v')
+                nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=edge_labels)
+                plt.savefig(
+                    'Beta_strands/{}_network.png'.format(domain_id)
+                    )
 
         # Pickles dictionaries of: 1) dataframes of atoms in residues of the
         # selected secondary structure type (currently restricted to
