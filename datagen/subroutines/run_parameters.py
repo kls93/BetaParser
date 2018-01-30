@@ -237,7 +237,7 @@ def gen_run_parameters(args):
     return stage, run_parameters
 
 
-def find_cdhit_input(stage, args):
+def find_cdhit_input(args):
     # Locates input file of CDHIT filtered FASTA sequences required for stage
     # 2 of the analysis pipeline
     if vars(args)['sequences']:
@@ -279,3 +279,24 @@ def find_cdhit_input(stage, args):
             break
 
     return cdhit_entries, cdhit_output
+
+
+def find_opm_database(args):
+    # Locates local copy of OPM database (for determining strand orientation of
+    # beta barrels in stage 4)
+    if vars(args)['opm']:
+        opm_database = vars(args)['opm']
+        opm_database.replace('\\', '/')
+        opm_database = '/' + opm_database.strip('/')
+    else:
+        opm_database = ''
+
+    while not os.path.isdir(opm_database):
+        print('Specify absolute file path of OPM database:')
+        opm_database = '/' + input(prompt).strip('/')
+        if not os.path.isdir(opm_database):
+            print('Specified file path not recognised')
+        else:
+            break
+
+    return opm_database

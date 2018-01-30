@@ -139,7 +139,7 @@ class run_stages():
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
 
-    def run_stage_4(self, orig_dir):
+    def run_stage_4(self, orig_dir, opm_database):
         if __name__ == 'subroutines.run_stages':
             from subroutines.OPM import extract_strand_tilt_and_TM_regions
             from subroutines.output_dataframe import gen_output
@@ -150,22 +150,27 @@ class run_stages():
         with open('Output_ISAMBARD_variables.pkl', 'rb') as pickle_file:
             sec_struct_dfs_dict, domain_sheets_dict = pickle.load(pickle_file)
 
+        output = gen_output(self.run_parameters)
         if self.code[0:4] in ['2.40']:
             beta_structure = extract_strand_tilt_and_TM_regions(self.run_parameters)
             opm_df = beta_structure.parse_opm(orig_dir)
             tilt_angles = beta_structure.find_strand_tilt(
                 sec_struct_dfs_dict, opm_df
                 )
-            sec_struct_dfs_dict = beta_structure.find_strand_TM_regions(
+            strand_numbers, shear_numbers = beta_structure.find_barrel_strand_and_shear_number(
                 sec_struct_dfs_dict, opm_df
                 )
             del opm_df  # To save memory and reduce the number of variables
             # considered
         else:
             tilt_angles = OrderedDict()
+            strand_numbers = OrderedDict()
+            shear_numbers = OrderedDict()
+            sec_struct_dfs_dict = output.identify_edge_central(
+                domain_sheets_dict, sec_struct_dfs_dict
+                )
 
-        output = gen_output(self.run_parameters)
-        sec_struct_dfs_dict = output.identify_edge_central(
-            domain_sheets_dict, sec_struct_dfs_dict
+        output.write_beta_strand_dataframe(
+            sec_struct_dfs_dict, opm_database, tilt_angles, strand_numbers,
+            shear_numbers
             )
-        output.write_beta_strand_dataframe(sec_struct_dfs_dict, tilt_angles)

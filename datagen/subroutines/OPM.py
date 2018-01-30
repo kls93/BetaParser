@@ -18,6 +18,7 @@ class extract_strand_tilt_and_TM_regions(run_stages):
         chains = []
         tilt_angles = []
         tm_lists = []
+        tm_segment_lists = []
         with open('{}/docs/OPM_TM_subunits.txt'.format(orig_dir), 'r') as opm_file:
             for line in opm_file:
                 line_segments = line.split('-')
@@ -30,6 +31,7 @@ class extract_strand_tilt_and_TM_regions(run_stages):
                 tm_segments = '-'.join(line_segments[2:])
                 tm_segments = tm_segments.replace('Segments:', '')
                 tm_segments = tm_segments.split(',')
+                tm_segment_lists.append(tm_segments)
                 tm_residues = []
                 for segment in tm_segments:
                     tm_range = ''
@@ -54,7 +56,8 @@ class extract_strand_tilt_and_TM_regions(run_stages):
         opm_df = pd.DataFrame({'PDB_CODE': pdb_codes,
                                'CHAIN': chains,
                                'TILT_ANGLE': tilt_angles,
-                               'TM_RANGE': tm_lists})
+                               'TM_RANGE': tm_lists,
+                               'SEGMENTS': tm_segment_lists})
 
         return opm_df
 
@@ -76,30 +79,14 @@ class extract_strand_tilt_and_TM_regions(run_stages):
 
         return tilt_angles
 
-    def find_strand_TM_regions(self, sec_struct_dfs_dict, opm_df):
-        # Determines strand TM regions
-        pdb_codes_list = opm_df['PDB_CODE'].tolist()
-        for domain_id in list(sec_struct_dfs_dict.keys()):
-            sec_struct_df = sec_struct_dfs_dict[domain_id]
-            pdb_code = domain_id[0:4]
-            tm_or_ext = ['']* sec_struct_df.shape[0]
+    def find_barrel_strand_and_shear_number(self, sec_struct_dfs_dict, opm_df):
+        strand_numbers = OrderedDict()
+        shear_numbers = OrderedDict()
 
-            if pdb_code in pdb_codes_list:
-                index = pdb_codes_list.index(pdb_code)
-                tm_strands = opm_df['TM_RANGE'][index]
+        for row in range(opm_df.shape[0]):
+            tm_segments = opm_df['SEGMENTS'][row]
+            strand_numbers[opm_df['PDB_CODE'][row]] = len(tm_segments)
 
-                for row in range(sec_struct_df.shape[0]):
-                    chain_res_num = (sec_struct_df['CHAIN'][row]
-                                     + str(sec_struct_df['RESNUM'][row])
-                                     + sec_struct_df['INSCODE'][row])
-                    if sec_struct_df['ATMNAME'][row] == 'CA':
-                        if chain_res_num in tm_strands:
-                            tm_or_ext[row] = 'transmembrane'
-                        else:
-                            tm_or_ext[row] = 'external'
+        # starting_strand = min(tm_segments, key=len)
 
-            tm_or_ext_df = pd.DataFrame({'TM_OR_EXT': tm_or_ext})
-            sec_struct_df = pd.concat([sec_struct_df, tm_or_ext_df], axis=1)
-            sec_struct_dfs_dict[domain_id] = sec_struct_df
-
-        return sec_struct_dfs_dict
+        return strand_numbers, shear_numbers

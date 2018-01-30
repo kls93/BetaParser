@@ -1,5 +1,4 @@
 
-import pickle
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -15,7 +14,7 @@ class calculate_beta_network(run_stages):
     def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
 
-    def identify_strand_interactions(self, sec_struct_dfs_dict):
+    def identify_strand_interactions(self, sec_struct_dfs_dict):  # SPLIT DOWN INTO SMALLER FUNCTIONS TO AVOID INDENTATION BUGS ETC.!
         # Separates the beta-strands identified by DSSP into sheets, and works
         # out the strand interactions and thus loop connections both within and
         # between sheets
@@ -81,7 +80,7 @@ class calculate_beta_network(run_stages):
                     """
 
                     # Identifies corresponding strand numbers of bridge pairs
-                    for key in strands_dict:
+                    for key in list(strands_dict.keys()):
                         if res_num_1 in strands_dict[key]:
                             strand_1 = key
 
@@ -117,7 +116,7 @@ class calculate_beta_network(run_stages):
                 if nx.number_of_nodes(G) > 2:
                     domain_sheets['{}_sheet_{}'.format(domain_id, sheet)] = G
                     domain_sheets_dict['{}_sheet_{}'.format(domain_id, sheet)] = G
-                    # Adds strand pairs in reatined sheets to edge_labels
+                    # Adds strand pairs in retained sheets to edge_labels
                     # dictionary
                     for key in strand_pairs:
                         if key not in edge_labels:
@@ -132,6 +131,8 @@ class calculate_beta_network(run_stages):
                     with open(
                         'Beta_strands/{}_sheet_{}.pdb'.format(domain_id, sheet), 'w'
                         ) as sheet_pdb_file:
+                        sheet_df = dssp_df[dssp_df['SHEET_NUM']==sheet]
+                        strands = sorted([int(strand) for strand in set(sheet_df['STRAND_NUM'].tolist())])
                         for strand in strands:
                             strand_df = sheet_df[sheet_df['STRAND_NUM']==strand]
                             chain = strand_df['CHAIN'].tolist()
@@ -176,7 +177,5 @@ class calculate_beta_network(run_stages):
         # one another
         sec_struct_dfs_dict = {key: value for key, value in
                                sec_struct_dfs_dict.items() if value is not None}
-        with open('Domain_networks_dict.pkl', 'wb') as pickle_file:
-            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
 
         return domain_sheets_dict
