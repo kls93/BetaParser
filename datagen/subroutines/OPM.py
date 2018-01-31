@@ -1,5 +1,6 @@
 
 import pandas as pd
+import scipy.stats
 from collections import OrderedDict
 if __name__ == 'subroutines.OPM':
     from subroutines.run_stages import run_stages
@@ -79,14 +80,107 @@ class extract_strand_tilt_and_TM_regions(run_stages):
 
         return tilt_angles
 
-    def find_barrel_strand_and_shear_number(self, sec_struct_dfs_dict, opm_df):
+
+class calculate_barrel_geometry(run_stages):
+
+    def __init__(self, run_parameters):
+        run_stages.__init__(self, run_parameters)
+
+    def find_barrel_strand_number(self, sec_struct_dfs_dict):
         strand_numbers = OrderedDict()
+
+        for domain_id, sec_struct_df in sec_struct_dfs_dict.items():
+            strands = [int(strand) for strand in
+                       set(sec_struct_df['STRAND_NUM'].tolist()) if strand != '']
+            strand_count = max(strands)
+            strand_numbers[domain_id] = strand_count
+
+        return strand_numbers
+
+    def find_barrel_shear_number(self, sec_struct_dfs_dict):
         shear_numbers = OrderedDict()
 
-        for row in range(opm_df.shape[0]):
-            tm_segments = opm_df['SEGMENTS'][row]
-            strand_numbers[opm_df['PDB_CODE'][row]] = len(tm_segments)
+        for domain_id, sec_struct_df in sec_struct_dfs_dict.items():
+            print(domain_id)  # DELETE ME
+            shear_estimates = []
 
-        # starting_strand = min(tm_segments, key=len)
+            strand_1_df = sec_struct_df[sec_struct_df['STRAND_NUM']==1]
+            strand_1_res = [int(num) for num in strand_1_df['DSSP_NUM'].tolist()]
 
-        return strand_numbers, shear_numbers
+            dssp_nums = sec_struct_df['DSSP_NUM'].tolist()
+
+            for residue in strand_1_res:
+                print(residue)  # DELETE ME
+                index = dssp_nums.index(str(residue))
+                bp = int(sec_struct_df['H-BONDS'][index][0])
+
+                if bp != 0:
+                    old_bp = residue
+                    count = 0
+                    strand_num = 0
+                    shear = 0
+
+                    while strand_num != 1:
+                        count = count + 1
+                        print(old_bp, bp)
+                        index = dssp_nums.index(str(bp))
+                        strand_num = sec_struct_df['STRAND_NUM'][index]
+                        print(strand_num)  # DELETE ME
+
+                        bp_a = int(sec_struct_df['H-BONDS'][index][0])
+                        print(bp_a)  # DELETE ME
+                        bp_b = int(sec_struct_df['H-BONDS'][index][1])
+                        print(bp_b)  # DELETE ME
+                        if bp_a == old_bp:
+                            new_bp = bp_b
+                            if count == 1:
+                                ref_bp = bp_a
+                        elif bp_b == old_bp:
+                            new_bp = bp_a
+                            if count == 1:
+                                ref_bp = bp_b
+                        else:
+                            print('ERROR: Strand pairs do not match')
+                            import sys  # DELETE ME
+                            sys.exit()
+                            break
+
+                        print(new_bp)  # DELETE ME
+                        if new_bp != 0:
+                            old_bp = bp  # These two lines must stay in order!
+                            bp = new_bp  # These two lines must stay in order!
+                        elif new_bp == 0:
+                            shear = shear + 2
+                            end = True
+                            try:
+                                dssp_nums.index(str(bp-2))
+                            except ValueError:
+                                end = False
+                                old_bp = old_bp - 2
+                                bp = bp + 2
+
+                            try:
+                                dssp_nums.index(str(bp+2))
+                            except ValueError:
+                                end = False
+                                old_bp = old_bp + 2
+                                bp = bp - 2
+
+                            if end is True:
+                                diff = abs(bp - ref_bp)
+                                print(bp)
+                                print(ref_bp)
+                                print(diff)
+                                shear = shear + diff
+                                break
+
+                print('SHEAR_NUMBER')
+                print(shear)  # DELETE ME
+                import sys  # DELETE ME
+                sys.exit()
+                shear_estimates.append(shear)
+
+            shear = scipy.stats.mode(shear_estimates)
+            shear_numbers[domain_id] = shear
+
+        return shear_numbers

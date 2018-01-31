@@ -141,10 +141,14 @@ class run_stages():
 
     def run_stage_4(self, orig_dir, opm_database):
         if __name__ == 'subroutines.run_stages':
-            from subroutines.OPM import extract_strand_tilt_and_TM_regions
+            from subroutines.OPM import (
+                extract_strand_tilt_and_TM_regions, calculate_barrel_geometry
+                )
             from subroutines.output_dataframe import gen_output
         else:
-            from datagen.subroutines.OPM import extract_strand_tilt_and_TM_regions
+            from datagen.subroutines.OPM import (
+                extract_strand_tilt_and_TM_regions, calculate_barrel_geometry
+                )
             from datagen.subroutines.output_dataframe import gen_output
 
         with open('Output_ISAMBARD_variables.pkl', 'rb') as pickle_file:
@@ -157,8 +161,12 @@ class run_stages():
             tilt_angles = beta_structure.find_strand_tilt(
                 sec_struct_dfs_dict, opm_df
                 )
-            strand_numbers, shear_numbers = beta_structure.find_barrel_strand_and_shear_number(
-                sec_struct_dfs_dict, opm_df
+            barrel_structure = calculate_barrel_geometry(self.run_parameters)
+            strand_numbers = barrel_structure.find_barrel_strand_number(
+                sec_struct_dfs_dict
+                )
+            shear_numbers = barrel_structure.find_barrel_shear_number(
+                sec_struct_dfs_dict
                 )
             del opm_df  # To save memory and reduce the number of variables
             # considered
