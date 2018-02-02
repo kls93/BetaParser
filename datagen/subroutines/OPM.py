@@ -142,6 +142,9 @@ class calculate_barrel_geometry(run_stages):
             processed_strands.append(strand_1)
             strand_1_df = sec_struct_df[sec_struct_df['STRAND_NUM']==strand_1]
             dssp_num = strand_1_df['DSSP_NUM'].tolist()
+            print(dssp_num)
+            dssp_num = [int(res) for res in dssp_num]
+            dssp_num = [res for res in range(min(dssp_num), max(dssp_num)+1)]
             for index, res in enumerate(dssp_num):
                 res_array[0, 400+index] = res
             res_list_1 = res_array[0:1,].tolist()
@@ -160,8 +163,8 @@ class calculate_barrel_geometry(run_stages):
 
                 next_strand_df = sec_struct_df[sec_struct_df['STRAND_NUM']==next_strand]
                 dssp_num = next_strand_df['DSSP_NUM'].tolist()
+                print(dssp_num)
                 h_bonds = next_strand_df['H-BONDS'].tolist()
-                orientations = next_strand_df['ORIENTATION'].tolist()
                 pair_index = ''
                 for h_bonds_index, pair in enumerate(h_bonds):
                     if float(pair[0]) != 0.0 and float(pair[0]) in res_list:
@@ -170,29 +173,61 @@ class calculate_barrel_geometry(run_stages):
                         pair_index = 1
                     else:
                         continue
-                h_bonds = [pair[pair_index] for pair in h_bonds]
-                orientations = [pair[pair_index] for pair in orientations]
-                if set([orientation for orientation in orientations if orientation != '']) == {'A'}:
-                    h_bonds.reverse()
-                elif set([orientation for orientation in orientations if orientation != '']) != {'P'}:
-                    print('ERROR: Strand {} is listed as both antiparallel and '
-                          'parallel to strand {}'.format(next_strand, current_strand))
+                h_bonds = [int(pair[pair_index]) for pair in h_bonds if pair[pair_index] != '0']
+                h_bonds = [res for res in range(min(h_bonds), max(h_bonds)+1)]
+                listed_res = []
                 for h_bonds_index, res in enumerate(h_bonds):
-                    if float(res) != 0.0 and float(res) in res_list:
+                    if res != 0 and float(res) in res_list:
+                        listed_res.append(res)
                         res_list_index = res_list.index(float(res))
-                        break
-                index_diff = abs(res_list_index - h_bonds_index)
-                for h_bonds_index, res in enumerate(h_bonds):
-                    res_array[count, h_bonds_index+index_diff] = dssp_num[h_bonds_index]
+                        res_array[count, res_list_index] = float(res)
+
+                lower_res = [res for res in range(min(h_bonds), min(listed_res))]
+                higher_res = [res for res in range(max(h_bonds)+1, max(listed_res)+1)]
+
                 res_list = res_array[count:count+1,].tolist()
                 res_list = [res for res_sub_list in res_list for res in res_sub_list]
+
+                if len(lower_res) > 1:
+                    lower_index = res_list.index(float(min(listed_res)))
+                else:
+                    lower_index = 0
+
+                if len(higher_res) > 1:
+                    higher_index = res_list.index(float(max(listed_res)))
+                else:
+                    higher_index = 1000
+
+                if lower_index < higher_index:
+                    if lower_index != 0:
+                        for index, res in enumerate(lower_res):
+                            res_list_index = (lower_index - len(lower_res)) + index
+                            res_array[count, res_list_index] = res
+                    if higher_index != 1000:
+                        for index, res in enumerate(higher_res):
+                            res_list_index = higher_index + index + 1
+                elif lower_index > higher_index:
+                    lower_res.reverse()
+                    higher_res.reverse()
+
+                    if lower_index != 0:
+                        for index, res in enumerate(higher_res):
+                            res_list_index = lower_index + index + 1
+                            res_array[count, res_list_index] = res
+                    if higher_index != 1000:
+                        for index, res in enumerate(higher_res):
+                            res_list_index = (higher_index - len(higher_res)) + index
+                            res_array[count, res_list_index] = res
+
+                res_list = res_array[count:count+1,].tolist()
+                res_list = [res for res_sub_list in res_list for res in res_sub_list]
+                # print(res_list)
 
                 current_strand = next_strand
 
             strand_1_df = sec_struct_df[sec_struct_df['STRAND_NUM']==strand_1]
             dssp_num = strand_1_df['DSSP_NUM'].tolist()
             h_bonds = strand_1_df['H-BONDS'].tolist()
-            orientations = strand_1_df['ORIENTATION'].tolist()
             pair_index = ''
             for h_bonds_index, pair in enumerate(h_bonds):
                 if float(pair[0]) != 0.0 and float(pair[0]) in res_list:
@@ -201,20 +236,29 @@ class calculate_barrel_geometry(run_stages):
                     pair_index = 1
                 else:
                     continue
-            h_bonds = [pair[pair_index] for pair in h_bonds]
-            orientations = [pair[pair_index] for pair in orientations]
-            if set([orientation for orientation in orientations if orientation != '']) == {'A'}:
-                h_bonds.reverse()
-            elif set([orientation for orientation in orientations if orientation != '']) != {'P'}:
-                print('ERROR: Strand {} is listed as both antiparallel and '
-                      'parallel to strand {}'.format(next_strand, current_strand))
+            h_bonds = [int(pair[pair_index]) for pair in h_bonds if pair[pair_index] != '0']
+            listed_res = []
             for h_bonds_index, res in enumerate(h_bonds):
-                if float(res) != 0.0 and float(res) in res_list:
+                if res != 0 and float(res) in res_list:
+                    listed_res.append(res)
                     res_list_index = res_list.index(float(res))
-                    break
-            index_diff = abs(res_list_index - h_bonds_index)
-            for h_bonds_index, res in enumerate(h_bonds):
-                res_array[-1, h_bonds_index+index_diff] = dssp_num[h_bonds_index]
+                    res_array[count, res_list_index] = res
+
+            lower_res = [res for res in range(min(h_bonds), min(listed_res))]
+            higher_res = [res for res in range(max(h_bonds)+1, max(listed_res)+1)]
+
+            lower_index = (res_array[count:count+1,].tolist()).index(min(listed_res))
+            higher_index = (res_array[count:count+1,].tolist()).index(max(listed_res))
+
+            if lower_index < higher_index:
+                lower_res.reverse()
+                for index, res in enumerate(lower_res):
+                    res_index = lower_index - (index+1)
+                    res_array[count, res_index] = res
+            elif lower_index > higher_index:
+                for index, res in enumerate(higher_res):
+                    res_index = higher_index + (index+1)
+                    res_array[count, res_index] = res
 
             res_list_2 = res_array[-1:, ].tolist()
             res_list_2 = [res for res_sub_list in res_list_2 for res in res_sub_list]
@@ -232,40 +276,6 @@ class calculate_barrel_geometry(run_stages):
             print(shear_estimates)
             print(shear)
             shear_numbers[domain_id] = shear
-
-            import sys
-            sys.exit()
-
-
-            current_strand = strand_2
-            while any(x not in processed_strands for x in G.neighbors(current_strand)):
-                next_strand = G.neighbors(current_strand)[0]
-                if next_strand in processed_strands:
-                    next_strand = G.neighbors(current_strand)[1]
-                processed_strands.append(next_strand)
-
-                next_strand_df = sec_struct_df[sec_struct_df['STRAND_NUM']==next_strand]
-                dssp_num = next_strand_df['DSSP_NUM'].tolist()
-                h_bonds = next_strand_df['H-BONDS'].tolist()
-                for h_bonds_index, pair in enumerate(h_bonds):
-                    if pair[0] in res_list:
-                        res_list_index = res_list.index(pair[0])
-                    elif pair[1] in res_list:
-                        res_list_index = res_list.index(pair[1])
-                    else:
-                        continue
-                    res_list[res_list_index] = dssp_num[h_bonds_index]
-                for residue in dssp_num:
-                    if residue not in res_list and residue > min(res_list):
-                        res_list.append(residue)
-
-                print(res_list)
-
-                current_strand = next_strand
-
-            shear = len(res_list) - strand_1_df.shape[0]
-            print(domain_id)
-            print(shear)
 
             import sys
             sys.exit()
