@@ -21,6 +21,9 @@ class gen_output(run_stages):
         for domain_id in list(sec_struct_dfs_dict.keys()):
             networks = [network for key, network in domain_sheets_dict.items()
                         if domain_id in key]
+            if networks > 2:
+                print('ERROR: Failed to filter beta-sheets to retain only two '
+                      'sheets of same sandwich')
             G = networks[0]
             for num in range(1, len(networks)):
                 H = networks[1]

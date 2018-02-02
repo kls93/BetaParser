@@ -4,6 +4,7 @@ import sys
 import shutil
 import pickle
 import pandas as pd
+from collections import OrderedDict
 
 prompt = '> '
 
@@ -166,7 +167,7 @@ class run_stages():
                 sec_struct_dfs_dict
                 )
             shear_numbers = barrel_structure.find_barrel_shear_number(
-                sec_struct_dfs_dict
+                sec_struct_dfs_dict, domain_sheets_dict
                 )
             del opm_df  # To save memory and reduce the number of variables
             # considered
