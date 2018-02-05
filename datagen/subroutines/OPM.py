@@ -2,7 +2,6 @@
 import pandas as pd
 import networkx as nx
 import numpy as np
-import scipy.stats
 from collections import OrderedDict
 if __name__ == 'subroutines.OPM':
     from subroutines.run_stages import run_stages
@@ -133,26 +132,25 @@ class calculate_barrel_geometry(run_stages):
                 unprocessed_list.append(domain_id)
                 continue
 
-            # WORKS UP TO HERE
             strands = nx.cycle_basis(G)[0]  # Finds first complete cycle
-            res_array = np.zeros((len(strands)+1, 1000))
+            res_array = np.zeros((len(strands)+1, 200))
 
             processed_strands = []
             strand_1 = strands[0]
             processed_strands.append(strand_1)
             strand_1_df = sec_struct_df[sec_struct_df['STRAND_NUM']==strand_1]
-            dssp_num = strand_1_df['DSSP_NUM'].tolist()
-            print(dssp_num)
-            dssp_num = [int(res) for res in dssp_num]
-            dssp_num = [res for res in range(min(dssp_num), max(dssp_num)+1)]
-            for index, res in enumerate(dssp_num):
-                res_array[0, 400+index] = res
+            dssp_num_1 = strand_1_df['DSSP_NUM'].tolist()
+            dssp_num_1 = [int(res) for res in dssp_num_1]
+            dssp_num_1 = [res for res in range(min(dssp_num_1), max(dssp_num_1)+1)]
+            for index, res in enumerate(dssp_num_1):
+                res_array[0, 80+index] = res
             res_list_1 = res_array[0:1,].tolist()
             res_list_1 = [res for res_sub_list in res_list_1 for res in res_sub_list]
             res_list = res_array[0:1,].tolist()
             res_list = [res for res_sub_list in res_list for res in res_sub_list]
 
             current_strand = strand_1
+            next_strand_df = strand_1_df
             count = 0
             while any(x not in processed_strands for x in G.neighbors(current_strand)):
                 next_strand = G.neighbors(current_strand)[0]
@@ -160,10 +158,15 @@ class calculate_barrel_geometry(run_stages):
                     next_strand = G.neighbors(current_strand)[1]
                 processed_strands.append(next_strand)
                 count = count + 1
+                if count == 2:
+                    processed_strands.remove(strand_1)
+
+                prev_dssp_num = next_strand_df['DSSP_NUM'].tolist()
+                prev_dssp_num = [int(num) for num in prev_dssp_num]
 
                 next_strand_df = sec_struct_df[sec_struct_df['STRAND_NUM']==next_strand]
                 dssp_num = next_strand_df['DSSP_NUM'].tolist()
-                print(dssp_num)
+                dssp_num = [int(num) for num in dssp_num]
                 h_bonds = next_strand_df['H-BONDS'].tolist()
                 pair_index = ''
                 for h_bonds_index, pair in enumerate(h_bonds):
@@ -171,34 +174,44 @@ class calculate_barrel_geometry(run_stages):
                         pair_index = 0
                     elif float(pair[1]) != 0.0 and float(pair[1]) in res_list:
                         pair_index = 1
-                    else:
-                        continue
-                h_bonds = [int(pair[pair_index]) for pair in h_bonds if pair[pair_index] != '0']
+
+                dssp_num_dict = {int(pair[pair_index]): dssp_num[index] for
+                                 index, pair in enumerate(h_bonds) if
+                                 pair[pair_index] != '0' and int(pair[pair_index])
+                                 in prev_dssp_num}
+                h_bonds = [int(pair[pair_index]) for pair in h_bonds if
+                           pair[pair_index] != '0' and int(pair[pair_index])
+                           in prev_dssp_num]
                 h_bonds = [res for res in range(min(h_bonds), max(h_bonds)+1)]
+
                 listed_res = []
                 for h_bonds_index, res in enumerate(h_bonds):
-                    if res != 0 and float(res) in res_list:
-                        listed_res.append(res)
+                    if (res != 0
+                        and float(res) in res_list
+                        and res in list(dssp_num_dict.keys())
+                        ):
+                        listed_res.append(int(dssp_num_dict[res]))
                         res_list_index = res_list.index(float(res))
-                        res_array[count, res_list_index] = float(res)
+                        res_array[count, res_list_index] = float(dssp_num_dict[res])
 
-                lower_res = [res for res in range(min(h_bonds), min(listed_res))]
-                higher_res = [res for res in range(max(h_bonds)+1, max(listed_res)+1)]
+                lower_res = [res for res in range(min(dssp_num), min(listed_res))]
+                higher_res = [res for res in range(max(listed_res)+1, max(dssp_num)+1)]
 
                 res_list = res_array[count:count+1,].tolist()
                 res_list = [res for res_sub_list in res_list for res in res_sub_list]
+                res_list_values = [num for num in res_list if num != 0.0]
 
-                if len(lower_res) > 1:
+                if len(lower_res) > 0:  # Error with overhang placement if len == 1, need to fix this
                     lower_index = res_list.index(float(min(listed_res)))
                 else:
                     lower_index = 0
 
-                if len(higher_res) > 1:
+                if len(higher_res) > 0:
                     higher_index = res_list.index(float(max(listed_res)))
                 else:
                     higher_index = 1000
 
-                if lower_index < higher_index:
+                if res_list_values[0] < res_list_values[-1]:
                     if lower_index != 0:
                         for index, res in enumerate(lower_res):
                             res_list_index = (lower_index - len(lower_res)) + index
@@ -206,10 +219,10 @@ class calculate_barrel_geometry(run_stages):
                     if higher_index != 1000:
                         for index, res in enumerate(higher_res):
                             res_list_index = higher_index + index + 1
-                elif lower_index > higher_index:
+                            res_array[count, res_list_index] = res
+                elif res_list_values[0] > res_list_values[-1]:
                     lower_res.reverse()
                     higher_res.reverse()
-
                     if lower_index != 0:
                         for index, res in enumerate(higher_res):
                             res_list_index = lower_index + index + 1
@@ -221,64 +234,22 @@ class calculate_barrel_geometry(run_stages):
 
                 res_list = res_array[count:count+1,].tolist()
                 res_list = [res for res_sub_list in res_list for res in res_sub_list]
-                # print(res_list)
 
                 current_strand = next_strand
 
-            strand_1_df = sec_struct_df[sec_struct_df['STRAND_NUM']==strand_1]
-            dssp_num = strand_1_df['DSSP_NUM'].tolist()
-            h_bonds = strand_1_df['H-BONDS'].tolist()
-            pair_index = ''
-            for h_bonds_index, pair in enumerate(h_bonds):
-                if float(pair[0]) != 0.0 and float(pair[0]) in res_list:
-                    pair_index = 0
-                elif float(pair[1]) != 0.0 and float(pair[1]) in res_list:
-                    pair_index = 1
-                else:
-                    continue
-            h_bonds = [int(pair[pair_index]) for pair in h_bonds if pair[pair_index] != '0']
-            listed_res = []
-            for h_bonds_index, res in enumerate(h_bonds):
-                if res != 0 and float(res) in res_list:
-                    listed_res.append(res)
-                    res_list_index = res_list.index(float(res))
-                    res_array[count, res_list_index] = res
+            # Residues are now aligned correctly, but are still small errors in
+            # shear number calculation due to skipped residues
+            low_index_row_1 = res_list_1.index(dssp_num_1[0])
+            low_index_row_n = res_list.index(dssp_num_1[0])
 
-            lower_res = [res for res in range(min(h_bonds), min(listed_res))]
-            higher_res = [res for res in range(max(h_bonds)+1, max(listed_res)+1)]
-
-            lower_index = (res_array[count:count+1,].tolist()).index(min(listed_res))
-            higher_index = (res_array[count:count+1,].tolist()).index(max(listed_res))
-
-            if lower_index < higher_index:
-                lower_res.reverse()
-                for index, res in enumerate(lower_res):
-                    res_index = lower_index - (index+1)
-                    res_array[count, res_index] = res
-            elif lower_index > higher_index:
-                for index, res in enumerate(higher_res):
-                    res_index = higher_index + (index+1)
-                    res_array[count, res_index] = res
-
-            res_list_2 = res_array[-1:, ].tolist()
-            res_list_2 = [res for res_sub_list in res_list_2 for res in res_sub_list]
-
-            df = pd.DataFrame(res_array)
-            df.to_csv('/Users/ks17361/Documents/Shear_number_calc.csv')
-
-            shear_estimates = []
-            for res in dssp_num:
-                index_1 = res_list_1.index(float(res))
-                index_2 = res_list_2.index(float(res))
-                shear_estimate = abs(index_2 - index_1)
-                shear_estimates.append(shear_estimate)
-            shear = scipy.stats.mode(shear_estimates)
-            print(shear_estimates)
-            print(shear)
+            if low_index_row_1 > low_index_row_n:
+                shear = low_index_row_1 - low_index_row_n
+            elif low_index_row_1 < low_index_row_n:
+                high_index_row_1 = res_list_1.index(listed_res[-1])
+                high_index_row_n = res_list.index(listed_res[-1])
+                shear = high_index_row_n - high_index_row_1
             shear_numbers[domain_id] = shear
-
-            import sys
-            sys.exit()
+            print(domain_id, shear)
 
         with open(
             'CATH_{}_resn_{}_rfac{}'.format(self.code, self.resn, self.rfac), 'a'
