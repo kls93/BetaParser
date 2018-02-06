@@ -241,3 +241,57 @@ class extract_beta_structure_coords(run_stages):
         cdhit_domain_df = pd.concat([cdhit_domain_df, domain_residue_df], axis=1)
 
         return cdhit_domain_df, all_atoms_dfs_dict
+
+    def remove_alternate_conformers(self, all_atoms_dfs_dict):
+        # Retains only the most probable alternate conformers. In the case
+        # where more than one conformer is equally most probable, (only) that
+        # which is listed first in the input PDB file is retained.
+        for domain_id in list(all_atoms_dfs_dict.keys()):
+            pdb_df = all_atoms_dfs_dict[domain_id]
+
+            alternate_conformers_chainresnum = []
+            alternate_conformers_label = []
+            alternate_conformers_occupancy = []
+
+            for row in range(pdb_df.shape[0]):
+                if pdb_df['CONFORMER'][row] != '':
+                    alternate_conformers_chainresnum.append(pdb_df['RES_ID'][row])
+                    alternate_conformers_label.append(pdb_df['CONFORMER'][row])
+                    alternate_conformers_occupancy.append(float(pdb_df['OCC'][row]))
+
+            df = pd.DataFrame({'chainresnum': alternate_conformers_chainresnum,
+                               'conformer': alternate_conformers_label,
+                               'occupancy': alternate_conformers_occupancy})
+            df = df.drop_duplicates()
+            chainresnum = df['chainresnum'].tolist()
+            conformer = df['conformer'].tolist()
+            occupancy = df['occupancy'].tolist()
+
+            alternate_conformers = {}
+            chainresnum_set = set(chainresnum)
+            for number in chainresnum_set:
+                indices = []
+                a = 'A1'
+                b = 'A'
+                c = 0
+                for index_1, value_1 in enumerate(chainresnum):
+                    if value_1 == number:
+                        indices.append(index_1)
+                for index_2 in indices:
+                    if occupancy[index_2] > c:
+                        a = chainresnum[index_2]
+                        b = conformer[index_2]
+                        c = occupancy[index_2]
+                alternate_conformers[a] = b
+
+            for row in range(pdb_df.shape[0]):
+                if (pdb_df['RES_ID'][row] in alternate_conformers
+                    and pdb_df['CONFORMER'][row] == alternate_conformers[pdb_df['RES_ID'][row]]
+                    ):
+                    pdb_df.loc[row, 'REC'] = None
+            pdb_df = pdb_df[pdb_df['REC'].notnull()]
+            pdb_df = pdb_df.reset_index(drop=True)
+
+            all_atoms_dfs_dict[domain_id] = pdb_df
+
+        return all_atoms_dfs_dict

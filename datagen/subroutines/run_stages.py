@@ -81,6 +81,9 @@ class run_stages():
         cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
             cdhit_domain_df
             )
+        all_atoms_dfs_dict = beta_structure.remove_alternate_conformers(
+            all_atoms_dfs_dict
+            )
 
         # Copies required DSSP files from database (on hard drive) to local
         # machine
@@ -168,9 +171,12 @@ class run_stages():
             strand_numbers = barrel_structure.find_barrel_strand_number(
                 sec_struct_dfs_dict
                 )
+            """
             shear_numbers = barrel_structure.find_barrel_shear_number(
                 sec_struct_dfs_dict, domain_sheets_dict
                 )
+            """
+            shear_numbers = OrderedDict()
             del opm_df  # To save memory and reduce the number of variables
             # considered
         else:

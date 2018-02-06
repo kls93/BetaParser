@@ -10,6 +10,61 @@ else:
     from datagen.subroutines.run_stages import run_stages
     from datagen.subroutines.variables import gen_amino_acids_dict
 
+
+class output_calcs():
+
+    def determine_strand_orientation(domain_id, strand_df, opm_database,
+                                     unprocessed_list):
+        # Determines strand orientation
+        pdb_code = domain_id[0:4]
+        res_ids_list = strand_df['RES_ID'].tolist()
+        strand_coordinates = []
+        upper_bound = 0
+        lower_bound = 0
+        reverse = False
+
+        if os.path.isfile('{}/{}.pdb'.format(opm_database, pdb_code)):
+            with open('{}/{}.pdb'.format(opm_database, pdb_code), 'r') as opm_file:
+                for line in opm_file:
+                    if line[17:20].strip() != 'DUM':
+                        if line[0:6].strip() in ['ATOM', 'HETATM']:
+                            chain_res_num = (line[21:22].strip()
+                                             + line[22:26].strip()
+                                             + line[26:27].strip())
+                            if (line[12:16].strip() == 'CA'
+                                and chain_res_num in res_ids_list
+                                ):
+                                strand_coordinates.append(float(line[46:54]))
+                    else:
+                        if float(line[46:54]) > upper_bound:
+                            upper_bound = float(line[46:54])
+                        elif float(line[46:54]) < lower_bound:
+                            lower_bound = float(line[46:54])
+
+            if len(strand_coordinates) != len(res_ids_list):
+                print('ERROR: Failed to locate all strand coordinates')
+                unprocessed_list.append(domain_id)
+            else:
+                if strand_coordinates[0] < strand_coordinates[len(strand_coordinates)-1]:
+                    reverse = True
+
+        return (reverse, res_ids_list, strand_coordinates, lower_bound,
+                upper_bound, unprocessed_list)
+
+    def determine_tm_or_ext(domain_id, res_ids_list, strand_coordinates,
+                            lower_bound, upper_bound, unprocessed_list):
+        tm_ext_list = ['']* len(res_ids_list)
+
+        if domain_id not in unprocessed_list:
+            for index, z_coord in enumerate(strand_coordinates):
+                if z_coord < lower_bound or z_coord > upper_bound:
+                    tm_ext_list[index] = 'exterior'
+                else:
+                    tm_ext_list[index] = 'transmembrane'
+
+        return tm_ext_list
+
+
 class gen_output(run_stages):
 
     def __init__(self, run_parameters):
@@ -18,21 +73,27 @@ class gen_output(run_stages):
     def identify_edge_central(self, domain_sheets_dict, sec_struct_dfs_dict):
         # Uses domain_networks_dict to identify whether strands are edge or
         # central
+        unprocessed_list = []
+
         for domain_id in list(sec_struct_dfs_dict.keys()):
             networks = [network for key, network in domain_sheets_dict.items()
                         if domain_id in key]
             if networks > 2:
                 print('ERROR: Failed to filter beta-sheets to retain only two '
                       'sheets of same sandwich')
+                unprocessed_list.append(domain_id)
+                continue
+
             G = networks[0]
             for num in range(1, len(networks)):
-                H = networks[1]
+                H = networks[num]
                 G = nx.compose(G, H)
+
             dssp_df = sec_struct_dfs_dict[domain_id]
 
             edge_or_central = OrderedDict()
-            strands = set(dssp_df['STRAND_NUM'].tolist())
-            for strand_num in strands:
+            df_strands = dssp_df['STRAND_NUM'].tolist()
+            for strand_num in set(df_strands):
                 if strand_num in G:
                     num_of_edges = len(G.neighbors(strand_num))
                     if num_of_edges == 1:
@@ -41,7 +102,6 @@ class gen_output(run_stages):
                         edge_id = 'central'
                     edge_or_central[strand_num] = edge_id
 
-            df_strands = dssp_df['STRAND_NUM'].tolist()
             df_edge_or_central = ['']*len(df_strands)
             for index, value in enumerate(df_strands):
                 if value in edge_or_central:
@@ -55,6 +115,11 @@ class gen_output(run_stages):
     def write_beta_strand_dataframe(self, sec_struct_dfs_dict, opm_database,
                                     tilt_angles, strand_numbers, shear_numbers):
         # Generates dataframe of beta-strands
+        if __name__ == 'subroutines.output_dataframe':
+            from subroutines.output_dataframe import output_calcs
+        else:
+            from datagen.subroutines.output_dataframe import output_calcs
+
         amino_acids_dict = gen_amino_acids_dict()
 
         domain_strand_ids = []
@@ -63,75 +128,44 @@ class gen_output(run_stages):
         shear_number = []
         res_ids = []
         edge_or_central = []
-        residues = []
+        fasta_seq = []
         int_ext = []
         tm_ext = []
         bckbn_phi_psi = []
         solv_ascblty = []
 
+        unprocessed_list = []
+
         for domain_id, dssp_df in sec_struct_dfs_dict.items():
-            strands_list = set(dssp_df['STRAND_NUM'].tolist())
-            strands_list = [strand_num for strand_num in strands_list if
-                            strand_num != '']
+            strands_list = [strand_num for strand_num in set(dssp_df['STRAND_NUM'].tolist())
+                            if strand_num != '']
 
             for strand_num in strands_list:
                 strand_df = dssp_df[dssp_df['STRAND_NUM']==strand_num]
                 strand_df = strand_df.reset_index(drop=True)
 
-                # Determines strand orientation
-                pdb_code = domain_id[0:4]
-                res_ids_list = strand_df['RES_ID'].tolist()
-                strand_coordinates = []
-                upper_bound = 0
-                lower_bound = 0
-                reverse = False
-                if os.path.isfile('{}/{}.pdb'.format(opm_database, pdb_code)):
-                    with open('{}/{}.pdb'.format(opm_database, pdb_code), 'r') as opm_file:
-                        for line in opm_file:
-                            if line[17:20].strip() != 'DUM':
-                                if line[0:6].strip() in ['ATOM', 'HETATM']:
-                                    chain_res_num = (line[21:22].strip()
-                                                     + line[22:26].strip()
-                                                     + line[26:27].strip())
-                                    if (line[12:16].strip() == 'CA'
-                                        and chain_res_num in res_ids_list
-                                        ):
-                                        strand_coordinates.append(float(line[46:54]))
-                            else:
-                                if float(line[46:54]) > upper_bound:
-                                    upper_bound = float(line[46:54])
-                                elif float(line[46:54]) < lower_bound:
-                                    lower_bound = float(line[46:54])
-
-                    tm_ext_list = ['']* len(res_ids_list)
-                    if len(strand_coordinates) != len(res_ids_list):
-                        print('ERROR: Failed to locate all strand coordinates')
-                    else:
-                        for index, z_coord in enumerate(strand_coordinates):
-                            if z_coord < lower_bound or z_coord > upper_bound:
-                                tm_ext_list[index] = 'exterior'
-                            else:
-                                tm_ext_list[index] = 'transmembrane'
-
-                        if strand_coordinates[0] < strand_coordinates[len(strand_coordinates)-1]:
-                            reverse = True
+                (reverse, res_ids_list, strand_coordinates, lower_bound, upper_bound,
+                 unprocessed_list) = output_calcs.determine_strand_orientation(
+                    domain_id, strand_df, opm_database, unprocessed_list
+                    )
 
                 # Gives strand a unique ID
                 domain_strand_ids.append('{}_strand_{}'.format(domain_id, strand_num))
 
                 # Lists tilt angle of strand
                 if self.code[0:4] in ['2.40']:
-                    tilt_angle.append(tilt_angles[domain_id])
+                    if domain_id in list(tilt_angles.keys()):
+                        tilt_angle.append(tilt_angles[domain_id])
+                    else:
+                        tilt_angle.append('')
 
                 # Lists number of strands in barrel
                 if self.code[0:4] in ['2.40']:
-                    if pdb_code in strand_numbers:
-                        strand_number.append(strand_numbers[pdb_code])
-                    else:
-                        strand_number.append('')
+                    strand_number.append(strand_numbers[domain_id])
 
                 # Lists barrel shear number
                 if self.code[0:4] in ['2.40']:
+                    # shear_number.append(shear_numbers[domain_id])
                     shear_number.append('')
 
                 # Lists residue IDs in strand
@@ -141,7 +175,7 @@ class gen_output(run_stages):
 
                 # Determines whether the strand is an edge or central strand
                 if self.code in ['2.60']:
-                    edge_or_central_list = strand_df['EDGE_OR_CNTRL'].tolist()[0]
+                    edge_or_central_list = strand_df['EDGE_OR_CNTRL'].tolist()
                     if reverse is True:
                         edge_or_central_list.reverse()
                     edge_or_central.append(edge_or_central_list)
@@ -156,7 +190,7 @@ class gen_output(run_stages):
                         sequence += 'X'
                 if reverse is True:
                     sequence = sequence[::-1]
-                residues.append(sequence)
+                fasta_seq.append(sequence)
 
                 # Generates list of interior and exterior facing residues in
                 # the strand
@@ -168,16 +202,19 @@ class gen_output(run_stages):
                 # Generates list of transmembrane and exterior residues in the
                 # strand
                 if self.code[0:4] in ['2.40']:
+                    tm_ext_list = output_calcs.determine_tm_or_ext(
+                        domain_id, res_ids_list, strand_coordinates,
+                        lower_bound, upper_bound, unprocessed_list
+                        )
                     if reverse is True:
                         tm_ext_list.reverse()
                     tm_ext.append(tm_ext_list)
 
                 # Generates list of phi and psi angles along the strand
                 phi = strand_df['PHI'].tolist()
-                if reverse is True:
-                    phi.reverse()
                 psi = strand_df['PSI'].tolist()
                 if reverse is True:
+                    phi.reverse()
                     psi.reverse()
                 bckbn_geom = [[phi[index], psi[index]] for index, value in
                               enumerate(phi)]
@@ -194,7 +231,7 @@ class gen_output(run_stages):
             beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
                                             'RES_ID': res_ids,
                                             'EDGE_OR_CNTRL': edge_or_central,
-                                            'FASTA': residues,
+                                            'FASTA': fasta_seq,
                                             'INT_EXT': int_ext,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_ascblty})
@@ -211,17 +248,17 @@ class gen_output(run_stages):
                                             'STRAND_NUMBER': strand_number,
                                             'SHEAR_NUMBER': shear_number,
                                             'RES_ID': res_ids,
-                                            'TM_OR_EXT': tm_ext,
-                                            'FASTA': residues,
+                                            'FASTA': fasta_seq,
                                             'INT_EXT': int_ext,
+                                            'TM_OR_EXT': tm_ext,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_ascblty})
-            beta_strands_df.to_pickle('Beta_strands_dataframe.pkl')
-            beta_strands_df.to_csv('Beta_strands_dataframe.csv')
             cols = beta_strands_df.columns.tolist()
             cols = ([cols[6]] + [cols[8]] + [cols[7]] + [cols[4]] + [cols[3]] +
-                    [cols[9]] + [cols[1]] + [cols[2]] + [cols[0]] + [cols[5]])
+                    [cols[1]] + [cols[2]] + [cols[9]] + [cols[0]] + [cols[5]])
             beta_strands_df = beta_strands_df[cols]
+            beta_strands_df.to_pickle('Beta_strands_dataframe.pkl')
+            beta_strands_df.to_csv('Beta_strands_dataframe.csv')
 
         else:
             return

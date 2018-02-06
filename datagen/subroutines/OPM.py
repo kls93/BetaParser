@@ -116,8 +116,8 @@ class calculate_barrel_geometry(run_stages):
                 print('ERROR: More than one beta-sheet retained for {} '
                       'barrel'.format(domain_id))
             elif len(networks) < 1:
-                print('ERROR: No beta-sheets identified for {}
-                      barrel'.format(domain_id))
+                print('ERROR: No beta-sheets identified for {} '
+                      'barrel'.format(domain_id))
             G = networks[0]
 
             nodes_dict = {}
