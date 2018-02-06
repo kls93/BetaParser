@@ -21,19 +21,25 @@ class extract_strand_tilt_and_TM_regions(run_stages):
         tilt_angles = []
         tm_lists = []
         tm_segment_lists = []
+
         with open('{}/docs/OPM_TM_subunits.txt'.format(orig_dir), 'r') as opm_file:
             for line in opm_file:
                 line_segments = line.split('-')
+
                 pdb_codes.append(line_segments[0][0:4])
+
                 chain = line_segments[0][4:].strip()
                 chains.append(chain)
+
                 tilt_angle = line_segments[1].replace('Tilt:', '')
                 tilt_angle = tilt_angle.replace('°', '')
                 tilt_angles.append(tilt_angle.strip())
+
                 tm_segments = '-'.join(line_segments[2:])
                 tm_segments = tm_segments.replace('Segments:', '')
                 tm_segments = tm_segments.split(',')
                 tm_segment_lists.append(tm_segments)
+
                 tm_residues = []
                 for segment in tm_segments:
                     tm_range = ''
@@ -52,7 +58,8 @@ class extract_strand_tilt_and_TM_regions(run_stages):
                     res_min = int(tm_range.split('-')[0])
                     res_max = int(tm_range.split('-')[1])
                     tm_residues = tm_residues + [chain+str(num) for num in
-                                                 range(res_min, res_max+1)]
+                                                 range(res_min, res_max+1)]  # No
+                    # insertion code available im OPM_TM_subunits.txt
                 tm_lists.append(tm_residues)
 
         opm_df = pd.DataFrame({'PDB_CODE': pdb_codes,
@@ -91,9 +98,9 @@ class calculate_barrel_geometry(run_stages):
         strand_numbers = OrderedDict()
 
         for domain_id, dssp_df in sec_struct_dfs_dict.items():
-            strands = [int(strand) for strand in
-                       set(dssp_df['STRAND_NUM'].tolist()) if strand != '']
-            strand_count = max(strands)
+            strands = [strand for strand in set(dssp_df['STRAND_NUM'].tolist())
+                       if strand != '']
+            strand_count = len(strands)
             strand_numbers[domain_id] = strand_count
 
         return strand_numbers

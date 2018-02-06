@@ -192,29 +192,36 @@ class gen_output(run_stages):
 
         if self.code[0:4] in ['2.60']:
             beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
-                                            'TILT_ANGLE': tilt_angle,
                                             'RES_ID': res_ids,
                                             'EDGE_OR_CNTRL': edge_or_central,
-                                            'RESIDUES': residues,
+                                            'FASTA': residues,
                                             'INT_EXT': int_ext,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_ascblty})
+            cols = beta_strands_df.columns.tolist()
+            cols = ([cols[6]] + [cols[4]] + [cols[1]] + [cols[2]] + [cols[3]]
+                    + [cols[0]] + [cols[5]])
+            beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_strands_dataframe.pkl')
             beta_strands_df.to_csv('Beta_strands_dataframe.csv')
 
         elif self.code[0:4] in ['2.40']:
             beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
-                                            'TILT_ANGLE': tilt_angle,
+                                            'TILT_ANGLE(°)': tilt_angle,
                                             'STRAND_NUMBER': strand_number,
                                             'SHEAR_NUMBER': shear_number,
                                             'RES_ID': res_ids,
                                             'TM_OR_EXT': tm_ext,
-                                            'RESIDUES': residues,
+                                            'FASTA': residues,
                                             'INT_EXT': int_ext,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_ascblty})
             beta_strands_df.to_pickle('Beta_strands_dataframe.pkl')
             beta_strands_df.to_csv('Beta_strands_dataframe.csv')
+            cols = beta_strands_df.columns.tolist()
+            cols = ([cols[6]] + [cols[8]] + [cols[7]] + [cols[4]] + [cols[3]] +
+                    [cols[9]] + [cols[1]] + [cols[2]] + [cols[0]] + [cols[5]])
+            beta_strands_df = beta_strands_df[cols]
 
         else:
             return
