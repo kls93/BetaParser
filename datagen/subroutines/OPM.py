@@ -90,9 +90,9 @@ class calculate_barrel_geometry(run_stages):
     def find_barrel_strand_number(self, sec_struct_dfs_dict):
         strand_numbers = OrderedDict()
 
-        for domain_id, sec_struct_df in sec_struct_dfs_dict.items():
+        for domain_id, dssp_df in sec_struct_dfs_dict.items():
             strands = [int(strand) for strand in
-                       set(sec_struct_df['STRAND_NUM'].tolist()) if strand != '']
+                       set(dssp_df['STRAND_NUM'].tolist()) if strand != '']
             strand_count = max(strands)
             strand_numbers[domain_id] = strand_count
 
@@ -102,12 +102,15 @@ class calculate_barrel_geometry(run_stages):
         unprocessed_list = []
         shear_numbers = OrderedDict()
 
-        for domain_id, sec_struct_df in sec_struct_dfs_dict.items():
+        for domain_id, dssp_df in sec_struct_dfs_dict.items():
             networks = [network for key, network in domain_sheets_dict.items()
                         if domain_id in key]
             if len(networks) > 1:
                 print('ERROR: More than one beta-sheet retained for {} '
                       'barrel'.format(domain_id))
+            elif len(networks) < 1:
+                print('ERROR: No beta-sheets identified for {}
+                      barrel'.format(domain_id))
             G = networks[0]
 
             nodes_dict = {}
@@ -138,7 +141,7 @@ class calculate_barrel_geometry(run_stages):
             processed_strands = []
             strand_1 = strands[0]
             processed_strands.append(strand_1)
-            strand_1_df = sec_struct_df[sec_struct_df['STRAND_NUM']==strand_1]
+            strand_1_df = dssp_df[dssp_df['STRAND_NUM']==strand_1]
             dssp_num_1 = strand_1_df['DSSP_NUM'].tolist()
             dssp_num_1 = [int(res) for res in dssp_num_1]
             dssp_num_1 = [res for res in range(min(dssp_num_1), max(dssp_num_1)+1)]
@@ -164,7 +167,7 @@ class calculate_barrel_geometry(run_stages):
                 prev_dssp_num = next_strand_df['DSSP_NUM'].tolist()
                 prev_dssp_num = [int(num) for num in prev_dssp_num]
 
-                next_strand_df = sec_struct_df[sec_struct_df['STRAND_NUM']==next_strand]
+                next_strand_df = dssp_df[dssp_df['STRAND_NUM']==next_strand]
                 dssp_num = next_strand_df['DSSP_NUM'].tolist()
                 dssp_num = [int(num) for num in dssp_num]
                 h_bonds = next_strand_df['H-BONDS'].tolist()
@@ -251,9 +254,7 @@ class calculate_barrel_geometry(run_stages):
             shear_numbers[domain_id] = shear
             print(domain_id, shear)
 
-        with open(
-            'CATH_{}_resn_{}_rfac{}'.format(self.code, self.resn, self.rfac), 'a'
-            ) as unprocessed_file:
+        with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nBarrel formed from discontinuous sheet:\n')
             for domain_id in unprocessed_list:
                 unprocessed_file.write('{}\n'.format(domain_id))

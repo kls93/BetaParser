@@ -28,10 +28,10 @@ class gen_output(run_stages):
             for num in range(1, len(networks)):
                 H = networks[1]
                 G = nx.compose(G, H)
-            sec_struct_df = sec_struct_dfs_dict[domain_id]
+            dssp_df = sec_struct_dfs_dict[domain_id]
 
             edge_or_central = OrderedDict()
-            strands = set(sec_struct_df['STRAND_NUM'].tolist())
+            strands = set(dssp_df['STRAND_NUM'].tolist())
             for strand_num in strands:
                 if strand_num in G:
                     num_of_edges = len(G.neighbors(strand_num))
@@ -41,14 +41,14 @@ class gen_output(run_stages):
                         edge_id = 'central'
                     edge_or_central[strand_num] = edge_id
 
-            df_strands = sec_struct_df['STRAND_NUM'].tolist()
+            df_strands = dssp_df['STRAND_NUM'].tolist()
             df_edge_or_central = ['']*len(df_strands)
             for index, value in enumerate(df_strands):
                 if value in edge_or_central:
                     df_edge_or_central[index] = edge_or_central[value]
             df_edge_or_central = pd.DataFrame({'EDGE_OR_CNTRL': df_edge_or_central})
-            sec_struct_df = pd.concat([sec_struct_df, df_edge_or_central], axis=1)
-            sec_struct_dfs_dict[domain_id] = sec_struct_df
+            dssp_df = pd.concat([dssp_df, df_edge_or_central], axis=1)
+            sec_struct_dfs_dict[domain_id] = dssp_df
 
         return sec_struct_dfs_dict
 
@@ -69,13 +69,13 @@ class gen_output(run_stages):
         bckbn_phi_psi = []
         solv_ascblty = []
 
-        for domain_id, sec_struct_df in sec_struct_dfs_dict.items():
-            strands_list = set(sec_struct_df['STRAND_NUM'].tolist())
+        for domain_id, dssp_df in sec_struct_dfs_dict.items():
+            strands_list = set(dssp_df['STRAND_NUM'].tolist())
             strands_list = [strand_num for strand_num in strands_list if
                             strand_num != '']
 
             for strand_num in strands_list:
-                strand_df = sec_struct_df[sec_struct_df['STRAND_NUM']==strand_num]
+                strand_df = dssp_df[dssp_df['STRAND_NUM']==strand_num]
                 strand_df = strand_df.reset_index(drop=True)
 
                 # Determines strand orientation

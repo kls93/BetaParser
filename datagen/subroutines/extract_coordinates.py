@@ -71,6 +71,7 @@ class extract_beta_structure_coords(run_stages):
             bfac = []
             element = []
             charge = []
+            chain_num_ins = []
             lines = []
 
             # Copies PDB file of input structure from hard drive
@@ -87,6 +88,9 @@ class extract_beta_structure_coords(run_stages):
                 pdb_file_lines = [line.strip('\n') for line in pdb_file if
                                   line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))
+            pdb_file_lines.append('TER'.ljust(80))  # Second TER line ensures
+            # that entire sequence segment is extracted if TER cards have not
+            # been placed correctly in the input PDB file
 
             os.chdir('{}'.format(cwd))
 
@@ -102,7 +106,7 @@ class extract_beta_structure_coords(run_stages):
                 start_seq = False
                 stop_seq = False
                 sequence = ''
-                index = []
+                index_list = []
 
                 for index_2, line in enumerate(pdb_file_lines):
                     if index_2 != (len(pdb_file_lines)-1):
@@ -112,7 +116,7 @@ class extract_beta_structure_coords(run_stages):
                             start_seq = True
 
                         if start_seq is True and stop_seq is False:
-                            index.append(index_2)
+                            index_list.append(index_2)
                             if (line[22:27].strip() != pdb_file_lines[index_2+1][22:27].strip()
                                 or pdb_file_lines[index_2+1][0:3] == 'TER'
                                 ):
@@ -120,9 +124,9 @@ class extract_beta_structure_coords(run_stages):
                                     sequence = sequence + amino_acids_dict[line[17:20].strip()]
                         elif stop_seq is True:
                             sequences.append(sequence)
-                            indices.append(index)
+                            indices.append(index_list)
                             sequence = ''
-                            index = []
+                            index_list = []
                             start_seq = False
                             stop_seq = False
                             continue
@@ -168,6 +172,7 @@ class extract_beta_structure_coords(run_stages):
                             bfac.append(float(pdb_file_lines[index_4][60:66].strip()))
                             element.append(pdb_file_lines[index_4][76:78].strip())
                             charge.append(pdb_file_lines[index_4][78:80].strip())
+                            chain_num_ins.append(pdb_file_lines[index_4][21:27].replace(' ', ''))
                             lines.append(pdb_file_lines[index_4].strip('\n'))
 
                         pdb_file.write('TER'.ljust(80)+'\n')
@@ -198,12 +203,14 @@ class extract_beta_structure_coords(run_stages):
                                        'OCC': occ,
                                        'BFAC': bfac,
                                        'ELEMENT': element,
-                                       'CHARGE': charge})
+                                       'CHARGE': charge,
+                                       'RES_ID': chain_num_ins})
                 cols = pdb_df.columns.tolist()
                 cols = ([cols[7]] + [cols[10]] + [cols[1]] + [cols[0]]
-                        + [cols[5]] + [cols[11]] + [cols[3]] + [cols[12]]
-                        + [cols[8]] + [cols[13]] + [cols[14]] + [cols[15]]
-                        + [cols[9]] + [cols[2]] + [cols[6]] + [cols[4]])
+                        + [cols[5]] + [cols[12]] + [cols[3]] + [cols[13]]
+                        + [cols[8]] + [cols[14]] + [cols[15]] + [cols[16]]
+                        + [cols[9]] + [cols[2]] + [cols[6]] + [cols[4]]
+                        + [cols[11]])
                 pdb_df = pdb_df[cols]
                 all_atoms_dfs_dict[cdhit_domain_df['DOMAIN_ID'][row]] = pdb_df
 

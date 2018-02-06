@@ -69,9 +69,9 @@ class beta_structure_dssp_classification(run_stages):
             with open('DSSP_files/{}.dssp'.format(dssp_domain_df['PDB_CODE'][row]), 'r') as dssp_file:
                 print('Processing {}.dssp'.format(dssp_domain_df['PDB_CODE'][row]))
                 for line in dssp_file:
-                    if (line[11:12]+line[5:11].strip()) in chain_num_list:
+                    if (line[11:12].strip()+line[5:11].strip()) in chain_num_list:
                         dssp_indv_file_lines.append(line.strip('\n'))
-                        index = chain_num_list.index(line[11:12]+line[5:11].strip())
+                        index = chain_num_list.index(line[11:12].strip()+line[5:11].strip())
                         chain_num_list[index] = ''
 
             chain_num_list = [chain_num for chain_num in chain_num_list if chain_num != '']
@@ -98,7 +98,8 @@ class beta_structure_dssp_classification(run_stages):
         return dssp_residues_dict
 
     def get_dssp_sec_struct_df(self, dssp_residues_dict, all_atoms_dfs_dict):
-        # Generates dataframe of relevant information in DSSP file
+        # Generates dataframe of relevant information in DSSP file for each
+        # domain
         sec_struct_dfs_dict = OrderedDict()
 
         for index_1, domain_id in enumerate(list(dssp_residues_dict.keys())):
@@ -108,8 +109,7 @@ class beta_structure_dssp_classification(run_stages):
             print('Generating dataframe summarising DSSP info for {}'.format(domain_id))
             print('{:0.2f}%'.format(((index_1+1)/len(list(dssp_residues_dict.keys())))*100))
 
-            res_num = []
-            chain = []
+            chain_res_num = []
             dssp_num = []
             sec_struct_assignment = []
             strand_number = 1
@@ -124,8 +124,7 @@ class beta_structure_dssp_classification(run_stages):
             # Extracts secondary structure information from the DSSP file lines
             for index_2, line in enumerate(dssp_indv_file_lines):
                 if not line.startswith('TER'):
-                    res_num.append(line[5:11].strip())
-                    chain.append(line[11:12])
+                    chain_res_num.append(line[11:12].strip() + line[5:11].replace(' ', ''))
                     dssp_num.append(line[0:5].strip())
                     secondary_structure = line[16:17]
                     phi.append(float(line[91:97]))
@@ -180,10 +179,8 @@ class beta_structure_dssp_classification(run_stages):
                 if pdb_df['ATMNAME'][row] == 'CA':  # All DSSP info
                 # (= per-residue) appended to the CA rows of the PDB info
                 # (= per-atom)
-                    for index_3, value in enumerate(res_num):
-                        if ((str(pdb_df['RESNUM'][row])+pdb_df['INSCODE'][row]) == res_num[index_3]
-                            and pdb_df['CHAIN'][row] == chain[index_3]
-                            ):
+                    for index_3, value in enumerate(chain_res_num):
+                        if pdb_df['RES_ID'][row] == chain_res_num[index_3]:
                             dssp_num_extnd_df[row] = dssp_num[index_3]
                             sec_struct_assignment_extnd_df[row] = sec_struct_assignment[index_3]
                             strand_number_list_extnd_df[row] = strand_number_list[index_3]
@@ -214,15 +211,9 @@ class beta_structure_dssp_classification(run_stages):
             extnd_df.to_pickle('Entire_domains/{}.pkl'.format(domain_id))
             all_atoms_dfs_dict[domain_id] = extnd_df
 
-            retained_chains = extnd_df[extnd_df['SHEET?']=='E']['CHAIN'].tolist()
-            retained_res_num = extnd_df[extnd_df['SHEET?']=='E']['RESNUM'].tolist()
-            retained_inscode = extnd_df[extnd_df['SHEET?']=='E']['INSCODE'].tolist()
-            chain_res_num = [retained_chains[index]+str(retained_res_num[index])+retained_inscode[index]
-                             for index, value in enumerate(retained_chains)]
+            retained_res = extnd_df[extnd_df['SHEET?']=='E']['RES_ID'].tolist()
             for row in range(extnd_df.shape[0]):
-                if ((extnd_df['CHAIN'][row]+str(extnd_df['RESNUM'][row])
-                    +extnd_df['INSCODE'][row]) not in chain_res_num
-                    ):
+                if extnd_df['RES_ID'][row] not in retained_res:
                     extnd_df.loc[row, 'REC'] = None
             filtered_extnd_df = extnd_df[extnd_df['REC'].notnull()]
             filtered_extnd_df = filtered_extnd_df.reset_index(drop=True)
@@ -244,16 +235,10 @@ class beta_structure_dssp_classification(run_stages):
             with open('Beta_strands/{}.pdb'.format(domain_id), 'w') as new_pdb_file:
                 for strand in strand_number_set:
                     dssp_df_strand = dssp_df[dssp_df['STRAND_NUM']==strand]
-                    chain = dssp_df_strand['CHAIN'].tolist()
-                    res_num = dssp_df_strand['RESNUM'].tolist()
-                    inscode = dssp_df_strand['INSCODE'].tolist()
-                    chain_res_num = [chain[index]+str(res_num[index])+inscode[index]
-                                     for index, value in enumerate(chain)]
+                    chain_res_num = dssp_df_strand['RES_ID'].tolist()
 
                     for row in range(dssp_df.shape[0]):
-                        if ((dssp_df['CHAIN'][row] + str(dssp_df['RESNUM'][row])
-                            + dssp_df['INSCODE'][row]) in chain_res_num
-                            ):
+                        if dssp_df['RES_ID'][row] in chain_res_num:
                             new_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
 
                     new_pdb_file.write('TER'.ljust(80)+'\n')

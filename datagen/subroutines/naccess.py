@@ -12,12 +12,12 @@ else:
 
 class naccess_solv_acsblty_calcs():
 
-    def calculate_sandwich_solv_acsblty(sec_struct_df, sheets):
+    def calculate_sandwich_solv_acsblty(sheets):
         combinations = list(itertools.combinations(list(sheets.keys()), 2))
         solv_acsblty_dict = OrderedDict()
         for sheet_pair in combinations:
             # Calculates solvent accessibility of both sheets in pair
-            print('Calculating solvent accessible surface area for {}'.format(domain_id))
+            print('Calculating solvent accessible surface area for {}'.format(sheet_pair))
             sheet_string = ''
             for sheet_id in sheet_pair:
                 with open('Beta_strands/{}.pdb'.format(sheet_id), 'r') as pdb_file:
@@ -50,8 +50,9 @@ class naccess_solv_acsblty_calcs():
 
         return solv_acsblty_dict
 
-    def calculate_barrel_solv_acsblty(sec_struct_df, sheets):
+    def calculate_barrel_solv_acsblty(sheets):
         solv_acsblty_dict = OrderedDict()
+
         for sheet_id in sheets:
             with open('Beta_strands/{}.pdb'.format(sheet_id), 'r') as pdb_file:
                 sheet_string = ''.join(pdb_file.readlines())
@@ -94,65 +95,56 @@ class naccess_solv_acsblty_calcs():
 
         return res_solv_acsblty
 
-    def add_naccess_info_to_df(domain_id, sec_struct_df, sheets, code,
+    def add_naccess_info_to_df(domain_id, dssp_df, sheets, code,
                                solv_acsblty_dict, res_solv_acsblty,
                                sec_struct_dfs_dict, domain_sheets_dict,
                                unprocessed_list):
-        # Checks that ratio of solvent accessible surface area of the two
-        # sheets in complex is not greater than the total surface
-        # area of the individual sheets
-        res_id_list = ['']*sec_struct_df.shape[0]
-        solv_acsblty_list = ['']*sec_struct_df.shape[0]
+        solv_acsblty_list = ['']*dssp_df.shape[0]
 
-        if solv_acsblty_dict:
-            if (code[0:4] not in ['2.40']
-                and min(list(solv_acsblty_dict.keys())) >= 1
-                ):
-                unprocessed_list.append(domain_id)
-                sec_struct_dfs_dict[domain_id] = None
-                for sheet_id in sheets:
+        # Discounts 'sandwich' from further analysis if the solvent
+        # accessiblity calculations show that none of the retained beta-sheets
+        # are in contact with one another
+        if (code[0:4] not in ['2.40']
+            and min(list(solv_acsblty_dict.keys())) >= 1
+            ):
+            unprocessed_list.append(domain_id)
+            sec_struct_dfs_dict[domain_id] = None
+            for sheet_id in sheets:
+                domain_sheets_dict[sheet_id] = None
+
+            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+
+        else:
+            sandwich = solv_acsblty_dict[min(list(solv_acsblty_dict.keys()))]
+
+            # Removes sheets outside of the sandwich / barrel from further
+            # analysis
+            for sheet_id in sheets:
+                if sheet_id not in sandwich:
                     domain_sheets_dict[sheet_id] = None
 
-                return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+            sheets_retained = [sheet_id.replace('{}_sheet_'.format(domain_id), '')
+                               for sheet_id in sandwich]
+            sub_dssp_df = dssp_df[dssp_df['SHEET_NUM'].isin(sheets_retained)]
 
-            else:
-                sandwich = solv_acsblty_dict[min(list(solv_acsblty_dict.keys()))]
+            chain_res_num = sub_dssp_df['RES_ID'].tolist()
 
-                for sheet_id in sheets:
-                    if sheet_id not in sandwich:
-                        domain_sheets_dict[sheet_id] = None
+            for row in range(dssp_df.shape[0]):
+                res_id = dssp_df['RES_ID'][row]
 
-                sheets_retained = [sheet_id.replace('{}_sheet_'.format(domain_id), '')
-                                   for sheet_id in sandwich]
-                sub_sec_struct_df = sec_struct_df[sec_struct_df['SHEET_NUM'].isin(sheets_retained)]
-                chain = sub_sec_struct_df['CHAIN'].tolist()
-                res_num = sub_sec_struct_df['RESNUM'].tolist()
-                inscode = sub_sec_struct_df['INSCODE'].tolist()
-                chain_res_num_list = [chain[index]+str(res_num[index])+inscode[index]
-                                      for index, value in enumerate(chain)]
-                for row in range(sec_struct_df.shape[0]):
-                    chain_res_num = (sec_struct_df['CHAIN'][row]
-                                     +str(sec_struct_df['RESNUM'][row])
-                                     +sec_struct_df['INSCODE'][row])
-                    if chain_res_num not in chain_res_num_list:
-                        sec_struct_df.loc[row, 'REC'] = None
-                    elif (chain_res_num in chain_res_num_list and
-                        sec_struct_df['ATMNAME'][row] == 'CA'
-                        ):
-                        res_id_list[row] = chain_res_num
+                if res_id not in chain_res_num:
+                    dssp_df.loc[row, 'REC'] = None
 
-                    if (chain_res_num in list(res_solv_acsblty.keys())
-                        and sec_struct_df['ATMNAME'][row] == 'CA'
-                        ):
-                        solv_acsblty_list[row] = res_solv_acsblty[chain_res_num]
+                if (res_id in list(res_solv_acsblty.keys())
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
+                    solv_acsblty_list[row] = res_solv_acsblty[res_id]
 
         solv_acsblty_df = pd.DataFrame({'SOLV_ACSBLTY': solv_acsblty_list})
-        res_id_df = pd.DataFrame({'RES_ID': res_id_list})
-        sec_struct_df = pd.concat([sec_struct_df, solv_acsblty_df,
-                                  res_id_df], axis=1)
-        sec_struct_df = sec_struct_df[sec_struct_df['REC'].notnull()]
-        sec_struct_df = sec_struct_df.reset_index(drop=True)
-        sec_struct_dfs_dict[domain_id] = sec_struct_df
+        dssp_df = pd.concat([dssp_df, solv_acsblty_df], axis=1)
+        dssp_df = dssp_df[dssp_df['REC'].notnull()]
+        dssp_df = dssp_df.reset_index(drop=True)
+        sec_struct_dfs_dict[domain_id] = dssp_df
 
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
@@ -169,22 +161,23 @@ class calculate_solvent_accessible_surface_area(run_stages):
         else:
             from datagen.subroutines.naccess import naccess_solv_acsblty_calcs
 
-        beta_structure = naccess_solv_acsblty_calcs()
-
         unprocessed_list = []
         for domain_id in list(sec_struct_dfs_dict.keys()):
-            sec_struct_df = sec_struct_dfs_dict[domain_id]
+            dssp_df = sec_struct_dfs_dict[domain_id]
             sheets = {key: value for key, value in domain_sheets_dict.items()
                       if domain_id in key}
 
+            if not sheets:
+                print('ERROR: No beta-sheets retained for {}'.format(domain_id))
+
             if self.code[0:4] in ['2.40']:
                 solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_barrel_solv_acsblty(
-                    sec_struct_df, sheets
+                    sheets
                     )
                 res_solv_acsblty = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(domain_id)
             elif self.code[0:4] in ['2.60']:
                 solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_sandwich_solv_acsblty(
-                    sec_struct_df, sheets
+                    sheets
                     )
                 res_solv_acsblty = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(domain_id)
             else:
@@ -193,7 +186,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
 
             (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
             ) = naccess_solv_acsblty_calcs.add_naccess_info_to_df(
-                domain_id, sec_struct_df, sheets, self.code, solv_acsblty_dict,
+                domain_id, dssp_df, sheets, self.code, solv_acsblty_dict,
                 res_solv_acsblty, sec_struct_dfs_dict, domain_sheets_dict,
                 unprocessed_list
                 )
@@ -214,17 +207,29 @@ class calculate_solvent_accessible_surface_area(run_stages):
         # Calculates the sum of the solvent accessibilities of every other
         # residue, and from this determines which face towards the interior
         # of the sandwich and which towards the exterior
-        import isambard.external_programs.naccess as naccess
+        # import isambard.external_programs.naccess as naccess
+        unprocessed_list = []
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
-            sec_struct_df = sec_struct_dfs_dict[domain_id]
+            dssp_df = sec_struct_dfs_dict[domain_id]
             sheets = [key for key in list(domain_sheets_dict.keys()) if
                       domain_id in key]
-            int_ext_list = ['']*sec_struct_df.shape[0]
+            int_ext_list = ['']*dssp_df.shape[0]
             int_ext_dict = OrderedDict()
-            if len(sheets) > 2:
-                sys.exit('Error - more than 2 sheets retained following '
-                         'solvent accessibility calculation')
+
+            if self.code[0:4] in ['2.40'] and len(sheets) > 1:
+                print('ERROR: more than 1 sheet retained following solvent '
+                      'accessibility calculation')
+                sec_struct_dfs_dict[domain_id] = None
+                unprocessed_list.append(domain_id)
+                continue
+            elif self.code[0:4] in ['2.60'] and len(sheets) > 2:
+                print('ERROR: more than 2 sheets retained following solvent '
+                      'accessibility calculation')
+                sec_struct_dfs_dict[domain_id] = None
+                unprocessed_list.append(domain_id)
+                continue
+
             # Calculates solvent accessibility of both sheets in pair
             print('Calculating solvent accessible surface area for {}'.format(domain_id))
             sheet_string = ''
@@ -242,35 +247,56 @@ class calculate_solvent_accessible_surface_area(run_stages):
                     ins_code = line[13:14].strip()
                     chain_res_num = chain + res_num + ins_code
                     int_ext_dict[chain_res_num] = float(line[14:22])
-            face_1_res = [value for value in list(int_ext_dict.values())[::2]]
-            face_2_res = [value for value in list(int_ext_dict.values())[1::2]]
-            face_1_solv_acsblty = sum(face_1_res)
-            face_2_solv_acsblty = sum(face_2_res)
-            if face_1_solv_acsblty > face_2_solv_acsblty:
-                ext_chain_res_num = list(int_ext_dict.keys())[::2]
-                int_chain_res_num = list(int_ext_dict.keys())[1::2]
-            elif face_1_solv_acsblty < face_2_solv_acsblty:
-                ext_chain_res_num = list(int_ext_dict.keys())[1::2]
-                int_chain_res_num = list(int_ext_dict.keys())[::2]
-            else:
-                sys.exit('Solvent accessibilities of two faces of {} are equal - '
-                         'something has gone wrong with the analysis'.format(sheet_id))
-            for chain_res_num in ext_chain_res_num:
-                int_ext_dict[chain_res_num] = 'exterior'
-            for chain_res_num in int_chain_res_num:
-                int_ext_dict[chain_res_num] = 'interior'
 
-            for row in range(sec_struct_df.shape[0]):
-                chain_res_num = (sec_struct_df['CHAIN'][row]
-                                 +str(sec_struct_df['RESNUM'][row])
-                                 +sec_struct_df['INSCODE'][row])
+            # Selects every other residue in each beta-sheet
+            for sheet_id in sheets:
+                sheet_id = sheet_id.replace('{}_sheet_'.format(domain_id), '')
+                sheet_df = dssp_df[dssp_df['SHEET_NUM']==sheet_id]
+                sheet_res = sheet_df['RES_ID'].tolist()
+                res_acsblty = [value for key, value in int_ext_dict.items() if
+                               key in sheet_res]
+
+                face_1_res = res_acsblty[::2]
+                face_2_res = res_acsblty[1::2]
+                face_1_solv_acsblty = sum(face_1_res)
+                face_2_solv_acsblty = sum(face_2_res)
+
+                if face_1_solv_acsblty > face_2_solv_acsblty:
+                    ext_chain_res_num = face_1_res
+                    int_chain_res_num = face_2_res
+                elif face_1_solv_acsblty < face_2_solv_acsblty:
+                    ext_chain_res_num = face_2_res
+                    int_chain_res_num = face_1_res
+                else:
+                    print('ERROR: solvent accessibilities of two faces of {} '
+                          'are equal - something has gone wrong with the '
+                          'analysis'.format(sheet_id))
+                    sec_struct_dfs_dict[domain_id] = None
+                    unprocessed_list.append(domain_id)
+                    break
+
+                for chain_res_num in ext_chain_res_num:
+                    int_ext_dict[chain_res_num] = 'exterior'
+                for chain_res_num in int_chain_res_num:
+                    int_ext_dict[chain_res_num] = 'interior'
+
+            for row in range(dssp_df.shape[0]):
+                chain_res_num = dssp_df['RES_ID'][row]
                 if (chain_res_num in list(int_ext_dict.keys())
-                    and sec_struct_df['ATMNAME'][row] == 'CA'
+                    and dssp_df['ATMNAME'][row] == 'CA'
                     ):
                     int_ext_list[row] = int_ext_dict[chain_res_num]
             int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
-            sec_struct_df = pd.concat([sec_struct_df, int_ext_df], axis=1)
-            sec_struct_df = sec_struct_df.reset_index(drop=True)
-            sec_struct_dfs_dict[domain_id] = sec_struct_df
+            dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
+            sec_struct_dfs_dict[domain_id] = dssp_df
+
+        with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
+            unprocessed_file.write('\n\nError in determination of interior and '
+                                   'exterior facing residues:\n')
+            for domain_id in set(unprocessed_list):
+                unprocessed_file.write('{}\n'.format(domain_id))
+
+        sec_struct_dfs_dict = {key: value for key, value in
+                               sec_struct_dfs_dict.items() if value is not None}
 
         return sec_struct_dfs_dict

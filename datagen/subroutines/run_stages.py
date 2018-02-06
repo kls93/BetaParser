@@ -112,10 +112,12 @@ class run_stages():
         # Combines the beta-strands into sheets and translates the identified
         # beta-strand interactions into a network
         beta_structure = calculate_beta_network(self.run_parameters)
-        domain_sheets_dict = beta_structure.identify_strand_interactions(
+        domain_sheets_dict, sec_struct_dfs_dict = beta_structure.generate_network(
             sec_struct_dfs_dict
             )
 
+        # Pickles variables required for running stage 3 (which currently has
+        # to run within ISAMBARD, hence the division of stages 2-4)
         with open('Input_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
 
