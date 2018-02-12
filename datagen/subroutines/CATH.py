@@ -8,7 +8,7 @@ def gen_domain_desc_list(orig_dir):
     domains_desc = []
     with open(
         '{}/docs/CATH_domain_desc_v_4_2_0.txt'.format(orig_dir), 'r'
-        ) as domains_file:
+    ) as domains_file:
         line_1 = False
         indv_domain_list = []
         for line in domains_file:
@@ -31,6 +31,8 @@ def gen_domain_desc_list(orig_dir):
 # Filters the domain descriptions list for beta-structures (either
 # sandwiches or barrels depending upon the user's choice), picking out PDB
 # accession codes and sequences, whose values are stored in a dataframe.
+
+
 def domain_desc_filter(code, domains_desc):
     domain_pdb_ids = []
     domain_ids = []

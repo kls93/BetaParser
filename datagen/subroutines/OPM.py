@@ -8,6 +8,7 @@ if __name__ == 'subroutines.OPM':
 else:
     from datagen.subroutines.run_stages import run_stages
 
+
 class extract_strand_tilt_and_TM_regions(run_stages):
 
     def __init__(self, run_parameters):
@@ -148,20 +149,21 @@ class calculate_barrel_geometry(run_stages):
             processed_strands = []
             strand_1 = strands[0]
             processed_strands.append(strand_1)
-            strand_1_df = dssp_df[dssp_df['STRAND_NUM']==strand_1]
+            strand_1_df = dssp_df[dssp_df['STRAND_NUM'] == strand_1]
             dssp_num_1 = strand_1_df['DSSP_NUM'].tolist()
             dssp_num_1 = [int(res) for res in dssp_num_1]
             dssp_num_1 = [res for res in range(min(dssp_num_1), max(dssp_num_1)+1)]
             for index, res in enumerate(dssp_num_1):
                 res_array[0, 80+index] = res
-            res_list_1 = res_array[0:1,].tolist()
+            res_list_1 = res_array[0:1, ].tolist()
             res_list_1 = [res for res_sub_list in res_list_1 for res in res_sub_list]
-            res_list = res_array[0:1,].tolist()
+            res_list = res_array[0:1, ].tolist()
             res_list = [res for res_sub_list in res_list for res in res_sub_list]
 
             current_strand = strand_1
             next_strand_df = strand_1_df
             count = 0
+            diff_dict = {}
             while any(x not in processed_strands for x in G.neighbors(current_strand)):
                 next_strand = G.neighbors(current_strand)[0]
                 if next_strand in processed_strands:
@@ -174,7 +176,7 @@ class calculate_barrel_geometry(run_stages):
                 prev_dssp_num = next_strand_df['DSSP_NUM'].tolist()
                 prev_dssp_num = [int(num) for num in prev_dssp_num]
 
-                next_strand_df = dssp_df[dssp_df['STRAND_NUM']==next_strand]
+                next_strand_df = dssp_df[dssp_df['STRAND_NUM'] == next_strand]
                 dssp_num = next_strand_df['DSSP_NUM'].tolist()
                 dssp_num = [int(num) for num in dssp_num]
                 h_bonds = next_strand_df['H-BONDS'].tolist()
@@ -197,9 +199,9 @@ class calculate_barrel_geometry(run_stages):
                 listed_res = []
                 for h_bonds_index, res in enumerate(h_bonds):
                     if (res != 0
-                        and float(res) in res_list
-                        and res in list(dssp_num_dict.keys())
-                        ):
+                            and float(res) in res_list
+                            and res in list(dssp_num_dict.keys())
+                            ):
                         listed_res.append(int(dssp_num_dict[res]))
                         res_list_index = res_list.index(float(res))
                         res_array[count, res_list_index] = float(dssp_num_dict[res])
@@ -207,9 +209,25 @@ class calculate_barrel_geometry(run_stages):
                 lower_res = [res for res in range(min(dssp_num), min(listed_res))]
                 higher_res = [res for res in range(max(listed_res)+1, max(dssp_num)+1)]
 
-                res_list = res_array[count:count+1,].tolist()
+                res_list = res_array[count:count+1, ].tolist()
                 res_list = [res for res_sub_list in res_list for res in res_sub_list]
                 res_list_values = [num for num in res_list if num != 0.0]
+
+                """
+                diff = len(range(min(listed_res), max(listed_res)+1)) - len(listed_res)
+                if diff >= 1:
+                    missing_res = []
+                    for num in range(min(listed_res), max(listed_res)+1):
+                        if num not in listed_res:
+                            missing_res.append(num)
+
+                    for num in missing_res:
+                        index_1 = res_list.index(min(listed_res, key=lambda x: abs(x-num)))
+                        listed_res.remove(min(listed_res, key=lambda x: abs(x-num)))
+                        index_2 = res_list.index(min(listed_res, key=lambda x: abs(x-num)))
+                        indices = sorted([index_1, index_2])
+                        diff_dict[diff] = indices
+                """
 
                 if len(lower_res) > 0:  # Error with overhang placement if len == 1, need to fix this
                     lower_index = res_list.index(float(min(listed_res)))
@@ -242,10 +260,56 @@ class calculate_barrel_geometry(run_stages):
                             res_list_index = (higher_index - len(higher_res)) + index
                             res_array[count, res_list_index] = res
 
-                res_list = res_array[count:count+1,].tolist()
+                res_list = res_array[count:count+1, ].tolist()
                 res_list = [res for res_sub_list in res_list for res in res_sub_list]
 
+                """
+                for index, res in enumerate(dssp_num):
+                    res_list = res_array[count:count+1, ].tolist()
+                    res_list = [res for res_sub_list in res_list for res in res_sub_list]
+                    if (index not in [0, len(dssp_num)-1]
+                            and res not in res_list
+                        ):
+                        print(res)
+                        print(res_list)
+
+                        index_count = 1
+                        while True:
+                            try:
+                                index_1 = res_list.index(float(dssp_num[index-index_count]))
+                            except ValueError:
+                                index_count += 1
+                            else:
+                                break
+
+                        index_count = 1
+                        while True:
+                            try:
+                                index_2 = res_list.index(float(dssp_num[index+index_count]))
+                            except ValueError:
+                                index_count += 1
+                            else:
+                                break
+
+                        new_index = max([index_1, index_2])
+                        np.insert(res_array, new_index, 0, axis=1)
+                        res_array[count, new_index] = float(res)
+                """
+
+                """
+                res_range = sorted([num for num in res_list if num != 0.0])
+                for index, res in enumerate(res_range):
+                    if (index != (len(res_range)-1)
+                            and (res+1) != res_range[index+1]
+                            ):
+                        diff = res_range[index+1] - res
+                        if diff % 2 == 0:
+                            shear = shear + 1
+                """
+
                 current_strand = next_strand
+
+            diff_dict = OrderedDict(sorted(diff_dict.items(), reverse=True))
 
             # Residues are now aligned correctly, but are still small errors in
             # shear number calculation due to skipped residues
@@ -254,10 +318,23 @@ class calculate_barrel_geometry(run_stages):
 
             if low_index_row_1 > low_index_row_n:
                 shear = low_index_row_1 - low_index_row_n
+                for diff in diff_dict:
+                    if (low_index_row_n < diff_dict[diff][0]
+                            and diff_dict[diff][1] < low_index_row_1
+                            ):
+                        shear += diff
+                        break
             elif low_index_row_1 < low_index_row_n:
                 high_index_row_1 = res_list_1.index(listed_res[-1])
                 high_index_row_n = res_list.index(listed_res[-1])
                 shear = high_index_row_n - high_index_row_1
+                for diff in diff_dict:
+                    if (high_index_row_1 < diff_dict[diff][0]
+                            and diff_dict[diff][1] < high_index_row_n
+                            ):
+                        shear += diff
+                        break
+
             shear_numbers[domain_id] = shear
             print(domain_id, shear)
 

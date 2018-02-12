@@ -10,6 +10,7 @@ if __name__ == 'subroutines.naccess':
 else:
     from datagen.subroutines.run_stages import run_stages
 
+
 class naccess_solv_acsblty_calcs():
 
     def calculate_barrel_solv_acsblty(sheets):
@@ -105,8 +106,8 @@ class naccess_solv_acsblty_calcs():
         # accessiblity calculations show that none of the retained beta-sheets
         # are in contact with one another
         if (code[0:4] not in ['2.40']
-            and min(list(solv_acsblty_dict.keys())) >= 1
-            ):
+                and min(list(solv_acsblty_dict.keys())) >= 1
+                ):
             unprocessed_list.append(domain_id)
             sec_struct_dfs_dict[domain_id] = None
             for sheet_id in sheets:
@@ -136,8 +137,8 @@ class naccess_solv_acsblty_calcs():
                     dssp_df.loc[row, 'REC'] = None
 
                 if (res_id in list(res_solv_acsblty.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                        and dssp_df['ATMNAME'][row] == 'CA'
+                        ):
                     solv_acsblty_list[row] = res_solv_acsblty[res_id]
 
         solv_acsblty_df = pd.DataFrame({'SOLV_ACSBLTY': solv_acsblty_list})
@@ -178,7 +179,7 @@ class naccess_solv_acsblty_calcs():
         strands = [strand for strand in set(sheets_df['STRAND_NUM'].tolist())
                    if strand != '']
         for strand in strands:
-            strand_df = dssp_df[dssp_df['STRAND_NUM']==strand]
+            strand_df = dssp_df[dssp_df['STRAND_NUM'] == strand]
             strand_res = strand_df['RES_ID'].tolist()
             res_acsblty = [value for key, value in int_ext_dict.items() if
                            key in strand_res]
@@ -210,8 +211,8 @@ class naccess_solv_acsblty_calcs():
         for row in range(dssp_df.shape[0]):
             chain_res_num = dssp_df['RES_ID'][row]
             if (chain_res_num in list(int_ext_dict.keys())
-                and dssp_df['ATMNAME'][row] == 'CA'
-                ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
                 int_ext_list[row] = int_ext_dict[chain_res_num]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
@@ -222,7 +223,7 @@ class naccess_solv_acsblty_calcs():
     def calculate_int_ext_sandwich(domain_id, dssp_df, sheets,
                                    sec_struct_dfs_dict, unprocessed_list):
         int_ext_list = ['']*dssp_df.shape[0]
-        int_ext_combined =OrderedDict()
+        int_ext_combined = OrderedDict()
         int_ext_indv = OrderedDict()
 
         print('Calculating solvent accessible surface area for residues in '
@@ -284,8 +285,8 @@ class naccess_solv_acsblty_calcs():
         for row in range(dssp_df.shape[0]):
             chain_res_num = dssp_df['RES_ID'][row]
             if (chain_res_num in list(int_ext_combined.keys())
-                and dssp_df['ATMNAME'][row] == 'CA'
-                ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
                 int_ext_list[row] = int_ext_combined[chain_res_num]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
@@ -320,23 +321,25 @@ class calculate_solvent_accessible_surface_area(run_stages):
             if self.code[0:4] in ['2.40']:
                 solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_barrel_solv_acsblty(
                     sheets
-                    )
-                res_solv_acsblty = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(domain_id)
+                )
+                res_solv_acsblty = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
+                    domain_id)
             elif self.code[0:4] in ['2.60']:
                 solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_sandwich_solv_acsblty(
                     sheets
-                    )
-                res_solv_acsblty = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(domain_id)
+                )
+                res_solv_acsblty = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
+                    domain_id)
             else:
                 solv_acsblty_dict = {}
                 res_solv_acsblty = {}
 
             (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-            ) = naccess_solv_acsblty_calcs.add_naccess_info_to_df(
+             ) = naccess_solv_acsblty_calcs.add_naccess_info_to_df(
                 domain_id, dssp_df, sheets, self.code, solv_acsblty_dict,
                 res_solv_acsblty, sec_struct_dfs_dict, domain_sheets_dict,
                 unprocessed_list
-                )
+            )
 
         sec_struct_dfs_dict = {key: value for key, value in
                                sec_struct_dfs_dict.items() if value is not None}
@@ -385,14 +388,14 @@ class calculate_solvent_accessible_surface_area(run_stages):
 
             if self.code[0:4] in ['2.40']:
                 (sec_struct_dfs_dict, unprocessed_list
-                ) = naccess_solv_acsblty_calcs.calculate_int_ext_barrel(
+                 ) = naccess_solv_acsblty_calcs.calculate_int_ext_barrel(
                     domain_id, dssp_df, sheets, sec_struct_dfs_dict, unprocessed_list
-                    )
+                )
             elif self.code[0:4] in ['2.60']:
                 (sec_struct_dfs_dict, unprocessed_list
-                ) = naccess_solv_acsblty_calcs.calculate_int_ext_sandwich(
+                 ) = naccess_solv_acsblty_calcs.calculate_int_ext_sandwich(
                     domain_id, dssp_df, sheets, sec_struct_dfs_dict, unprocessed_list
-                    )
+                )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nError in determination of interior and '

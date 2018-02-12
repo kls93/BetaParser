@@ -146,19 +146,19 @@ class beta_structure_dssp_classification(run_stages):
                         ladder_2 = line[24:25]
                         if ladder_2 == ' ':
                             ladder_2 = ''
-                        elif ladder_2.isupper(): # Uppercase => antiparallel strands
+                        elif ladder_2.isupper():  # Uppercase => antiparallel strands
                             ladder_2 = 'A'
-                        elif ladder_2.islower(): # Lowercase => parallel strands
+                        elif ladder_2.islower():  # Lowercase => parallel strands
                             ladder_2 = 'P'
-                        orientation_list.append([ladder_1,ladder_2])
+                        orientation_list.append([ladder_1, ladder_2])
                         bridge_pair_list.append([line[25:29].strip(),
                                                  line[29:33].strip()])
                     elif secondary_structure != 'E':
                         sec_struct_assignment.append('')
                         strand_number_list.append('')
                         sheet_number_list.append('')
-                        orientation_list.append(['',''])
-                        bridge_pair_list.append(['',''])
+                        orientation_list.append(['', ''])
+                        bridge_pair_list.append(['', ''])
 
             # Initialises lists of additional properties extracted from the
             # DSSP file lines to be appended to the dataframe of PDB information
@@ -177,8 +177,8 @@ class beta_structure_dssp_classification(run_stages):
             # Fills lists created in the previous step
             for row in range(row_num):
                 if pdb_df['ATMNAME'][row] == 'CA':  # All DSSP info
-                # (= per-residue) appended to the CA rows of the PDB info
-                # (= per-atom)
+                    # (= per-residue) appended to the CA rows of the PDB info
+                    # (= per-atom)
                     for index_3, value in enumerate(chain_res_num):
                         if pdb_df['RES_ID'][row] == chain_res_num[index_3]:
                             dssp_num_extnd_df[row] = dssp_num[index_3]
@@ -211,7 +211,7 @@ class beta_structure_dssp_classification(run_stages):
             extnd_df.to_pickle('Entire_domains/{}.pkl'.format(domain_id))
             all_atoms_dfs_dict[domain_id] = extnd_df
 
-            retained_res = extnd_df[extnd_df['SHEET?']=='E']['RES_ID'].tolist()
+            retained_res = extnd_df[extnd_df['SHEET?'] == 'E']['RES_ID'].tolist()
             for row in range(extnd_df.shape[0]):
                 if extnd_df['RES_ID'][row] not in retained_res:
                     extnd_df.loc[row, 'REC'] = None
@@ -234,7 +234,7 @@ class beta_structure_dssp_classification(run_stages):
 
             with open('Beta_strands/{}.pdb'.format(domain_id), 'w') as new_pdb_file:
                 for strand in strand_number_set:
-                    dssp_df_strand = dssp_df[dssp_df['STRAND_NUM']==strand]
+                    dssp_df_strand = dssp_df[dssp_df['STRAND_NUM'] == strand]
                     chain_res_num = dssp_df_strand['RES_ID'].tolist()
 
                     for row in range(dssp_df.shape[0]):

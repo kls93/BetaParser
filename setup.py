@@ -1,9 +1,11 @@
 
 from setuptools import setup, find_packages
 
+
 def readme():
     with open('README.md', 'r') as info:
         return info.read()
+
 
 setup(name='datagen',
       version='0.1.0',
@@ -18,4 +20,4 @@ setup(name='datagen',
       install_requires=['pandas', 'matplotlib', 'networkx'],
       entry_points={'console_scripts': ['datagen=datagen.datagen:main']},
       zip_safe=False
-)
+      )

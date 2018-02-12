@@ -18,7 +18,7 @@ class network_calcs():
         strands_dict = {}
         strands = [int(strand) for strand in set(sheet_df['STRAND_NUM'].tolist())]
         for strand in strands:
-            strand_df = sheet_df[sheet_df['STRAND_NUM']==strand]
+            strand_df = sheet_df[sheet_df['STRAND_NUM'] == strand]
 
             strand_res_num = [int(res) for res in strand_df['DSSP_NUM'].tolist()]
             strand_min = min(strand_res_num)
@@ -93,7 +93,7 @@ class network_calcs():
         return strand_pairs
 
     def create_network(domain_id, sheet, strand_pairs, edge_labels,
-                     domain_sheets, domain_sheets_dict):
+                       domain_sheets, domain_sheets_dict):
         # Creates network of the interacting strands in the sheet
         G = nx.Graph()
         for pair in strand_pairs:
@@ -120,13 +120,13 @@ class network_calcs():
 
             with open(
                 'Beta_strands/{}_sheet_{}.pdb'.format(domain_id, sheet), 'w'
-                ) as sheet_pdb_file:
-                sheet_df = dssp_df[dssp_df['SHEET_NUM']==sheet]
+            ) as sheet_pdb_file:
+                sheet_df = dssp_df[dssp_df['SHEET_NUM'] == sheet]
                 sheet_df = sheet_df.reset_index(drop=True)
 
                 strands = sorted([int(strand) for strand in set(sheet_df['STRAND_NUM'].tolist())])
                 for strand in strands:
-                    strand_df = sheet_df[sheet_df['STRAND_NUM']==strand]
+                    strand_df = sheet_df[sheet_df['STRAND_NUM'] == strand]
                     chain_res_num = strand_df['RES_ID'].tolist()
 
                     for row in range(dssp_df.shape[0]):
@@ -151,7 +151,7 @@ class network_calcs():
         nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=edge_labels)
         plt.savefig(
             'Beta_strands/{}_network.png'.format(domain_id)
-            )
+        )
 
 
 class calculate_beta_network(run_stages):
@@ -159,7 +159,8 @@ class calculate_beta_network(run_stages):
     def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
 
-    def generate_network(self, sec_struct_dfs_dict):  # SPLIT DOWN INTO SMALLER FUNCTIONS TO AVOID INDENTATION BUGS ETC.!
+    # SPLIT DOWN INTO SMALLER FUNCTIONS TO AVOID INDENTATION BUGS ETC.!
+    def generate_network(self, sec_struct_dfs_dict):
         # Separates the beta-strands identified by DSSP into sheets, and works
         # out the strand interactions and thus loop connections both within and
         # between sheets
@@ -177,17 +178,17 @@ class calculate_beta_network(run_stages):
 
             sheets = [sheet for sheet in set(dssp_df['SHEET_NUM'].tolist()) if sheet != '']
             for sheet in sheets:
-                sheet_df = dssp_df[dssp_df['SHEET_NUM']==sheet]
+                sheet_df = dssp_df[dssp_df['SHEET_NUM'] == sheet]
                 sheet_df = sheet_df.reset_index(drop=True)
 
                 strands_dict = network_calcs.create_strands_dict(sheet_df)
                 strand_pairs = network_calcs.identify_strand_interactions(
                     sheet_df, strands_dict
-                    )
+                )
                 edge_labels, domain_sheets, domain_sheets_dict = network_calcs.create_network(
                     domain_id, sheet, strand_pairs, edge_labels, domain_sheets,
                     domain_sheets_dict
-                    )
+                )
 
             if domain_sheets:
                 network_calcs.write_network_pdb(domain_id, dssp_df, domain_sheets)

@@ -58,12 +58,13 @@ class filter_beta_structure(run_stages):
                         unprocessed_list_2.append(domain_df['PDB_CODE'][row])
                         break
                 elif (whitespace_remv_line.startswith('REMARK2')
-                    and 'ANGSTROM' in whitespace_remv_line):
-                        try:
-                            resolution = float(line[23:30])
-                        except ValueError:
-                            resolution = 0
-                            break
+                      and 'ANGSTROM' in whitespace_remv_line
+                      ):
+                    try:
+                        resolution = float(line[23:30])
+                    except ValueError:
+                        resolution = 0
+                        break
                 elif whitespace_remv_line.startswith('REMARK3RVALUE'):
                     if any(x in whitespace_remv_line for x in ['(WORKINGSET)', '(WORKINGSET,NOCUTOFF)']):
                         rfactor = whitespace_remv_line.split(':')
@@ -84,7 +85,9 @@ class filter_beta_structure(run_stages):
         filtered_domain_df_part_1 = filtered_domain_df_part_1.reset_index(drop=True)
         filtered_domain_df_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
                                                   'RFACTOR': rfactor_list})
-        filtered_domain_df = pd.concat([filtered_domain_df_part_1, filtered_domain_df_part_2], axis=1)
+        filtered_domain_df = pd.concat(
+            [filtered_domain_df_part_1, filtered_domain_df_part_2], axis=1
+        )
         filtered_domain_df.to_pickle('CDHIT_entries.pkl')
         filtered_domain_df.to_csv('CDHIT_entries.csv')
 

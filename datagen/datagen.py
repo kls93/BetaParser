@@ -7,16 +7,17 @@ import argparse
 # database. A summary of the structural characteristics of each structure in
 # the dataset (for e.g. further bioinformatics analysis) is also generated.
 
+
 def main():
     if __name__ == '__main__':
         from subroutines.run_parameters import (
             gen_run_parameters, find_cdhit_input, find_opm_database
-            )
+        )
         from subroutines.run_stages import run_stages
     else:
         from datagen.subroutines.run_parameters import (
             gen_run_parameters, find_cdhit_input, find_opm_database
-            )
+        )
         from datagen.subroutines.run_stages import run_stages
     orig_dir = os.getcwd()
 
@@ -61,6 +62,7 @@ def main():
     elif stage in ['4']:
         opm_database = find_opm_database(args)
         analysis.run_stage_4(orig_dir, opm_database)
+
 
 # Calls 'main' function if datagen.py is run as a script
 if __name__ == '__main__':

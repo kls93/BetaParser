@@ -25,12 +25,12 @@ class run_stages():
         if __name__ == 'subroutines.run_stages':
             from subroutines.CATH import (
                 gen_domain_desc_list, domain_desc_filter
-                )
+            )
             from subroutines.CDHIT import filter_beta_structure
         else:
             from datagen.subroutines.CATH import (
                 gen_domain_desc_list, domain_desc_filter
-                )
+            )
             from datagen.subroutines.CDHIT import filter_beta_structure
 
         # Generates a list of the domain descriptions provided in
@@ -57,13 +57,13 @@ class run_stages():
             from subroutines.extract_coordinates import extract_beta_structure_coords
             from subroutines.DSSP import (
                 filter_dssp_database, beta_structure_dssp_classification
-                )
+            )
             from subroutines.generate_network import calculate_beta_network
         else:
             from datagen.subroutines.extract_coordinates import extract_beta_structure_coords
             from datagen.subroutines.DSSP import (
                 filter_dssp_database, beta_structure_dssp_classification
-                )
+            )
             from datagen.subroutines.generate_network import calculate_beta_network
 
         # Loads the dataframe generated in previous steps
@@ -77,13 +77,13 @@ class run_stages():
         beta_structure = extract_beta_structure_coords(self.run_parameters)
         cdhit_domain_df = beta_structure.gen_cdhit_dict(
             cdhit_output, filtered_domain_df
-            )
+        )
         cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
             cdhit_domain_df
-            )
+        )
         all_atoms_dfs_dict = beta_structure.remove_alternate_conformers(
             all_atoms_dfs_dict
-            )
+        )
 
         # Copies required DSSP files from database (on hard drive) to local
         # machine
@@ -107,7 +107,7 @@ class run_stages():
 
         all_atoms_dfs_dict, sec_struct_dfs_dict = beta_structure.get_dssp_sec_struct_df(
             dssp_residues_dict, all_atoms_dfs_dict
-            )
+        )
         beta_structure.write_dssp_sec_struct_pdb(sec_struct_dfs_dict)
         del dssp_residues_dict  # To save memory and reduce the number of
         # variables considered
@@ -117,7 +117,7 @@ class run_stages():
         beta_structure = calculate_beta_network(self.run_parameters)
         domain_sheets_dict, sec_struct_dfs_dict = beta_structure.generate_network(
             sec_struct_dfs_dict
-            )
+        )
 
         # Pickles variables required for running stage 3 (which currently has
         # to run within ISAMBARD, hence the division of stages 2-4)
@@ -137,10 +137,10 @@ class run_stages():
         beta_structure = calculate_solvent_accessible_surface_area(self.run_parameters)
         sec_struct_dfs_dict, domain_sheets_dict = beta_structure.run_naccess(
             sec_struct_dfs_dict, domain_sheets_dict
-            )
+        )
         sec_struct_dfs_dict = beta_structure.identify_int_ext(
             sec_struct_dfs_dict, domain_sheets_dict
-            )
+        )
 
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
@@ -149,12 +149,12 @@ class run_stages():
         if __name__ == 'subroutines.run_stages':
             from subroutines.OPM import (
                 extract_strand_tilt_and_TM_regions, calculate_barrel_geometry
-                )
+            )
             from subroutines.output_dataframe import gen_output
         else:
             from datagen.subroutines.OPM import (
                 extract_strand_tilt_and_TM_regions, calculate_barrel_geometry
-                )
+            )
             from datagen.subroutines.output_dataframe import gen_output
 
         with open('Output_ISAMBARD_variables.pkl', 'rb') as pickle_file:
@@ -166,17 +166,14 @@ class run_stages():
             opm_df = beta_structure.parse_opm(orig_dir)
             tilt_angles = beta_structure.find_strand_tilt(
                 sec_struct_dfs_dict, opm_df
-                )
+            )
             barrel_structure = calculate_barrel_geometry(self.run_parameters)
             strand_numbers = barrel_structure.find_barrel_strand_number(
                 sec_struct_dfs_dict
-                )
-            """
+            )
             shear_numbers = barrel_structure.find_barrel_shear_number(
                 sec_struct_dfs_dict, domain_sheets_dict
-                )
-            """
-            shear_numbers = OrderedDict()
+            )
             del opm_df  # To save memory and reduce the number of variables
             # considered
         else:
@@ -185,9 +182,13 @@ class run_stages():
             shear_numbers = OrderedDict()
             sec_struct_dfs_dict = output.identify_edge_central(
                 domain_sheets_dict, sec_struct_dfs_dict
-                )
+            )
 
         output.write_beta_strand_dataframe(
-            sec_struct_dfs_dict, opm_database, tilt_angles, strand_numbers,
-            shear_numbers
-            )
+            'strand', sec_struct_dfs_dict, opm_database, tilt_angles,
+            strand_numbers, shear_numbers
+        )
+        output.write_beta_strand_dataframe(
+            'res', sec_struct_dfs_dict, opm_database, tilt_angles,
+            strand_numbers, shear_numbers
+        )

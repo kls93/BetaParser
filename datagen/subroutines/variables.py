@@ -1,6 +1,8 @@
 
 # Defines dictionary of three- and one-letter codes of the standard 20 amino
 # acids
+
+
 def gen_amino_acids_dict():
     amino_acids_dict = {'ALA': 'A',
                         'ARG': 'R',

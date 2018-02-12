@@ -7,6 +7,7 @@ from collections import OrderedDict
 
 prompt = '> '
 
+
 def gen_run_parameters(args):
     # Determines which stage of analysis the user wants to perform - currently
     # the analysis cannot be run in its entirety owing to the need to run the
@@ -64,14 +65,14 @@ def gen_run_parameters(args):
     # to analyse is not specified in the input file / is not recognised
     if 'id' in run_parameters:
         if (run_parameters['structuredatabase'] == 'CATH'
-            and not run_parameters['id'].startswith('2')
-            ):
+                and not run_parameters['id'].startswith('2')
+                ):
             print('DataGen is currently only suitable for generation and '
                   'analysis of\nall-beta structures')
             run_parameters.pop('id')
         elif (run_parameters['structuredatabase'] == 'SCOP'
-            and not run_parameters['id'].startswith('b')
-            ):
+              and not run_parameters['id'].startswith('b')
+              ):
             print('DataGen is currently only suitable for generation and '
                   'analysis of\nall-beta structures')
             run_parameters.pop('id')
@@ -215,7 +216,7 @@ def gen_run_parameters(args):
     dir_name = '{}_{}_resn_{}_rfac_{}'.format(
         run_parameters['structuredatabase'], run_parameters['id'],
         run_parameters['resolution'], run_parameters['rfactor']
-        )
+    )
     if stage == '1':
         if os.path.isdir(dir_name):
             shutil.rmtree(dir_name)
@@ -271,7 +272,7 @@ def find_cdhit_input(args):
 
     while not os.path.isfile(cdhit_output):
         print('Specify absolute file path of txt file of filtered FASTA '
-             'sequences output from CDHIT')
+              'sequences output from CDHIT')
         cdhit_output = '/{}'.format(input(prompt).strip('/'))
         if not os.path.isfile(cdhit_output):
             print('Specified file path not recognised')

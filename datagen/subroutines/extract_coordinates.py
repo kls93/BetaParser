@@ -111,15 +111,15 @@ class extract_beta_structure_coords(run_stages):
                 for index_2, line in enumerate(pdb_file_lines):
                     if index_2 != (len(pdb_file_lines)-1):
                         if (line[22:27].strip() == start
-                            and line[21:22] == cdhit_domain_df['CHAIN'][row]
-                            ):
+                                and line[21:22] == cdhit_domain_df['CHAIN'][row]
+                                ):
                             start_seq = True
 
                         if start_seq is True and stop_seq is False:
                             index_list.append(index_2)
                             if (line[22:27].strip() != pdb_file_lines[index_2+1][22:27].strip()
-                                or pdb_file_lines[index_2+1][0:3] == 'TER'
-                                ):
+                                    or pdb_file_lines[index_2+1][0:3] == 'TER'
+                                    ):
                                 if line[17:20].strip() in amino_acids_dict:
                                     sequence = sequence + amino_acids_dict[line[17:20].strip()]
                         elif stop_seq is True:
@@ -132,12 +132,12 @@ class extract_beta_structure_coords(run_stages):
                             continue
 
                         if (pdb_file_lines[index_2+1][0:3] == 'TER'
-                            or (line[22:27].strip() == stop
-                                and line[21:22] == cdhit_domain_df['CHAIN'][row]
-                                and pdb_file_lines[index_2+1][22:27].strip() != stop
-                                )
-                            ):
-                                stop_seq = True
+                                or (line[22:27].strip() == stop
+                                    and line[21:22] == cdhit_domain_df['CHAIN'][row]
+                                    and pdb_file_lines[index_2+1][22:27].strip() != stop
+                                    )
+                                ):
+                            stop_seq = True
 
                 # Selects the first identified sequence from the input PDB that
                 # shares greater than 95% sequence similarity with the domain
@@ -286,8 +286,8 @@ class extract_beta_structure_coords(run_stages):
 
             for row in range(pdb_df.shape[0]):
                 if (pdb_df['RES_ID'][row] in alternate_conformers
-                    and pdb_df['CONFORMER'][row] == alternate_conformers[pdb_df['RES_ID'][row]]
-                    ):
+                        and pdb_df['CONFORMER'][row] == alternate_conformers[pdb_df['RES_ID'][row]]
+                        ):
                     pdb_df.loc[row, 'REC'] = None
             pdb_df = pdb_df[pdb_df['REC'].notnull()]
             pdb_df = pdb_df.reset_index(drop=True)
