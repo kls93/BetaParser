@@ -23,6 +23,8 @@ class extract_strand_tilt_and_TM_regions(run_stages):
         tm_lists = []
         tm_segment_lists = []
 
+        print('Creating datframe of OPM database information')
+
         with open('{}/docs/OPM_TM_subunits.txt'.format(orig_dir), 'r') as opm_file:
             for line in opm_file:
                 line_segments = line.split('-')
@@ -58,9 +60,9 @@ class extract_strand_tilt_and_TM_regions(run_stages):
 
                     res_min = int(tm_range.split('-')[0])
                     res_max = int(tm_range.split('-')[1])
-                    tm_residues = tm_residues + [chain+str(num) for num in
-                                                 range(res_min, res_max+1)]  # No
-                    # insertion code available im OPM_TM_subunits.txt
+                    tm_residues += [chain+str(num) for num in
+                                    range(res_min, res_max+1)]  # No insertion
+                    # code available in OPM_TM_subunits.txt
                 tm_lists.append(tm_residues)
 
         opm_df = pd.DataFrame({'PDB_CODE': pdb_codes,
@@ -77,13 +79,14 @@ class extract_strand_tilt_and_TM_regions(run_stages):
         tilt_angles = OrderedDict()
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
+            print('Calculating tilt angle for {}'.format(domain_id))
+
             pdb_code = domain_id[0:4]
 
             if pdb_code in pdb_codes_list:
                 index = pdb_codes_list.index(pdb_code)
                 tilt_angle = opm_df['TILT_ANGLE'][index]
                 tilt_angles[domain_id] = tilt_angle
-
             else:
                 tilt_angles[domain_id] = 'Undefined'
 
@@ -99,6 +102,7 @@ class calculate_barrel_geometry(run_stages):
         strand_numbers = OrderedDict()
 
         for domain_id, dssp_df in sec_struct_dfs_dict.items():
+            print('Calculating number of strands in {}'.format(domain_id))
             strands = [strand for strand in set(dssp_df['STRAND_NUM'].tolist())
                        if strand != '']
             strand_count = len(strands)
@@ -107,18 +111,14 @@ class calculate_barrel_geometry(run_stages):
         return strand_numbers
 
     def find_barrel_shear_number(self, sec_struct_dfs_dict, domain_sheets_dict):
+        # Calculates barrel shear number
+        # CURRENTLY DOESNT WORK (ENCOUNTERS ERRORS WITH INSERTED RESIDUES ETC.)
         unprocessed_list = []
         shear_numbers = OrderedDict()
 
         for domain_id, dssp_df in sec_struct_dfs_dict.items():
             networks = [network for key, network in domain_sheets_dict.items()
                         if domain_id in key]
-            if len(networks) > 1:
-                print('ERROR: More than one beta-sheet retained for {} '
-                      'barrel'.format(domain_id))
-            elif len(networks) < 1:
-                print('ERROR: No beta-sheets identified for {} '
-                      'barrel'.format(domain_id))
             G = networks[0]
 
             nodes_dict = {}
@@ -201,7 +201,7 @@ class calculate_barrel_geometry(run_stages):
                     if (res != 0
                             and float(res) in res_list
                             and res in list(dssp_num_dict.keys())
-                            ):
+                        ):
                         listed_res.append(int(dssp_num_dict[res]))
                         res_list_index = res_list.index(float(res))
                         res_array[count, res_list_index] = float(dssp_num_dict[res])
@@ -321,7 +321,7 @@ class calculate_barrel_geometry(run_stages):
                 for diff in diff_dict:
                     if (low_index_row_n < diff_dict[diff][0]
                             and diff_dict[diff][1] < low_index_row_1
-                            ):
+                        ):
                         shear += diff
                         break
             elif low_index_row_1 < low_index_row_n:
@@ -331,7 +331,7 @@ class calculate_barrel_geometry(run_stages):
                 for diff in diff_dict:
                     if (high_index_row_1 < diff_dict[diff][0]
                             and diff_dict[diff][1] < high_index_row_n
-                            ):
+                        ):
                         shear += diff
                         break
 

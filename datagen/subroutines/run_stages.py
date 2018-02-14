@@ -161,8 +161,13 @@ class run_stages():
             sec_struct_dfs_dict, domain_sheets_dict = pickle.load(pickle_file)
 
         output = gen_output(self.run_parameters)
+
+        tilt_angles = OrderedDict()
+        strand_numbers = OrderedDict()
+        shear_numbers = OrderedDict()
         if self.code[0:4] in ['2.40']:
             beta_structure = extract_strand_tilt_and_TM_regions(self.run_parameters)
+
             opm_df = beta_structure.parse_opm(orig_dir)
             tilt_angles = beta_structure.find_strand_tilt(
                 sec_struct_dfs_dict, opm_df
@@ -171,15 +176,9 @@ class run_stages():
             strand_numbers = barrel_structure.find_barrel_strand_number(
                 sec_struct_dfs_dict
             )
-            shear_numbers = barrel_structure.find_barrel_shear_number(
-                sec_struct_dfs_dict, domain_sheets_dict
-            )
             del opm_df  # To save memory and reduce the number of variables
             # considered
         else:
-            tilt_angles = OrderedDict()
-            strand_numbers = OrderedDict()
-            shear_numbers = OrderedDict()
             sec_struct_dfs_dict = output.identify_edge_central(
                 domain_sheets_dict, sec_struct_dfs_dict
             )

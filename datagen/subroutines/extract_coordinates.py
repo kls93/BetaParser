@@ -286,7 +286,8 @@ class extract_beta_structure_coords(run_stages):
 
             for row in range(pdb_df.shape[0]):
                 if (pdb_df['RES_ID'][row] in alternate_conformers
-                        and pdb_df['CONFORMER'][row] == alternate_conformers[pdb_df['RES_ID'][row]]
+                        and pdb_df['CONFORMER'][row] not in
+                        [alternate_conformers[pdb_df['RES_ID'][row]], '']
                         ):
                     pdb_df.loc[row, 'REC'] = None
             pdb_df = pdb_df[pdb_df['REC'].notnull()]

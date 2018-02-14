@@ -42,7 +42,7 @@ def domain_desc_filter(code, domains_desc):
     domain_sseqs = []
     domain_sseqs_start_stop = []
     for domain in domains_desc:
-        if 'CATHCODE  {}'.format(code) in domain:
+        if 'CATHCODE  {}'.format(code) in domain and '5c6wH02' in domain:
             dseqs_list = []
             sseqs_consec_list = []
             sseqs_list = []
