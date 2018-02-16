@@ -2,10 +2,10 @@
 import sys
 import math
 import itertools
-import pickle
+import isambard
 import pandas as pd
 import numpy as np
-import isambard.external_programs.naccess as naccess
+import networkx as nx
 from collections import OrderedDict
 if __name__ == 'subroutines.naccess':
     from subroutines.run_stages import run_stages
@@ -32,8 +32,9 @@ class naccess_solv_acsblty_calcs():
             sheet_string = ''.join(sheet_sub_strings)
 
             print('Calculating solvent accessible surface area for {}'.format(sheet_id))
-            naccess_out = naccess.run_naccess(sheet_string, 'rsa', path=False,
-                                              include_hetatms=True)
+            naccess_out = isambard.external_programs.naccess.run_naccess(
+                sheet_string, 'rsa', path=False, include_hetatms=True
+            )
             naccess_out = naccess_out.split('\n')
             naccess_out = [line for line in naccess_out if line != '']
             # Determines the solvent accessibility of the sheet as the sum of
@@ -69,8 +70,9 @@ class naccess_solv_acsblty_calcs():
                         sheet_sub_strings.append(new_line)
             sheet_string = ''.join(sheet_sub_strings)
 
-            naccess_out = naccess.run_naccess(sheet_string, 'rsa', path=False,
-                                              include_hetatms=True)
+            naccess_out = isambard.external_programs.naccess.run_naccess(
+                sheet_string, 'rsa', path=False, include_hetatms=True
+            )
             naccess_out = naccess_out.split('\n')
             naccess_out = [line for line in naccess_out if line != '']
             # Determines the solvent accessibility of the complex as the sum of
@@ -90,9 +92,9 @@ class naccess_solv_acsblty_calcs():
                         new_line = line_start + ' ' + line_end
                         sheet_sub_strings.append(new_line)
                 sheet_string = ''.join(sheet_sub_strings)
-                naccess_out = naccess.run_naccess(sheet_string, 'rsa',
-                                                  path=False,
-                                                  include_hetatms=True)
+                naccess_out = isambard.external_programs.naccess.run_naccess(
+                    sheet_string, 'rsa', path=False, include_hetatms=True
+                )
                 naccess_out = naccess_out.split('\n')
                 naccess_out = [line for line in naccess_out if line != '']
                 # Determines the solvent accessibility of the individual sheet as
@@ -122,8 +124,9 @@ class naccess_solv_acsblty_calcs():
                 new_line = line_start + ' ' + line_end
                 sheet_sub_strings.append(new_line)
         sheet_string = ''.join(sheet_sub_strings)
-        naccess_out = naccess.run_naccess(sheet_string, 'rsa', path=False,
-                                          include_hetatms=True)
+        naccess_out = isambard.external_programs.naccess.run_naccess(
+            sheet_string, 'rsa', path=False, include_hetatms=True
+        )
         naccess_out = naccess_out.split('\n')
         for line in naccess_out:
             if line[0:3] in ['RES', 'HEM']:
@@ -148,8 +151,8 @@ class naccess_solv_acsblty_calcs():
         # accessibility calculations show that none of the retained beta-sheets
         # are in contact with one another
         if (code[0:4] in ['2.60']
-            and float(max(list(solv_acsblty_dict.keys()))) == 0.0
-            ):
+                    and float(max(list(solv_acsblty_dict.keys()))) == 0.0
+                ):
             unprocessed_list.append(domain_id)
             sec_struct_dfs_dict[domain_id] = None
             for sheet_id in sheets:
@@ -179,7 +182,7 @@ class naccess_solv_acsblty_calcs():
 
                 if (res_id in list(res_solv_acsblty.keys())
                         and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                        ):
                     solv_acsblty_list[row] = res_solv_acsblty[res_id]
 
         solv_acsblty_df = pd.DataFrame({'SOLV_ACSBLTY': solv_acsblty_list})
@@ -209,69 +212,178 @@ class naccess_solv_acsblty_calcs():
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-        # Initialises records of interior / exterior facing residues
-        print('Determining interior and exterior residues in {}'.format(sheets[0]))
-        int_ext_list = ['']*dssp_df.shape[0]
-        int_ext_dict = OrderedDict()
-
         # Creates dataframe of residues in barrel
         sheet_num = sheets[0].replace('{}_sheet_'.format(domain_id), '')
         sheets_df = dssp_df[dssp_df['SHEET_NUM'] == sheet_num]
         sheets_df = sheets_df.reset_index(drop=True)
 
-        # Calculates average x and y coordinates of the barrel Calpha atoms
-        xyz = []
-        for row in range(sheets_df.shape[0]):
-            xyz.append((sheets_df['XPOS'][row], sheets_df['YPOS'][row],
-                        sheets_df['ZPOS'][row]))
-        xyz = np.array(xyz)
-        x_average = np.sum(xyz, axis=0)[0] / xyz.shape[0]
-        y_average = np.sum(xyz, axis=0)[1] / xyz.shape[0]
-        z_average = np.sum(xyz, axis=0)[2] / xyz.shape[0]
+        # Creates ampal object from barrel
+        barrel = isambard.ampal.convert_pdb_to_ampal('Beta_strands/{}.pdb'.format(sheets[0]))
+
+        # Finds network of interacting neighbouring strands
+        networks = [network for key, network in domain_sheets_dict.items()
+                    if domain_id in key]
+        G = networks[0]
+
+        nodes_dict = {}
+        strands = nx.nodes(G)
+        for strand in strands:
+            nodes_dict[strand] = len(G.neighbors(strand))
+        try:
+            while min(list(nodes_dict.values())) < 2:
+                for strand in strands:
+                    if len(G.neighbors(strand)) < 2:
+                        G.remove_node(strand)
+                        del nodes_dict[strand]
+                strands = nx.nodes(G)
+                for strand in strands:
+                    nodes_dict[strand] = len(G.neighbors(strand))
+        except ValueError:
+            unprocessed_list.append(domain_id)
+            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+
+        cycles = [strand for cycle in nx.cycle_basis(G) for strand in cycle]
+        if len(set(cycles)) != len(nx.nodes(G)):
+            unprocessed_list.append(domain_id)
+            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+
+        strands = nx.cycle_basis(G)[0]  # Finds first complete cycle
+
+        # Finds reference axis
+        count = 0
+        coords_res_1 = []
+        coords_res_n = []
+        for strand in strands:
+            count += 1
+
+            strand_df = sheets_df[sheets_df['STRAND_NUM'] == strand]
+            strand_df = strand_df.reset_index(drop=True)
+
+            row_num = strand_df.shape[0]
+            if row_num % 2 == 1:
+                row_num += 1
+
+            index_1 = (row_num / 2) - 1
+            index_n = row_num / 2
+            if count % 2 == 1:
+                index_1 = row_num / 2
+                index_n = (row_num / 2) - 1
+
+            res_1_x = strand_df['XPOS'][index_1]
+            res_1_y = strand_df['YPOS'][index_1]
+            res_1_z = strand_df['ZPOS'][index_1]
+            res_n_x = strand_df['XPOS'][index_n]
+            res_n_y = strand_df['YPOS'][index_n]
+            res_n_z = strand_df['ZPOS'][index_n]
+
+            coords_res_1.append((res_1_x, res_1_y, res_1_z))
+            coords_res_n.append((res_n_x, res_n_y, res_n_z))
+
+        coords_res_1 = np.array(coords_res_1)
+        coords_res_n = np.array(coords_res_n)
+        x_coord_1 = np.sum(coords_res_1[:, 0])
+        y_coord_1 = np.sum(coords_res_1[:, 1])
+        z_coord_1 = np.sum(coords_res_1[:, 2])
+        x_coord_n = np.sum(coords_res_n[:, 0])
+        y_coord_n = np.sum(coords_res_n[:, 1])
+        z_coord_n = np.sum(coords_res_n[:, 2])
+
+        # Aligns the barrel with z = 0
+        s1 = [x_coord_1, y_coord_1, z_coord_1]
+        e1 = [x_coord_n, y_coord_n, z_coord_n]
+        s2 = [0.0, 0.0, 0.0]
+        e2 = [0.0, 0.0, 1.0]
+        translation, angle, axis, point = isambard.geometry.find_transformations(
+            s1, e1, s2, e2
+        )
+        barrel.rotate(angle, axis, point=point)  # Rotation must be performed
+        # before translation
+        barrel.translate(translation)
+
+        # Generates dictionary of residues and their new xyz coordinates
+        barrel_pdb_string = barrel.make_pdb().split('\n')
+        xy_dict = OrderedDict()
+
+        for line in barrel_pdb_string:
+            if line[0:6].strip() in ['ATOM', 'HETATM']:
+                atom_id = line[21:27].replace(' ', '') + '_' + line[12:16].strip()
+                line_segments = line.split('.')
+                x_coord_atom = float(line_segments[0].split()[-1] + '.' + line_segments[1][0:3])
+                y_coord_atom = float(line_segments[1][3:] + '.' + line_segments[2][0:3])
+                xy_coords = np.array([[x_coord_atom],
+                                      [y_coord_atom]])
+                xy_dict[atom_id] = xy_coords
+
+        # Initialises records of interior / exterior facing residues
+        print('Determining interior and exterior residues in {}'.format(sheets[0]))
+        int_ext_list = ['']*dssp_df.shape[0]
+        int_ext_dict = OrderedDict()
+
+        # Calculates average xy coordinates of the barrel Calpha atoms
+        x_sum = 0
+        y_sum = 0
+        count = 0
+        for res_id in list(xy_dict.keys()):
+            if res_id.split('_')[0] in sheets_df['RES_ID'].tolist():
+                x_sum += xy_dict[res_id][0][0]
+                y_sum += xy_dict[res_id][1][0]
+                count += 1
+
+        if count > 0:
+            x_average = x_sum / count
+            y_average = y_sum / count
+            com = np.array([[x_average],
+                            [y_average]])
+        else:
+            print('ERROR: Unable to identify xyz coordinates for interior / '
+                  'exterior calculation')
 
         # Calculates whether a residue faces towards the interior or the
         # exterior of the barrel
-        res_ids = sheets_df['RES_ID'].tolist()
-        for res_id in res_ids:
-            res_df = dssp_df[dssp_df['RES_ID'] == res_id]
-            res_df = res_df.reset_index(drop=True)
+        res_dict = OrderedDict()
+        for index, res_id in enumerate(sheets_df['RES_ID'].tolist()):
+            res_dict[res_id] = sheets_df['RESNAME'].tolist()[index]
 
-            n_df = res_df[res_df['ATMNAME'] == 'N']
-            n_df = n_df.reset_index(drop=True)
-            n_x = n_df['XPOS'][0]
-            n_y = n_df['YPOS'][0]
-            n_z = n_df['ZPOS'][0]
+        for res_id in list(res_dict.keys()):
+            if ((not 'GLY' in res_dict[res_id])
+                    and all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
+                            for x in ['N', 'CA', 'C', 'O', 'CB']
+                            )
+                ):
+                # Calculates angle between C_alpha, C_beta and the centre of
+                # mass
+                c_alpha_x = xy_dict['{}_CA'.format(res_id)][0][0]
+                c_alpha_y = xy_dict['{}_CA'.format(res_id)][1][0]
 
-            calpha_df = res_df[res_df['ATMNAME'] == 'CA']
-            calpha_df = calpha_df.reset_index(drop=True)
-            calpha_x = calpha_df['XPOS'][0]
-            calpha_y = calpha_df['YPOS'][0]
-            calpha_z = calpha_df['ZPOS'][0]
+                c_beta_x = xy_dict['{}_CB'.format(res_id)][0][0]
+                c_beta_y = xy_dict['{}_CB'.format(res_id)][1][0]
 
-            c_df = res_df[res_df['ATMNAME'] == 'C']
-            c_df = c_df.reset_index(drop=True)
-            c_x = c_df['XPOS'][0]
-            c_y = c_df['YPOS'][0]
-            c_z = c_df['ZPOS'][0]
+                c_alpha_beta_vector = np.array([[c_beta_x-c_alpha_x],
+                                                [c_beta_y-c_alpha_y]])
+                c_alpha_com_vector = np.array([[com[0][0]-c_alpha_x],
+                                               [com[1][0]-c_alpha_y]])
 
-            n_dist = math.sqrt(((n_x - x_average)**2) + ((n_y - y_average)**2)
-                               + ((n_z - z_average)**2))
-            calpha_dist = math.sqrt(((calpha_x - x_average)**2)
-                                    + ((calpha_y - y_average)**2)
-                                    + ((calpha_z - z_average)**2))
-            c_dist = math.sqrt(((c_x - x_average)**2) + ((c_y - y_average)**2)
-                               + ((c_z - z_average)**2))
+                c_alpha_numerator = np.sum((c_alpha_beta_vector*c_alpha_com_vector), axis=0)[0]
 
-            if ((n_dist+c_dist)/2) > calpha_dist:
-                int_ext_dict[res_id] = 'interior'
-            elif ((n_dist+c_dist)/2) < calpha_dist:
-                int_ext_dict[res_id] = 'exterior'
+                c_alpha_beta_magnitude = math.sqrt(((c_alpha_beta_vector[0][0])**2)
+                                                   + ((c_alpha_beta_vector[1][0])**2))
+                c_alpha_com_magnitude = math.sqrt(((c_alpha_com_vector[0][0])**2)
+                                                  + ((c_alpha_com_vector[1][0])**2))
+                c_alpha_denominator = c_alpha_beta_magnitude*c_alpha_com_magnitude
+
+                cos_c_alpha_angle = (c_alpha_numerator / c_alpha_denominator)
+                c_alpha_angle = math.degrees(math.acos(cos_c_alpha_angle))
+
+                if c_alpha_angle < 90:
+                    int_ext_dict[res_id] = 'interior'
+                elif c_alpha_angle > 90:
+                    int_ext_dict[res_id] = 'exterior'
 
         # Updates dataframe with solvent accessibility information
         for row in range(dssp_df.shape[0]):
             if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
                     and dssp_df['ATMNAME'][row] == 'CA'
-                ):
+                    ):
                 int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
@@ -315,8 +427,9 @@ class naccess_solv_acsblty_calcs():
                 new_line = line_start + ' ' + line_end
                 sheet_sub_strings.append(new_line)
         sheet_string = ''.join(sheet_sub_strings)
-        naccess_out = naccess.run_naccess(sheet_string, 'rsa', path=False,
-                                          include_hetatms=True)
+        naccess_out = isambard.external_programs.naccess.run_naccess(
+            sheet_string, 'rsa', path=False, include_hetatms=True
+        )
         naccess_out = naccess_out.split('\n')
         naccess_out = [line for line in naccess_out if line != '']
         for line in naccess_out:
@@ -387,9 +500,9 @@ class naccess_solv_acsblty_calcs():
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
     """
 
-    def calculate_int_ext_sandwich(domain_id, dssp_df, sheets,
-                                   sec_struct_dfs_dict, domain_sheets_dict,
-                                   unprocessed_list):
+    def calc_core_residues_sandwich(domain_id, dssp_df, sheets,
+                                    sec_struct_dfs_dict, domain_sheets_dict,
+                                    unprocessed_list):
         # Calculates whether each residue faces towards the interior or the
         # exterior of the sandwich from the ratio of its solvent accessibility
         # within the sandwich to its solvent accessibility within its
@@ -408,9 +521,9 @@ class naccess_solv_acsblty_calcs():
 
         # Initialises records of interior / exterior facing residues
         print('Determining interior and exterior facing residues in {}'.format(domain_id))
-        int_ext_list = ['']*dssp_df.shape[0]
-        int_ext_combined = OrderedDict()
-        int_ext_indv = OrderedDict()
+        core_ext_list = ['']*dssp_df.shape[0]
+        core_ext_combined = OrderedDict()
+        core_ext_indv = OrderedDict()
 
         # Calculates solvent accessibility of both sheets in pair
         print('Calculating solvent accessible surface area for residues in '
@@ -424,8 +537,9 @@ class naccess_solv_acsblty_calcs():
                     new_line = line_start + ' ' + line_end
                     sheet_sub_strings.append(new_line)
         sheet_string = ''.join(sheet_sub_strings)
-        naccess_out = naccess.run_naccess(sheet_string, 'rsa', path=False,
-                                          include_hetatms=True)
+        naccess_out = isambard.external_programs.naccess.run_naccess(
+            sheet_string, 'rsa', path=False, include_hetatms=True
+        )
         naccess_out = naccess_out.split('\n')
         naccess_out = [line for line in naccess_out if line != '']
         for line in naccess_out:
@@ -434,7 +548,7 @@ class naccess_solv_acsblty_calcs():
                 res_num = line[9:13].strip()
                 ins_code = line[13:14].strip()
                 chain_res_num = chain + res_num + ins_code
-                int_ext_combined[chain_res_num] = float(line[14:22])
+                core_ext_combined[chain_res_num] = float(line[14:22])
 
         # Calculates solvent accessibility of sheets in pair individually
         for sheet_id in sheets:
@@ -448,8 +562,9 @@ class naccess_solv_acsblty_calcs():
                     new_line = line_start + ' ' + line_end
                     sheet_sub_strings.append(new_line)
             sheet_string = ''.join(sheet_sub_strings)
-            naccess_out = naccess.run_naccess(sheet_string, 'rsa', path=False,
-                                              include_hetatms=True)
+            naccess_out = isambard.external_programs.naccess.run_naccess(
+                sheet_string, 'rsa', path=False, include_hetatms=True
+            )
             naccess_out = naccess_out.split('\n')
             naccess_out = [line for line in naccess_out if line != '']
             for line in naccess_out:
@@ -458,39 +573,30 @@ class naccess_solv_acsblty_calcs():
                     res_num = line[9:13].strip()
                     ins_code = line[13:14].strip()
                     chain_res_num = chain + res_num + ins_code
-                    int_ext_indv[chain_res_num] = float(line[14:22])
+                    core_ext_indv[chain_res_num] = float(line[14:22])
 
         # Determines solvent accessibility of each residue in the beta-sheet
         # assembly as compared to its individual parent beta-sheet. If the
         # solvent accessibility is lower in the assembly, the residue is
         # assigned as 'interior', if it is the same it is assigned as
         # 'exterior', otherwise an error is thrown.
-        for res in list(int_ext_combined.keys()):
-            solv_acsblty_combined = int_ext_combined[res]
-            solv_acsblty_indv = int_ext_indv[res]
+        for res in list(core_ext_combined.keys()):
+            solv_acsblty_combined = core_ext_combined[res]
+            solv_acsblty_indv = core_ext_indv[res]
 
-            if solv_acsblty_combined < solv_acsblty_indv:
-                int_ext_combined[res] = 'interior'
-            elif solv_acsblty_combined == solv_acsblty_indv:
-                int_ext_combined[res] = 'exterior'
-            else:
-                print('ERROR: solvent accessibility in sheet complex is '
-                      'larger than in individual sheet')
-                sec_struct_dfs_dict[domain_id] = None
-                for sheet in sheets:
-                    domain_sheets_dict[sheet] = None
-                unprocessed_list.append(domain_id)
-
-                return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+            if solv_acsblty_indv - solv_acsblty_combined > 1:
+                core_ext_combined[res] = 'core'
+            elif solv_acsblty_indv - solv_acsblty_combined < 1:
+                core_ext_combined[res] = 'external'
 
         # Updates dataframe with solvent accessibility information
         for row in range(dssp_df.shape[0]):
-            if (dssp_df['RES_ID'][row] in list(int_ext_combined.keys())
+            if (dssp_df['RES_ID'][row] in list(core_ext_combined.keys())
                     and dssp_df['ATMNAME'][row] == 'CA'
-                ):
-                int_ext_list[row] = int_ext_combined[dssp_df['RES_ID'][row]]
-        int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
-        dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
+                    ):
+                core_ext_list[row] = core_ext_combined[dssp_df['RES_ID'][row]]
+        core_ext_df = pd.DataFrame({'CORE_OR_EXT': core_ext_list})
+        dssp_df = pd.concat([dssp_df, core_ext_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
 
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
