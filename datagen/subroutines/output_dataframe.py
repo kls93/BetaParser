@@ -146,6 +146,7 @@ class gen_output(run_stages):
         edge_or_central = []
         fasta_seq = []
         int_ext = []
+        core_ext = []
         tm_ext = []
         bckbn_phi_psi = []
         solv_acsblty = []
@@ -213,7 +214,6 @@ class gen_output(run_stages):
 
                 # Determines whether the strand is an edge or central strand
                 if self.code[0:4] in ['2.60']:
-                    print('YAY')
                     edge_or_central_list = [label for label in
                                             set(strand_df['EDGE_OR_CNTRL'].tolist())]
 
@@ -248,6 +248,17 @@ class gen_output(run_stages):
                     int_ext.append(int_ext_list)
                 elif strand_or_res == 'res':
                     int_ext += int_ext_list
+
+                # Generates list of residues that form the beta-sandwich core
+                if self.code[0:4] in ['2.60']:
+                    core_ext_list = strand_df['CORE_OR_EXT'].tolist()
+                    if reverse is True:
+                        core_ext_list.reverse()
+
+                    if strand_or_res == 'strand':
+                        core_ext.append(core_ext_list)
+                    elif strand_or_res == 'res':
+                        core_ext += core_ext_list
 
                 # Generates list of transmembrane and external residues in the
                 # strand
@@ -319,11 +330,12 @@ class gen_output(run_stages):
                                             'EDGE_OR_CNTRL': edge_or_central,
                                             'FASTA': fasta_seq,
                                             'INT_EXT': int_ext,
+                                            'CORE_OR_EXT': core_ext,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_acsblty})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[6]] + [cols[4]] + [cols[1]] + [cols[2]] + [cols[3]]
-                    + [cols[0]] + [cols[5]])
+            cols = ([cols[7]] + [cols[5]] + [cols[2]] + [cols[3]] + [cols[4]]
+                    + [cols[1]] + [cols[0]] + [cols[6]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))

@@ -11,7 +11,7 @@
             sheet_strands = []
             for sheet in sheets:
                 locals()['sheet_{}_strands'.format(sheet)] = []
-                for strand in dssp_df[dssp_df['SHEET_NUM']==sheet]['STRAND_NUM'].tolist():
+                for strand in dssp_df[dssp_df['SHEET_NUM'] == sheet]['STRAND_NUM'].tolist():
                     if strand not in locals()['sheet_{}_strands'.format(sheet)]:
                         locals()['sheet_{}_strands'.format(sheet)].append(strand)
                 sheet_strands.append(locals()['sheet_{}_strands'.format(sheet)])
@@ -33,7 +33,8 @@
                         if count_1 != index and strands != '':
                             intersect = set(strands).intersection(set(sheet_strands[index]))
                             if len(intersect) > 0:
-                                sheet_strands_copy[count_1] = list(set(sheet_strands[count_1])|set(sheet_strands[index]))
+                                sheet_strands_copy[count_1] = list(
+                                    set(sheet_strands[count_1]) | set(sheet_strands[index]))
                                 sheet_strands_copy[index] = ''
                                 sheet_strands = sheet_strands_copy
                                 restart = True
@@ -54,17 +55,125 @@
         return dssp_dfs_merged_sheets_dict
 
 
+def calculate_int_ext_barrel(domain_id, dssp_df, sheets,
+                             sec_struct_dfs_dict, domain_sheets_dict,
+                             unprocessed_list):
+    # Determines which face of the beta-sheet forms the interior of the
+    # barrel and which forms the exterior. **NOTE: this function assumes
+    # that adjacent residues point in opposite directions.**
+    # TO DO: UPDATE TO USE BACKBONE PHI AND PSI ANGLES TO DETERMINE IF THE
+    # STRAND CONTAINS A BULGE OR NOT
+
+    # Checks that correct number of sheets has been retained for analysis
+    if len(sheets) != 1:
+        print('ERROR: more than 1 sheet retained in {} following solvent '
+              'accessibility calculation'.format(domain_id))
+        sec_struct_dfs_dict[domain_id] = None
+        for sheet in sheets:
+            domain_sheets_dict[sheet] = None
+        unprocessed_list.append(domain_id)
+
+        return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+
+    # Initialises records of interior / exterior facing residues
+    int_ext_list = ['']*dssp_df.shape[0]
+    int_ext_dict = OrderedDict()
+
+    # Calculates solvent accessibility of both faces of barrel
+    sheet_sub_strings = []
+    print('Calculating solvent accessible surface area for {}'.format(domain_id))
+
+    with open('Beta_strands/{}.pdb'.format(sheets[0]), 'r') as pdb_file:
+        for line in pdb_file.readlines():
+            line_start = line[0:16]
+            line_end = line[17:]
+            new_line = line_start + ' ' + line_end
+            sheet_sub_strings.append(new_line)
+    sheet_string = ''.join(sheet_sub_strings)
+    naccess_out = isambard.external_programs.naccess.run_naccess(
+        sheet_string, 'rsa', path=False, include_hetatms=True
+    )
+    naccess_out = naccess_out.split('\n')
+    naccess_out = [line for line in naccess_out if line != '']
+    for line in naccess_out:
+        if line[0:3] in ['RES', 'HEM']:
+            chain = line[8:9].strip()
+            res_num = line[9:13].strip()
+            ins_code = line[13:14].strip()
+            chain_res_num = chain + res_num + ins_code
+            int_ext_dict[chain_res_num] = float(line[14:22])
+
+    # Selects strands in barrel
+    sheet_num = sheets[0].replace('{}_sheet_'.format(domain_id), '')
+    sheets_df = dssp_df[dssp_df['SHEET_NUM'] == sheet_num]
+    strands = [strand for strand in set(sheets_df['STRAND_NUM'].tolist())
+               if strand != '']
+
+    # For each strand, determines which of its residues face towards the
+    # interior and which face towards the exterior (assuming that
+    # consecutive residues face in opposite directions)
+    for strand in strands:
+        strand_df = dssp_df[dssp_df['STRAND_NUM'] == strand]
+        res_acsblty = OrderedDict()
+        for res_id in strand_df['RES_ID'].tolist():
+            if res_id != '':
+                res_acsblty[res_id] = int_ext_dict[res_id]
+
+        # Splits the residues into opposite faces and calculates the sum of
+        # their solvent accessibilities
+        face_1_res = list(res_acsblty.values())[:: 2]
+        face_2_res = list(res_acsblty.values())[1:: 2]
+        face_1_solv_acsblty = sum(face_1_res)
+        face_2_solv_acsblty = sum(face_2_res)
+
+        # Determines which face is exterior and which is interior (the sum
+        # of the solvent accessibilities of the exterior facing residues
+        # will be greater than that of the interior facing residues)
+        if face_1_solv_acsblty > face_2_solv_acsblty:
+            ext_chain_res_num = list(res_acsblty.keys())[:: 2]
+            int_chain_res_num = list(res_acsblty.keys())[1:: 2]
+        elif face_1_solv_acsblty < face_2_solv_acsblty:
+            ext_chain_res_num = list(res_acsblty.keys())[1:: 2]
+            int_chain_res_num = list(res_acsblty.keys())[:: 2]
+        else:
+            print('ERROR: solvent accessibilities of two faces of '
+                  '{}_strand_{} are equal - something has gone wrong with '
+                  'the analysis'.format(domain_id, strand))
+            sec_struct_dfs_dict[domain_id] = None
+            domain_sheets_dict[sheets[0]] = None
+            unprocessed_list.append(domain_id)
+            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+
+        # Assigns 'interior' and 'exterior' labels to the relevant res_id
+        for chain_res_num in ext_chain_res_num:
+            int_ext_dict[chain_res_num] = 'exterior'
+        for chain_res_num in int_chain_res_num:
+            int_ext_dict[chain_res_num] = 'interior'
+
+    # Updates dataframe with solvent accessibility information
+    for row in range(dssp_df.shape[0]):
+        if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
+                and dssp_df['ATMNAME'][row] == 'CA'
+                ):
+            int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
+    int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
+    dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
+    sec_struct_dfs_dict[domain_id] = dssp_df
+
+    return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+
+
 def find_barrel_shear_number(self, sec_struct_dfs_dict):
     for domain_id, sec_struct_df in sec_struct_dfs_dict.items():
         shear_estimates = []
 
-        sec_struct_df = sec_struct_df[sec_struct_df['SHEET?']=='E']
+        sec_struct_df = sec_struct_df[sec_struct_df['SHEET?'] == 'E']
         sec_struct_df = sec_struct_df.reset_index(drop=True)
 
         min_strand_num = min([num for num in set(sec_struct_df['STRAND_NUM'].tolist())
-                             if num != ''])
+                              if num != ''])
         max_strand_num = max([num for num in set(sec_struct_df['STRAND_NUM'].tolist())
-                             if num != ''])
+                              if num != ''])
         for row in range(sec_struct_df.shape[0]):
             if sec_struct_df['STRAND_NUM'][row] in [min_strand_num, max_strand_num]:
                 res_1 = sec_struct_df['DSSP_NUM'][row]
@@ -89,8 +198,8 @@ def find_barrel_shear_number(self, sec_struct_dfs_dict):
                 shear_pairs = [[h_bonded_res_2_b, h_bonded_res_3_a],
                                [h_bonded_res_2_a, h_bonded_res_3_b]]
                 if (not any(x in [None, 0] for x in [dssp_num for pair in
-                    shear_pairs for dssp_num in pair])
-                    ):
+                                                         shear_pairs for dssp_num in pair])
+                        ):
                     for pair in shear_pairs:
                         print(pair)  # DELETE ME
                         if int(res_1) in pair:
@@ -116,7 +225,7 @@ def find_barrel_shear_number():
         print(domain_id)  # DELETE ME
         shear_estimates = []
 
-        strand_1_df = sec_struct_df[sec_struct_df['STRAND_NUM']==4]
+        strand_1_df = sec_struct_df[sec_struct_df['STRAND_NUM'] == 4]
         strand_1_res = [int(num) for num in strand_1_df['DSSP_NUM'].tolist()]
 
         dssp_nums = sec_struct_df['DSSP_NUM'].tolist()
