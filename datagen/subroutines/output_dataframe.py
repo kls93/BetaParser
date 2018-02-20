@@ -32,14 +32,13 @@ class output_calcs():
         if os.path.isfile('{}/{}.pdb'.format(opm_database, pdb_code)):
             with open('{}/{}.pdb'.format(opm_database, pdb_code), 'r') as opm_file:
                 for line in opm_file:
-                    if line[17:20].strip() != 'DUM':
+                    if line[17:20].strip() != 'DUM':  # Don't put as 'and'
+                        # statement with line below (see corresponding 'else' statement)
                         if line[0:6].strip() in ['ATOM', 'HETATM']:
-                            chain_res_num = (line[21:22].strip()
-                                             + line[22:26].strip()
-                                             + line[26:27].strip())
+                            chain_res_num = line[21:27].replace(' ', '')
                             if (line[12:16].strip() == 'CA'
-                                and chain_res_num in res_ids_list
-                                ):
+                                    and chain_res_num in res_ids_list
+                                    ):
                                 strand_coordinates[chain_res_num] = float(line[46:54])
                     else:
                         if float(line[46:54]) > upper_bound:
@@ -100,25 +99,25 @@ class gen_output(run_stages):
 
             dssp_df = sec_struct_dfs_dict[domain_id]
 
-            edge_or_central = OrderedDict()
+            edge_or_central_dict = OrderedDict()
             df_strands = [strand for strand in set(dssp_df['STRAND_NUM'].tolist())
                           if strand != '']
 
-            for strand_num in set(df_strands):
+            for strand_num in df_strands:
                 num_of_edges = len(G.neighbors(strand_num))
                 if num_of_edges == 1:
                     edge_id = 'edge'
                 elif num_of_edges > 1:
                     edge_id = 'central'
-                edge_or_central[strand_num] = edge_id
+                edge_or_central_dict[strand_num] = edge_id
 
-            df_edge_or_central = ['']*dssp_df.shape[0]
+            edge_or_central_list = ['']*dssp_df.shape[0]
             for row in range(dssp_df.shape[0]):
-                if (dssp_df['STRAND_NUM'][row] in list(edge_or_central.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
-                    df_edge_or_central[row] = edge_or_central[dssp_df['STRAND_NUM'][row]]
-            df_edge_or_central = pd.DataFrame({'EDGE_OR_CNTRL': df_edge_or_central})
+                if (dssp_df['STRAND_NUM'][row] in list(edge_or_central_dict.keys())
+                        and dssp_df['ATMNAME'][row] == 'CA'
+                        ):
+                    edge_or_central_list[row] = edge_or_central_dict[dssp_df['STRAND_NUM'][row]]
+            df_edge_or_central = pd.DataFrame({'EDGE_OR_CNTRL': edge_or_central_list})
             dssp_df = pd.concat([dssp_df, df_edge_or_central], axis=1)
             sec_struct_dfs_dict[domain_id] = dssp_df
 
@@ -203,15 +202,6 @@ class gen_output(run_stages):
                     elif strand_or_res == 'res':
                         shear_number += ['']*len(res_ids_list)
 
-                # Lists residue IDs in strand
-                if reverse is True:
-                    res_ids_list.reverse()
-
-                if strand_or_res == 'strand':
-                    res_ids.append(res_ids_list)
-                elif strand_or_res == 'res':
-                    res_ids += res_ids_list
-
                 # Determines whether the strand is an edge or central strand
                 if self.code[0:4] in ['2.60']:
                     edge_or_central_list = [label for label in
@@ -221,6 +211,15 @@ class gen_output(run_stages):
                         edge_or_central.append(edge_or_central_list[0])
                     elif strand_or_res == 'res':
                         edge_or_central += [edge_or_central_list[0]]*len(res_ids_list)
+
+                # Lists residue IDs in strand
+                if reverse is True:
+                    res_ids_list.reverse()
+
+                if strand_or_res == 'strand':
+                    res_ids.append(res_ids_list)
+                elif strand_or_res == 'res':
+                    res_ids += res_ids_list
 
                 # Generates FASTA sequence of strand
                 res_list = strand_df['RESNAME'].tolist()
@@ -261,7 +260,7 @@ class gen_output(run_stages):
                         core_ext += core_ext_list
 
                 # Generates list of transmembrane and external residues in the
-                # strand
+                # strand - MUST COME AFTER REVERSAL (OR NOT) OF RES_IDS_LIST
                 if self.code[0:4] in ['2.40']:
                     tm_ext_list = output_calcs.determine_tm_or_ext(
                         domain_id, strand_num, res_ids_list, strand_coordinates,
@@ -318,23 +317,16 @@ class gen_output(run_stages):
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
 
         elif self.code[0:4] in ['2.60']:
-            print(len(domain_strand_ids))
-            print(len(res_ids))
-            print(len(edge_or_central))
-            print(len(fasta_seq))
-            print(len(int_ext))
-            print(len(bckbn_geom))
-            print(len(solv_acsblty))
             beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
-                                            'RES_ID': res_ids,
                                             'EDGE_OR_CNTRL': edge_or_central,
+                                            'RES_ID': res_ids,
                                             'FASTA': fasta_seq,
                                             'INT_EXT': int_ext,
                                             'CORE_OR_EXT': core_ext,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_acsblty})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[7]] + [cols[5]] + [cols[2]] + [cols[3]] + [cols[4]]
+            cols = ([cols[7]] + [cols[2]] + [cols[5]] + [cols[3]] + [cols[4]]
                     + [cols[1]] + [cols[0]] + [cols[6]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))

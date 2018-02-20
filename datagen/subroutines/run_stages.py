@@ -128,19 +128,25 @@ class run_stages():
         # To be run within ISAMBARD
         if __name__ == 'subroutines.run_stages':
             from subroutines.naccess import calculate_solvent_accessible_surface_area
+            from subroutines.find_surfaces import find_interior_exterior_surfaces
         else:
             from datagen.subroutines.naccess import calculate_solvent_accessible_surface_area
+            from datagen.subroutines.find_surfaces import find_interior_exterior_surfaces
 
         with open('Input_ISAMBARD_variables.pkl', 'rb') as pickle_file:
             sec_struct_dfs_dict, domain_sheets_dict = pickle.load(pickle_file)
 
         beta_structure = calculate_solvent_accessible_surface_area(self.run_parameters)
-        """
         sec_struct_dfs_dict, domain_sheets_dict = beta_structure.run_naccess(
             sec_struct_dfs_dict, domain_sheets_dict
         )
-        """
-        sec_struct_dfs_dict = beta_structure.identify_int_ext(
+        if self.code[0:4] in ['2.60']:
+            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_core_ext(
+                sec_struct_dfs_dict, domain_sheets_dict
+            )
+
+        beta_structure = find_interior_exterior_surfaces(self.run_parameters)
+        sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
             sec_struct_dfs_dict, domain_sheets_dict
         )
 
@@ -180,7 +186,8 @@ class run_stages():
             )
             del opm_df  # To save memory and reduce the number of variables
             # considered
-        else:
+
+        if self.code[0:4] in ['2.60']:
             sec_struct_dfs_dict = output.identify_edge_central(
                 domain_sheets_dict, sec_struct_dfs_dict
             )

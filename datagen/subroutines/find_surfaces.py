@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 import networkx as nx
 from collections import OrderedDict
-if __name__ == 'subroutines.naccess':
+if __name__ == 'subroutines.find_surfaces':
     from subroutines.run_stages import run_stages
 else:
     from datagen.subroutines.run_stages import run_stages
@@ -15,66 +15,41 @@ else:
 
 class interior_exterior_calcs():
 
-    def calculate_int_ext_barrel(domain_id, dssp_df, sheets,
-                                 sec_struct_dfs_dict, domain_sheets_dict,
-                                 unprocessed_list):
-        # Determines which face of the beta-sheet forms the interior of the
-        # barrel and which forms the exterior based upon whether or not the
-        # Calpha atom of a residue is located closer to the central axis of the
-        # barrel than the N and C atoms of that residue.
-
-        # Checks that correct number of sheets has been retained for analysis
-        if len(sheets) != 1:
-            print('ERROR: more than 1 sheet retained in {} following solvent '
-                  'accessibility calculation'.format(domain_id))
-            sec_struct_dfs_dict[domain_id] = None
-            for sheet in sheets:
-                domain_sheets_dict[sheet] = None
-            unprocessed_list.append(domain_id)
-
-            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-
-        # Creates dataframe of residues in barrel
-        sheet_num = sheets[0].replace('{}_sheet_'.format(domain_id), '')
-        sheets_df = dssp_df[dssp_df['SHEET_NUM'] == sheet_num]
-        sheets_df = sheets_df.reset_index(drop=True)
-
-        # Creates ampal object from barrel
-        barrel = isambard.ampal.convert_pdb_to_ampal('Beta_strands/{}.pdb'.format(sheets[0]))
-
+    def find_strands_network(G):
         # Finds network of interacting neighbouring strands
-        networks = [network for key, network in domain_sheets_dict.items()
-                    if domain_id in key]
-        G = networks[0]
-
         nodes_dict = {}
         strands = nx.nodes(G)
+
         for strand in strands:
             nodes_dict[strand] = len(G.neighbors(strand))
-        try:
-            while min(list(nodes_dict.values())) < 2:
-                for strand in strands:
-                    if len(G.neighbors(strand)) < 2:
-                        G.remove_node(strand)
-                        del nodes_dict[strand]
-                strands = nx.nodes(G)
-                for strand in strands:
-                    nodes_dict[strand] = len(G.neighbors(strand))
-        except ValueError:
-            unprocessed_list.append(domain_id)
-            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-        cycles = [strand for cycle in nx.cycle_basis(G) for strand in cycle]
-        if len(set(cycles)) != len(nx.nodes(G)):
-            unprocessed_list.append(domain_id)
-            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+        # Removes edge strands to find a closed circle of interacting strands
+        # (note that this approach assumes only one closed circle is present in
+        # the input network)
+        while min(list(nodes_dict.values())) < 2:
+            for strand in strands:
+                if len(G.neighbors(strand)) < 2:
+                    G.remove_node(strand)
+                    del nodes_dict[strand]
 
+            strands = nx.nodes(G)
+            for strand in strands:
+                nodes_dict[strand] = len(G.neighbors(strand))
+
+        # Makes list of strands in closed circle network
         strands = nx.cycle_basis(G)[0]  # Finds first complete cycle
 
-        # Finds reference axis
+        return strands
+
+    def find_z_axis(strands, sheets_df):
+        # Finds axis through the barrel pore as the line that passes through
+        # the average xyz coordinates of the middle two residues of each
+        # strand.
         count = 0
         coords_res_1 = []
         coords_res_n = []
+
+        # Determines the indices of the central two residues in each strand.
         for strand in strands:
             count += 1
 
@@ -82,12 +57,21 @@ class interior_exterior_calcs():
             strand_df = strand_df.reset_index(drop=True)
 
             row_num = strand_df.shape[0]
+            # If there is an odd number of strands, the central residue plus
+            # its C-terminal residue are selected as the two central residues
             if row_num % 2 == 1:
                 row_num += 1
 
             index_1 = (row_num / 2) - 1
             index_n = row_num / 2
-            if count % 2 == 1:
+            if count % 2 == 1:  # Ensures that residues closer to the
+                # periplasmic side of the membrane are grouped together,
+                # likewise for residues closer to the extracellular side of the
+                # membrane. Note that this assumes that neighbouring strands
+                # interact with one another in an antiparallel hydrogen bonding
+                # arrangement (however, the code will only break if the
+                # majority of strands interact with a parallel instead of a
+                # parallel hydrogen bonding arrangement, which is highly unlikely)
                 index_1 = row_num / 2
                 index_n = (row_num / 2) - 1
 
@@ -101,6 +85,7 @@ class interior_exterior_calcs():
             coords_res_1.append((res_1_x, res_1_y, res_1_z))
             coords_res_n.append((res_n_x, res_n_y, res_n_z))
 
+        # Calculates average xyz coordinates
         coords_res_1 = np.array(coords_res_1)
         coords_res_n = np.array(coords_res_n)
         x_coord_1 = np.sum(coords_res_1[:, 0]) / coords_res_1.shape[0]
@@ -109,10 +94,24 @@ class interior_exterior_calcs():
         x_coord_n = np.sum(coords_res_n[:, 0]) / coords_res_n.shape[0]
         y_coord_n = np.sum(coords_res_n[:, 1]) / coords_res_n.shape[0]
         z_coord_n = np.sum(coords_res_n[:, 2]) / coords_res_n.shape[0]
+        xyz_coords = [x_coord_1, y_coord_1, z_coord_1, x_coord_n, y_coord_n,
+                      z_coord_n]
+
+        return xyz_coords
+
+    def rotate_translate_barrel(domain_id, xyz_coords, sheets):
+        # Aligns the barrel to z = 0 using the reference axis through the
+        # barrel pore calculated in the previous step
+        print('Aligning {} barrel with z = 0'.format(domain_id))
+
+        # Creates ampal object from barrel
+        barrel = isambard.ampal.convert_pdb_to_ampal(
+            'Beta_strands/{}.pdb'.format(list(sheets.keys())[0])
+        )
 
         # Aligns the barrel with z = 0
-        s1 = [x_coord_1, y_coord_1, z_coord_1]
-        e1 = [x_coord_n, y_coord_n, z_coord_n]
+        s1 = [xyz_coords[0], xyz_coords[1], xyz_coords[2]]
+        e1 = [xyz_coords[3], xyz_coords[4], xyz_coords[5]]
         s2 = [0.0, 0.0, 0.0]
         e2 = [0.0, 0.0, 1.0]
         translation, angle, axis, point = isambard.geometry.find_transformations(
@@ -129,6 +128,7 @@ class interior_exterior_calcs():
         for line in barrel_pdb_string:
             if line[0:6].strip() in ['ATOM', 'HETATM']:
                 atom_id = line[21:27].replace(' ', '') + '_' + line[12:16].strip()
+
                 line_segments = line.split('.')
                 x_coord_atom = float(line_segments[0].split()[-1] + '.' + line_segments[1][0:3])
                 y_coord_atom = float(line_segments[1][3:] + '.' + line_segments[2][0:3])
@@ -136,15 +136,15 @@ class interior_exterior_calcs():
                                       [y_coord_atom]])
                 xy_dict[atom_id] = xy_coords
 
-        # Initialises records of interior / exterior facing residues
-        print('Determining interior and exterior residues in {}'.format(sheets[0]))
-        int_ext_list = ['']*dssp_df.shape[0]
-        int_ext_dict = OrderedDict()
+        return xy_dict
 
-        # Calculates average xy coordinates of the barrel Calpha atoms
+    def calc_average_coordinates(domain_id, xy_dict, sheets_df,
+                                 unprocessed_list):
+        # Calculates average xy coordinates of the barrel C_alpha atoms
         x_sum = 0
         y_sum = 0
         count = 0
+
         for res_id in list(xy_dict.keys()):
             if res_id.split('_')[0] in sheets_df['RES_ID'].tolist():
                 x_sum += xy_dict[res_id][0][0]
@@ -159,9 +159,15 @@ class interior_exterior_calcs():
         else:
             print('ERROR: Unable to identify xyz coordinates for interior / '
                   'exterior calculation')
+            unprocessed_list.append(domain_id)
 
+        return com, unprocessed_list
+
+    def calc_int_ext(domain_id, sheets_df, xy_dict, com, int_ext_dict):
         # Calculates whether a residue faces towards the interior or the
         # exterior of the barrel
+        print('Identifying interior and exterior residues in {}'.format(domain_id))
+
         res_dict = OrderedDict()
         for index, res_id in enumerate(sheets_df['RES_ID'].tolist()):
             res_dict[res_id] = sheets_df['RESNAME'].tolist()[index]
@@ -182,15 +188,15 @@ class interior_exterior_calcs():
 
                 c_alpha_beta_vector = np.array([[c_beta_x-c_alpha_x],
                                                 [c_beta_y-c_alpha_y]])
-                c_alpha_com_vector = np.array([[com[0][0]-c_alpha_x],
-                                               [com[1][0]-c_alpha_y]])
-
-                c_alpha_numerator = np.sum((c_alpha_beta_vector*c_alpha_com_vector), axis=0)[0]
-
                 c_alpha_beta_magnitude = math.sqrt(((c_alpha_beta_vector[0][0])**2)
                                                    + ((c_alpha_beta_vector[1][0])**2))
+
+                c_alpha_com_vector = np.array([[com[0][0]-c_alpha_x],
+                                               [com[1][0]-c_alpha_y]])
                 c_alpha_com_magnitude = math.sqrt(((c_alpha_com_vector[0][0])**2)
                                                   + ((c_alpha_com_vector[1][0])**2))
+
+                c_alpha_numerator = np.sum((c_alpha_beta_vector*c_alpha_com_vector), axis=0)[0]
                 c_alpha_denominator = c_alpha_beta_magnitude*c_alpha_com_magnitude
 
                 cos_c_alpha_angle = (c_alpha_numerator / c_alpha_denominator)
@@ -201,17 +207,75 @@ class interior_exterior_calcs():
                 elif c_alpha_angle > 90:
                     int_ext_dict[res_id] = 'exterior'
 
+        return int_ext_dict
+
+
+class barrel_int_ext():
+
+    def int_ext_pipeline(domain_id, dssp_df, sheets, sec_struct_dfs_dict,
+                         domain_sheets_dict, unprocessed_list):
+        # Determines which face of the beta-sheet forms the interior of the
+        # barrel and which forms the exterior based upon whether or not the
+        # Calpha atom of a residue is located closer to the central axis of the
+        # barrel than the N and C atoms of that residue.
+
+        # Checks that correct number of sheets has been retained for analysis
+        if len(sheets) != 1:
+            print('ERROR: more than 1 sheet retained in {} following solvent '
+                  'accessibility calculation'.format(domain_id))
+            sec_struct_dfs_dict[domain_id] = None
+            for sheet in sheets:
+                domain_sheets_dict[sheet] = None
+            unprocessed_list.append(domain_id)
+
+            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+
+        # Creates dataframe of residues in barrel
+        sheet_num = list(sheets.keys())[0].replace('{}_sheet_'.format(domain_id), '')
+        sheets_df = dssp_df[dssp_df['SHEET_NUM'] == sheet_num]
+        sheets_df = sheets_df.reset_index(drop=True)
+
+        # Finds network of interacting neighbouring strands
+        networks = list(sheets.values())
+        G = networks[0]
+        strands = interior_exterior_calcs.find_strands_network(G)
+
+        # Finds axis through barrel pore
+        xyz_coords = interior_exterior_calcs.find_z_axis(strands, sheets_df)
+
+        # Aligns barrel with z = 0
+        xy_dict = interior_exterior_calcs.rotate_translate_barrel(
+            domain_id, xyz_coords, sheets
+        )
+
+        # Initialises records of interior / exterior facing residues
+        int_ext_list = ['']*dssp_df.shape[0]
+        int_ext_dict = OrderedDict()
+
+        # Calculates average xy coordinates of the barrel C_alpha atoms
+        com, unprocessed_list = interior_exterior_calcs.calc_average_coordinates(
+            domain_id, xy_dict, sheets_df, unprocessed_list
+        )
+
+        int_ext_dict = interior_exterior_calcs.calc_int_ext(
+            domain_id, sheets_df, xy_dict, com, int_ext_dict
+        )
+
         # Updates dataframe with solvent accessibility information
         for row in range(dssp_df.shape[0]):
-            if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
+            res_id = dssp_df['RES_ID'][row]
+            if (res_id in list(int_ext_dict.keys())
                     and dssp_df['ATMNAME'][row] == 'CA'
                     ):
-                int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
+                int_ext_list[row] = int_ext_dict[res_id]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
 
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+
+
+class sandwich_int_ext():
 
     def calculate_int_ext_sandwich(domain_id, dssp_df, sheets,
                                    sec_struct_dfs_dict, domain_sheets_dict,
@@ -430,10 +494,6 @@ class interior_exterior_calcs():
                     elif com_ca_cb_angle > 90:
                         int_ext_dict[res_id] = 'exterior'
 
-        print(int_ext_dict)
-        import sys
-        sys.exit()
-
         # Updates dataframe with solvent accessibility information
         for row in range(dssp_df.shape[0]):
             if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
@@ -442,107 +502,6 @@ class interior_exterior_calcs():
                 int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
-        sec_struct_dfs_dict[domain_id] = dssp_df
-
-        return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-
-    def calc_core_residues_sandwich(domain_id, dssp_df, sheets,
-                                    sec_struct_dfs_dict, domain_sheets_dict,
-                                    unprocessed_list):
-        # Calculates whether each residue faces towards the interior or the
-        # exterior of the sandwich from the ratio of its solvent accessibility
-        # within the sandwich to its solvent accessibility within its
-        # individual parent beta-sheet
-
-        # Checks that correct number of sheets has been retained for analysis
-        if len(sheets) != 2:
-            print('ERROR: incorrect number of sheets retained in {} following '
-                  'solvent accessibility calculation'.format(domain_id))
-            sec_struct_dfs_dict[domain_id] = None
-            for sheet in sheets:
-                domain_sheets_dict[sheet] = None
-            unprocessed_list.append(domain_id)
-
-            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-
-        # Initialises records of interior / exterior facing residues
-        print('Determining interior and exterior facing residues in {}'.format(domain_id))
-        core_ext_list = ['']*dssp_df.shape[0]
-        core_ext_combined = OrderedDict()
-        core_ext_indv = OrderedDict()
-
-        # Calculates solvent accessibility of both sheets in pair
-        print('Calculating solvent accessible surface area for residues in '
-              '{}'.format(domain_id))
-        sheet_sub_strings = []
-        for sheet_id in sheets:
-            with open('Beta_strands/{}.pdb'.format(sheet_id), 'r') as pdb_file:
-                for line in pdb_file.readlines():
-                    line_start = line[0:16]
-                    line_end = line[17:]
-                    new_line = line_start + ' ' + line_end
-                    sheet_sub_strings.append(new_line)
-        sheet_string = ''.join(sheet_sub_strings)
-        naccess_out = isambard.external_programs.naccess.run_naccess(
-            sheet_string, 'rsa', path=False, include_hetatms=True
-        )
-        naccess_out = naccess_out.split('\n')
-        naccess_out = [line for line in naccess_out if line != '']
-        for line in naccess_out:
-            if line[0:3] in ['RES', 'HEM']:
-                chain = line[8:9].strip()
-                res_num = line[9:13].strip()
-                ins_code = line[13:14].strip()
-                chain_res_num = chain + res_num + ins_code
-                core_ext_combined[chain_res_num] = float(line[14:22])
-
-        # Calculates solvent accessibility of sheets in pair individually
-        for sheet_id in sheets:
-            sheet_sub_strings = []
-            print('Calculating solvent accessible surface area for residues in '
-                  '{}'.format(sheet_id))
-            with open('Beta_strands/{}.pdb'.format(sheet_id), 'r') as pdb_file:
-                for line in pdb_file.readlines():
-                    line_start = line[0:16]
-                    line_end = line[17:]
-                    new_line = line_start + ' ' + line_end
-                    sheet_sub_strings.append(new_line)
-            sheet_string = ''.join(sheet_sub_strings)
-            naccess_out = isambard.external_programs.naccess.run_naccess(
-                sheet_string, 'rsa', path=False, include_hetatms=True
-            )
-            naccess_out = naccess_out.split('\n')
-            naccess_out = [line for line in naccess_out if line != '']
-            for line in naccess_out:
-                if line[0:3] in ['RES', 'HEM']:
-                    chain = line[8:9].strip()
-                    res_num = line[9:13].strip()
-                    ins_code = line[13:14].strip()
-                    chain_res_num = chain + res_num + ins_code
-                    core_ext_indv[chain_res_num] = float(line[14:22])
-
-        # Determines solvent accessibility of each residue in the beta-sheet
-        # assembly as compared to its individual parent beta-sheet. If the
-        # solvent accessibility is lower in the assembly, the residue is
-        # assigned as 'interior', if it is the same it is assigned as
-        # 'exterior', otherwise an error is thrown.
-        for res in list(core_ext_combined.keys()):
-            solv_acsblty_combined = core_ext_combined[res]
-            solv_acsblty_indv = core_ext_indv[res]
-
-            if solv_acsblty_indv - solv_acsblty_combined > 1:
-                core_ext_combined[res] = 'core'
-            elif solv_acsblty_indv - solv_acsblty_combined < 1:
-                core_ext_combined[res] = 'external'
-
-        # Updates dataframe with solvent accessibility information
-        for row in range(dssp_df.shape[0]):
-            if (dssp_df['RES_ID'][row] in list(core_ext_combined.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
-                core_ext_list[row] = core_ext_combined[dssp_df['RES_ID'][row]]
-        core_ext_df = pd.DataFrame({'CORE_OR_EXT': core_ext_list})
-        dssp_df = pd.concat([dssp_df, core_ext_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
 
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
@@ -560,31 +519,28 @@ class find_interior_exterior_surfaces(run_stages):
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
             dssp_df = sec_struct_dfs_dict[domain_id]
-            sheets = [key for key in list(domain_sheets_dict.keys()) if
-                      domain_id in key]
+            sheets = {key: value for key, value in domain_sheets_dict.items()
+                      if domain_id in key}
 
             if self.code[0:4] in ['2.40']:
                 (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-                 ) = naccess_solv_acsblty_calcs.calculate_int_ext_barrel(
+                 ) = barrel_int_ext.int_ext_pipeline(
                     domain_id, dssp_df, sheets, sec_struct_dfs_dict,
                     domain_sheets_dict, unprocessed_list
                 )
             elif self.code[0:4] in ['2.60']:
                 (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-                 ) = naccess_solv_acsblty_calcs.calculate_int_ext_sandwich(
-                    domain_id, dssp_df, sheets, sec_struct_dfs_dict,
-                    domain_sheets_dict, unprocessed_list
-                )
-                (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-                 ) = naccess_solv_acsblty_calcs.calc_core_residues_sandwich(
+                 ) = barrel_int_ext.int_ext_pipeline(
                     domain_id, dssp_df, sheets, sec_struct_dfs_dict,
                     domain_sheets_dict, unprocessed_list
                 )
 
-        sec_struct_dfs_dict = {key: value for key, value in
-                               sec_struct_dfs_dict.items() if value is not None}
-        domain_sheets_dict = {key: value for key, value in
-                              domain_sheets_dict.items() if value is not None}
+        sec_struct_dfs_dict = OrderedDict(
+            {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
+        )
+        domain_sheets_dict = OrderedDict(
+            {key: value for key, value in domain_sheets_dict.items() if value is not None}
+        )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nError in determination of interior and '
@@ -592,4 +548,4 @@ class find_interior_exterior_surfaces(run_stages):
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
-        return sec_struct_dfs_dict
+        return sec_struct_dfs_dict, domain_sheets_dict

@@ -27,7 +27,11 @@ class naccess_solv_acsblty_calcs():
                 for line in pdb_file.readlines():
                     line_start = line[0:16]
                     line_end = line[17:]
-                    new_line = line_start + ' ' + line_end
+                    new_line = line_start + ' ' + line_end  # Removes alternate
+                    # conformer labels to prevent problems with running naccess
+                    # (for some reason naccess encounters an error if alternate
+                    # conformers are removed without also removing the
+                    # conformer id of the retained conformer)
                     sheet_sub_strings.append(new_line)
             sheet_string = ''.join(sheet_sub_strings)
 
@@ -66,7 +70,12 @@ class naccess_solv_acsblty_calcs():
                     for line in pdb_file.readlines():
                         line_start = line[0:16]
                         line_end = line[17:]
-                        new_line = line_start + ' ' + line_end
+                        new_line = line_start + ' ' + line_end  # Removes
+                        # alternate conformer labels to prevent problems with
+                        # running naccess (for some reason naccess encounters
+                        # an error if alternate conformers are removed without
+                        # also removing the conformer id of the retained
+                        # conformer)
                         sheet_sub_strings.append(new_line)
             sheet_string = ''.join(sheet_sub_strings)
 
@@ -89,7 +98,12 @@ class naccess_solv_acsblty_calcs():
                     for line in pdb_file.readlines():
                         line_start = line[0:16]
                         line_end = line[17:]
-                        new_line = line_start + ' ' + line_end
+                        new_line = line_start + ' ' + line_end  # Removes
+                        # alternate conformer labels to prevent problems with
+                        # running naccess (for some reason naccess encounters
+                        # an error if alternate conformers are removed without
+                        # also removing the conformer id of the retained
+                        # conformer)
                         sheet_sub_strings.append(new_line)
                 sheet_string = ''.join(sheet_sub_strings)
                 naccess_out = isambard.external_programs.naccess.run_naccess(
@@ -121,7 +135,11 @@ class naccess_solv_acsblty_calcs():
             for line in pdb_file.readlines():
                 line_start = line[0:16]
                 line_end = line[17:]
-                new_line = line_start + ' ' + line_end
+                new_line = line_start + ' ' + line_end  # Removes alternate
+                # conformer labels to prevent problems with running naccess
+                # (for some reason naccess encounters an error if alternate
+                # conformers are removed without also removing the
+                # conformer id of the retained conformer)
                 sheet_sub_strings.append(new_line)
         sheet_string = ''.join(sheet_sub_strings)
         naccess_out = isambard.external_programs.naccess.run_naccess(
@@ -145,13 +163,16 @@ class naccess_solv_acsblty_calcs():
         # Uses the previously calculated solvent accessibility values to
         # determine which sheet/s form/s the beta-barrel/sandwich, and then
         # prunes the dataframe (dssp_df) to remove all other sheets
+
+        # Initialises list of residue solvent accessibility values for
+        # incorporation into the domain dataframe (dssp_df)
         solv_acsblty_list = ['']*dssp_df.shape[0]
 
         # Discounts a beta-sandwich domain from further analysis if the solvent
         # accessibility calculations show that none of the retained beta-sheets
         # are in contact with one another
         if (code[0:4] in ['2.60']
-                    and float(max(list(solv_acsblty_dict.keys()))) == 0.0
+                and max(list(solv_acsblty_dict.keys())) == 0.0
                 ):
             unprocessed_list.append(domain_id)
             sec_struct_dfs_dict[domain_id] = None
@@ -181,7 +202,7 @@ class naccess_solv_acsblty_calcs():
                     dssp_df.loc[row, 'REC'] = None
 
                 if (res_id in list(res_solv_acsblty.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
+                            and dssp_df['ATMNAME'][row] == 'CA'
                         ):
                     solv_acsblty_list[row] = res_solv_acsblty[res_id]
 
@@ -227,7 +248,11 @@ class naccess_solv_acsblty_calcs():
                 for line in pdb_file.readlines():
                     line_start = line[0:16]
                     line_end = line[17:]
-                    new_line = line_start + ' ' + line_end
+                    new_line = line_start + ' ' + line_end  # Removes alternate
+                    # conformer labels to prevent problems with running naccess
+                    # (for some reason naccess encounters an error if alternate
+                    # conformers are removed without also removing the
+                    # conformer id of the retained conformer)
                     sheet_sub_strings.append(new_line)
         sheet_string = ''.join(sheet_sub_strings)
         naccess_out = isambard.external_programs.naccess.run_naccess(
@@ -252,7 +277,11 @@ class naccess_solv_acsblty_calcs():
                 for line in pdb_file.readlines():
                     line_start = line[0:16]
                     line_end = line[17:]
-                    new_line = line_start + ' ' + line_end
+                    new_line = line_start + ' ' + line_end  # Removes alternate
+                    # conformer labels to prevent problems with running naccess
+                    # (for some reason naccess encounters an error if alternate
+                    # conformers are removed without also removing the
+                    # conformer id of the retained conformer)
                     sheet_sub_strings.append(new_line)
             sheet_string = ''.join(sheet_sub_strings)
             naccess_out = isambard.external_programs.naccess.run_naccess(
@@ -284,10 +313,11 @@ class naccess_solv_acsblty_calcs():
 
         # Updates dataframe with solvent accessibility information
         for row in range(dssp_df.shape[0]):
-            if (dssp_df['RES_ID'][row] in list(core_ext_combined.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
+            res_id = dssp_df['RES_ID'][row]
+            if (res_id in list(core_ext_combined.keys())
+                        and dssp_df['ATMNAME'][row] == 'CA'
                     ):
-                core_ext_list[row] = core_ext_combined[dssp_df['RES_ID'][row]]
+                core_ext_list[row] = core_ext_combined[res_id]
         core_ext_df = pd.DataFrame({'CORE_OR_EXT': core_ext_list})
         dssp_df = pd.concat([dssp_df, core_ext_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
@@ -308,15 +338,21 @@ class calculate_solvent_accessible_surface_area(run_stages):
         else:
             from datagen.subroutines.naccess import naccess_solv_acsblty_calcs
 
-        unprocessed_list = []
+        unprocessed_list_1 = []
+        unprocessed_list_2 = []
+
         for domain_id in list(sec_struct_dfs_dict.keys()):
             dssp_df = sec_struct_dfs_dict[domain_id]
             sheets = {key: value for key, value in domain_sheets_dict.items()
                       if domain_id in key}
 
-            if not sheets:
-                print('ERROR: No beta-sheets retained for {}'.format(domain_id))
+            if (
+                (not sheets)
+                or (self.code[0:4] in ['2.60'] and len(list(sheets.keys())) < 2)
+            ):
+                print('ERROR: No / only 1 beta-sheet/s retained for {}'.format(domain_id))
                 unprocessed_list.append(domain_id)
+                continue
 
             if self.code[0:4] in ['2.40']:
                 solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_barrel_solv_acsblty(
@@ -336,28 +372,35 @@ class calculate_solvent_accessible_surface_area(run_stages):
                 solv_acsblty_dict = {}
                 res_solv_acsblty = {}
 
-            (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+            (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list_2
              ) = naccess_solv_acsblty_calcs.add_naccess_info_to_df(
                 domain_id, dssp_df, sheets, self.code, solv_acsblty_dict,
                 res_solv_acsblty, sec_struct_dfs_dict, domain_sheets_dict,
-                unprocessed_list
+                unprocessed_list_2
             )
 
-        sec_struct_dfs_dict = {key: value for key, value in
-                               sec_struct_dfs_dict.items() if value is not None}
-        domain_sheets_dict = {key: value for key, value in
-                              domain_sheets_dict.items() if value is not None}
+        sec_struct_dfs_dict = OrderedDict(
+            {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
+        )
+        domain_sheets_dict = OrderedDict(
+            {key: value for key, value in domain_sheets_dict.items() if value is not None}
+        )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
+            unprocessed_file.write('\n\nError in network generation - no / '
+                                   'only 1 sheet/s retained for solvent '
+                                   'accessibility calculations:\n')
+            for domain_id in set(unprocessed_list_1):
+                unprocessed_file.write('{}\n'.format(domain_id))
             unprocessed_file.write('\n\nError in solvent accessibility calculation:\n')
-            for domain_id in set(unprocessed_list):
+            for domain_id in set(unprocessed_list_2):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
         return sec_struct_dfs_dict, domain_sheets_dict
 
     def identify_core_ext(self, sec_struct_dfs_dict, domain_sheets_dict):
-        # Pipeline script to identify interior and exterior-facing residues in
-        # barrels / sandwiches
+        # Pipeline function to identify interior and exterior-facing residues
+        # in barrels / sandwiches
         unprocessed_list = []
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
@@ -371,10 +414,12 @@ class calculate_solvent_accessible_surface_area(run_stages):
                 domain_sheets_dict, unprocessed_list
             )
 
-        sec_struct_dfs_dict = {key: value for key, value in
-                               sec_struct_dfs_dict.items() if value is not None}
-        domain_sheets_dict = {key: value for key, value in
-                              domain_sheets_dict.items() if value is not None}
+        sec_struct_dfs_dict = OrderedDict(
+            {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
+        )
+        domain_sheets_dict = OrderedDict(
+            {key: value for key, value in domain_sheets_dict.items() if value is not None}
+        )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nError in finding core and external '
@@ -382,4 +427,4 @@ class calculate_solvent_accessible_surface_area(run_stages):
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
-        return sec_struct_dfs_dict
+        return sec_struct_dfs_dict, domain_sheets_dict

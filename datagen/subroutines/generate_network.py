@@ -16,7 +16,8 @@ class network_calcs():
         # Creates a dictionary of each of the strand labels plus the residue
         # ranges they span in an individual beta-sheet
         strands_dict = {}
-        strands = [int(strand) for strand in set(sheet_df['STRAND_NUM'].tolist())]
+        strands = [strand for strand in set(sheet_df['STRAND_NUM'].tolist()) if
+                   strand != '']
         for strand in strands:
             strand_df = sheet_df[sheet_df['STRAND_NUM'] == strand]
 
@@ -146,7 +147,8 @@ class network_calcs():
                 sheet_df = dssp_df[dssp_df['SHEET_NUM'] == sheet]
                 sheet_df = sheet_df.reset_index(drop=True)
 
-                strands = sorted([int(strand) for strand in set(sheet_df['STRAND_NUM'].tolist())])
+                strands = sorted([strand for strand in set(sheet_df['STRAND_NUM'].tolist())
+                                  if strand != ''])
                 for strand in strands:
                     strand_df = sheet_df[sheet_df['STRAND_NUM'] == strand]
                     chain_res_num = strand_df['RES_ID'].tolist()
@@ -160,6 +162,7 @@ class network_calcs():
         # Draws plot of the network of interacting strands (all retained sheets
         # in a domain are plotted on the same graph)
         print('Plotting network of interacting beta-strands in {}'.format(domain_id))
+
         sheet_1 = list(domain_sheets.keys())[0]
         sheets_2_to_n = list(domain_sheets.keys())[1:]
         G = domain_sheets[sheet_1]
@@ -226,10 +229,16 @@ class calculate_beta_network(run_stages):
                 network_calcs.draw_network(domain_id, domain_sheets, edge_labels)
             else:
                 sec_struct_dfs_dict[domain_id] = None
+                for sheet_id in list(domain_sheets.keys()):
+                    domain_sheets_dict[sheet_id] = None
                 unprocessed_list.append(domain_id)
 
-        sec_struct_dfs_dict = {key: value for key, value in
-                               sec_struct_dfs_dict.items() if value is not None}
+        sec_struct_dfs_dict = OrderedDict(
+            {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
+        )
+        domain_sheets_dict = OrderedDict(
+            {key: value for key, value in domain_sheets_dict.items() if value is not None}
+        )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nError in network generation - no / '
