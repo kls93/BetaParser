@@ -34,14 +34,6 @@ def domain_desc_filter(code, domains_desc):
     # sandwiches or barrels depending upon the user's choice), picking out PDB
     # accession codes and sequences, whose values are stored in a dataframe.
 
-    # Prevents cathcodes at the same level of the hierarchy
-    # with overlapping codes (e.g. 2.60.40.10 and 2.60.40.1090)
-    # from being mistaken for one another
-    if code.count('.') == 3:
-        code += ' '
-    else:
-        code += '.'
-
     domain_pdb_ids = []
     domain_ids = []
     domain_chains = []
@@ -50,7 +42,13 @@ def domain_desc_filter(code, domains_desc):
     domain_sseqs = []
     domain_sseqs_start_stop = []
     for domain in domains_desc:
-        if 'CATHCODE  {}'.format(code) in domain:
+        # Prevents cathcodes at the same level of the hierarchy with
+        # overlapping codes (e.g. 2.60.40.10 and 2.60.40.1090) from being
+        # mistaken for one another
+        if ((code.count('.') == 3 and 'CATHCODE  {}'.format(code) in domain)
+                or
+                (code.count('.') < 3 and 'CATHCODE  {}.'.format(code) in domain)
+                ):
             dseqs_list = []
             sseqs_consec_list = []
             sseqs_list = []
