@@ -45,10 +45,11 @@ def domain_desc_filter(code, domains_desc):
         # Prevents cathcodes at the same level of the hierarchy with
         # overlapping codes (e.g. 2.60.40.10 and 2.60.40.1090) from being
         # mistaken for one another
-        if ((code.count('.') == 3 and 'CATHCODE  {}'.format(code) in domain)
+        if (
+                (code.count('.') == 3 and 'CATHCODE  {}\n'.format(code) in domain)
                 or
                 (code.count('.') < 3 and 'CATHCODE  {}.'.format(code) in domain)
-                ):
+        ):
             dseqs_list = []
             sseqs_consec_list = []
             sseqs_list = []
