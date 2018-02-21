@@ -55,112 +55,83 @@
         return dssp_dfs_merged_sheets_dict
 
 
-def calculate_int_ext_barrel(domain_id, dssp_df, sheets,
-                             sec_struct_dfs_dict, domain_sheets_dict,
-                             unprocessed_list):
-    # Determines which face of the beta-sheet forms the interior of the
-    # barrel and which forms the exterior. **NOTE: this function assumes
-    # that adjacent residues point in opposite directions.**
-    # TO DO: UPDATE TO USE BACKBONE PHI AND PSI ANGLES TO DETERMINE IF THE
-    # STRAND CONTAINS A BULGE OR NOT
+def calc_int_ext_sandwich():
+    com_coords = np.array([[np.sum(list(xy_dict.values())[0][0])],
+                           [np.sum(list(xy_dict.values())[1][0])]])
 
-    # Checks that correct number of sheets has been retained for analysis
-    if len(sheets) != 1:
-        print('ERROR: more than 1 sheet retained in {} following solvent '
-              'accessibility calculation'.format(domain_id))
-        sec_struct_dfs_dict[domain_id] = None
-        for sheet in sheets:
-            domain_sheets_dict[sheet] = None
-        unprocessed_list.append(domain_id)
+        for res_id in sheets_df['RES_ID'].tolist():
+            print(domain_id, res_id)
+            if 'GLY' not in res_id:
+                res_df = dssp_df[dssp_df['RES_ID'] == res_id]
+                res_atoms = res_df['ATMNAME'].tolist()
 
-        return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+                if all([x in res_atoms for x in ['N', 'CA', 'C', 'O', 'CB']]):
+                    n_coords = xy_dict['{}_N'.format(res_id)]
+                    c_coords = xy_dict['{}_C'.format(res_id)]
+                    ca_coords = xy_dict['{}_CA'.format(res_id)]
+                    cb_coords = xy_dict['{}_CB'.format(res_id)]
 
-    # Initialises records of interior / exterior facing residues
-    int_ext_list = ['']*dssp_df.shape[0]
-    int_ext_dict = OrderedDict()
+                    n_com_vector = np.array([[com_coords[0][0] - n_coords[0][0]],
+                                             [com_coords[1][0] - n_coords[1][0]]])
+                    n_com_magnitude = math.sqrt(((n_com_vector[0][0])**2)
+                                                + ((n_com_vector[1][0])**2))
 
-    # Calculates solvent accessibility of both faces of barrel
-    sheet_sub_strings = []
-    print('Calculating solvent accessible surface area for {}'.format(domain_id))
+                    c_com_vector = np.array([[com_coords[0][0] - c_coords[0][0]],
+                                             [com_coords[1][0] - c_coords[1][0]]])
+                    c_com_magnitude = math.sqrt(((c_com_vector[0][0])**2)
+                                                + ((c_com_vector[1][0])**2))
 
-    with open('Beta_strands/{}.pdb'.format(sheets[0]), 'r') as pdb_file:
-        for line in pdb_file.readlines():
-            line_start = line[0:16]
-            line_end = line[17:]
-            new_line = line_start + ' ' + line_end
-            sheet_sub_strings.append(new_line)
-    sheet_string = ''.join(sheet_sub_strings)
-    naccess_out = isambard.external_programs.naccess.run_naccess(
-        sheet_string, 'rsa', path=False, include_hetatms=True
-    )
-    naccess_out = naccess_out.split('\n')
-    naccess_out = [line for line in naccess_out if line != '']
-    for line in naccess_out:
-        if line[0:3] in ['RES', 'HEM']:
-            chain = line[8:9].strip()
-            res_num = line[9:13].strip()
-            ins_code = line[13:14].strip()
-            chain_res_num = chain + res_num + ins_code
-            int_ext_dict[chain_res_num] = float(line[14:22])
+                    ca_com_vector = np.array([[com_coords[0][0] - ca_coords[0][0]],
+                                              [com_coords[1][0] - ca_coords[1][0]]])
+                    ca_com_magnitude = math.sqrt(((ca_com_vector[0][0])**2)
+                                                 + ((ca_com_vector[1][0])**2))
 
-    # Selects strands in barrel
-    sheet_num = sheets[0].replace('{}_sheet_'.format(domain_id), '')
-    sheets_df = dssp_df[dssp_df['SHEET_NUM'] == sheet_num]
-    strands = [strand for strand in set(sheets_df['STRAND_NUM'].tolist())
-               if strand != '']
+                    n_ca_vector = np.array([[ca_coords[0][0] - n_coords[0][0]],
+                                            [ca_coords[1][0] - n_coords[1][0]]])
+                    n_ca_magnitude = math.sqrt(((n_ca_vector[0][0])**2)
+                                               + ((n_ca_vector[1][0])**2))
 
-    # For each strand, determines which of its residues face towards the
-    # interior and which face towards the exterior (assuming that
-    # consecutive residues face in opposite directions)
-    for strand in strands:
-        strand_df = dssp_df[dssp_df['STRAND_NUM'] == strand]
-        res_acsblty = OrderedDict()
-        for res_id in strand_df['RES_ID'].tolist():
-            if res_id != '':
-                res_acsblty[res_id] = int_ext_dict[res_id]
+                    c_ca_vector = np.array([[ca_coords[0][0] - c_coords[0][0]],
+                                            [ca_coords[1][0] - c_coords[1][0]]])
+                    c_ca_magnitude = math.sqrt(((c_ca_vector[0][0])**2)
+                                               + ((c_ca_vector[1][0])**2))
 
-        # Splits the residues into opposite faces and calculates the sum of
-        # their solvent accessibilities
-        face_1_res = list(res_acsblty.values())[:: 2]
-        face_2_res = list(res_acsblty.values())[1:: 2]
-        face_1_solv_acsblty = sum(face_1_res)
-        face_2_solv_acsblty = sum(face_2_res)
+                    ca_cb_vector = np.array([[cb_coords[0][0] - ca_coords[0][0]],
+                                             [cb_coords[1][0] - ca_coords[1][0]]])
+                    ca_cb_magnitude = math.sqrt(((ca_cb_vector[0][0])**2)
+                                                + ((ca_cb_vector[1][0])**2))
 
-        # Determines which face is exterior and which is interior (the sum
-        # of the solvent accessibilities of the exterior facing residues
-        # will be greater than that of the interior facing residues)
-        if face_1_solv_acsblty > face_2_solv_acsblty:
-            ext_chain_res_num = list(res_acsblty.keys())[:: 2]
-            int_chain_res_num = list(res_acsblty.keys())[1:: 2]
-        elif face_1_solv_acsblty < face_2_solv_acsblty:
-            ext_chain_res_num = list(res_acsblty.keys())[1:: 2]
-            int_chain_res_num = list(res_acsblty.keys())[:: 2]
-        else:
-            print('ERROR: solvent accessibilities of two faces of '
-                  '{}_strand_{} are equal - something has gone wrong with '
-                  'the analysis'.format(domain_id, strand))
-            sec_struct_dfs_dict[domain_id] = None
-            domain_sheets_dict[sheets[0]] = None
-            unprocessed_list.append(domain_id)
-            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+                    # Calculates com-N-C_alpha angle
+                    com_n_ca_numerator = np.sum((n_com_vector*n_ca_vector), axis=0)[0]
+                    com_n_ca_denominator = n_com_magnitude*n_ca_magnitude
+                    com_n_ca_angle = math.degrees(
+                        math.acos(com_n_ca_numerator / com_n_ca_denominator)
+                    )
 
-        # Assigns 'interior' and 'exterior' labels to the relevant res_id
-        for chain_res_num in ext_chain_res_num:
-            int_ext_dict[chain_res_num] = 'exterior'
-        for chain_res_num in int_chain_res_num:
-            int_ext_dict[chain_res_num] = 'interior'
+                    # Caculates com-C-C_alpha angle
+                    com_c_ca_numerator = np.sum((c_com_vector*c_ca_vector), axis=0)[0]
+                    com_c_ca_denominator = c_com_magnitude*c_ca_magnitude
+                    com_c_ca_angle = math.degrees(
+                        math.acos(com_c_ca_numerator / com_c_ca_denominator)
+                    )
 
-    # Updates dataframe with solvent accessibility information
-    for row in range(dssp_df.shape[0]):
-        if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
-                and dssp_df['ATMNAME'][row] == 'CA'
-                ):
-            int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
-    int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
-    dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
-    sec_struct_dfs_dict[domain_id] = dssp_df
+                    # Selects the largest angle of the two backbone angles
+                    if n_com_magnitude < c_com_magnitude:
+                        backbone_angle = com_c_ca_angle
 
-    return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+                    # Calculates com-C_alpha-C_beta angle
+                    com_ca_cb_numerator = np.sum((ca_com_vector*ca_cb_vector), axis=0)[0]
+                    com_ca_cb_denominator = ca_com_magnitude*ca_cb_magnitude
+                    com_ca_cb_angle = math.degrees(
+                        math.acos(com_ca_cb_numerator / com_ca_cb_denominator)
+                    )
+
+                    # Determines whether the residue is interior- or
+                    # exterior-facing
+                    if com_ca_cb_angle < 90:
+                        int_ext_dict[res_id] = 'interior'
+                    elif com_ca_cb_angle > 90:
+                        int_ext_dict[res_id] = 'exterior'
 
 
 def find_barrel_shear_number(self, sec_struct_dfs_dict):
@@ -198,8 +169,8 @@ def find_barrel_shear_number(self, sec_struct_dfs_dict):
                 shear_pairs = [[h_bonded_res_2_b, h_bonded_res_3_a],
                                [h_bonded_res_2_a, h_bonded_res_3_b]]
                 if (not any(x in [None, 0] for x in [dssp_num for pair in
-                                                         shear_pairs for dssp_num in pair])
-                        ):
+                                                     shear_pairs for dssp_num in pair])
+                    ):
                     for pair in shear_pairs:
                         print(pair)  # DELETE ME
                         if int(res_1) in pair:

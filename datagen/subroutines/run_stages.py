@@ -125,7 +125,8 @@ class run_stages():
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
 
     def run_stage_3(self):
-        # To be run within ISAMBARD
+        # To be run within ISAMBARD. **NOTE** solvent accessibility
+        # calculations must be run first.
         if __name__ == 'subroutines.run_stages':
             from subroutines.naccess import calculate_solvent_accessible_surface_area
             from subroutines.find_surfaces import find_interior_exterior_surfaces
@@ -145,10 +146,11 @@ class run_stages():
                 sec_struct_dfs_dict, domain_sheets_dict
             )
 
-        beta_structure = find_interior_exterior_surfaces(self.run_parameters)
-        sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
-            sec_struct_dfs_dict, domain_sheets_dict
-        )
+        if self.code[0:4] in ['2.40']:
+            beta_structure = find_interior_exterior_surfaces(self.run_parameters)
+            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
+                sec_struct_dfs_dict, domain_sheets_dict
+            )
 
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)

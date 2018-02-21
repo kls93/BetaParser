@@ -48,7 +48,6 @@ class output_calcs():
 
             z_coordinates = list(strand_coordinates.values())
             if len(z_coordinates) != len(res_ids_list):
-                print('ERROR: Failed to locate all strand coordinates')
                 unprocessed_list.append('{}_strand_{}'.format(domain_id, strand_id))
             else:
                 if z_coordinates[0] < z_coordinates[-1]:
