@@ -238,14 +238,15 @@ class gen_output(run_stages):
 
                 # Generates list of interior and exterior facing residues in
                 # the strand
-                int_ext_list = strand_df['INT_EXT'].tolist()
-                if reverse is True:
-                    int_ext_list.reverse()
+                if self.code[0:4] in ['2.40']:
+                    int_ext_list = strand_df['INT_EXT'].tolist()
+                    if reverse is True:
+                        int_ext_list.reverse()
 
-                if strand_or_res == 'strand':
-                    int_ext.append(int_ext_list)
-                elif strand_or_res == 'res':
-                    int_ext += int_ext_list
+                    if strand_or_res == 'strand':
+                        int_ext.append(int_ext_list)
+                    elif strand_or_res == 'res':
+                        int_ext += int_ext_list
 
                 # Generates list of residues that form the beta-sandwich core
                 if self.code[0:4] in ['2.60']:
@@ -320,13 +321,12 @@ class gen_output(run_stages):
                                             'EDGE_OR_CNTRL': edge_or_central,
                                             'RES_ID': res_ids,
                                             'FASTA': fasta_seq,
-                                            'INT_EXT': int_ext,
                                             'CORE_OR_EXT': core_ext,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_acsblty})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[7]] + [cols[2]] + [cols[5]] + [cols[3]] + [cols[4]]
-                    + [cols[1]] + [cols[0]] + [cols[6]])
+            cols = ([cols[6]] + [cols[2]] + [cols[4]] + [cols[3]] + [cols[1]]
+                    + [cols[0]] + [cols[5]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))

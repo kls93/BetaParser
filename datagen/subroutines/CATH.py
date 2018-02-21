@@ -2,9 +2,9 @@
 import pandas as pd
 
 
-# Generates a list of the domain descriptions provided in
-# CATH_domain_description_v_4_2_0.txt
 def gen_domain_desc_list(orig_dir):
+    # Generates a list of the domain descriptions provided in
+    # CATH_domain_description_v_4_2_0.txt
     domains_desc = []
     with open(
         '{}/docs/CATH_domain_desc_v_4_2_0.txt'.format(orig_dir), 'r'
@@ -28,12 +28,20 @@ def gen_domain_desc_list(orig_dir):
     domains_desc = [line for line in domains_desc if line != '']
     return domains_desc
 
-# Filters the domain descriptions list for beta-structures (either
-# sandwiches or barrels depending upon the user's choice), picking out PDB
-# accession codes and sequences, whose values are stored in a dataframe.
-
 
 def domain_desc_filter(code, domains_desc):
+    # Filters the domain descriptions list for beta-structures (either
+    # sandwiches or barrels depending upon the user's choice), picking out PDB
+    # accession codes and sequences, whose values are stored in a dataframe.
+
+    # Prevents cathcodes at the same level of the hierarchy
+    # with overlapping codes (e.g. 2.60.40.10 and 2.60.40.1090)
+    # from being mistaken for one another
+    if code.count('.') == 3:
+        code += ' '
+    else:
+        code += '.'
+
     domain_pdb_ids = []
     domain_ids = []
     domain_chains = []
