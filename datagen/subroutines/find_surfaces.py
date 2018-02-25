@@ -204,7 +204,7 @@ class barrel_interior_exterior_calcs():
                 cos_c_alpha_angle = (c_alpha_numerator / c_alpha_denominator)
                 c_alpha_angle = math.degrees(math.acos(cos_c_alpha_angle))
 
-                if c_alpha_angle < 90:
+                if c_alpha_angle <= 90:
                     int_ext_dict[res_id] = 'interior'
                 elif c_alpha_angle > 90:
                     int_ext_dict[res_id] = 'exterior'
@@ -306,7 +306,9 @@ class sandwich_interior_exterior_calcs():
         return xyz_coords
 
     def align_sandwich(domain_id, xyz_coords):
-        # TODO: STILL PROBLEMS WITH AXIS ALIGNMENT, NEEDS FIXING
+        # TODO: STILL PROBLEMS WITH AXIS ALIGNMENT, NEEDS FIXING - align with
+        # the perpendicular axis between the sheets instead? Will need to take
+        # into account whenther neighbouring strands are parallel or antiparallel.
 
         # Creates an ampal object of the beta-sandwich
         sandwich = isambard.ampal.convert_pdb_to_ampal('Beta_strands/{}.pdb'.format(domain_id))

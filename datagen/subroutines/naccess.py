@@ -236,8 +236,10 @@ class naccess_solv_acsblty_calcs():
         # Initialises records of interior / exterior facing residues
         print('Determining interior and exterior facing residues in {}'.format(domain_id))
         core_ext_list = ['']*dssp_df.shape[0]
+        buried_surface_area_list = ['']*dssp_df.shape[0]
         core_ext_combined = OrderedDict()
         core_ext_indv = OrderedDict()
+        buried_surface_area_dict = OrderedDict()
 
         # Calculates solvent accessibility of both sheets in pair
         print('Calculating solvent accessible surface area for residues in '
@@ -303,16 +305,14 @@ class naccess_solv_acsblty_calcs():
         # assigned as 'interior', if it is the same it is assigned as
         # 'exterior', otherwise an error is thrown.
         for res in list(core_ext_combined.keys()):
-            print(res)
             solv_acsblty_combined = core_ext_combined[res]
             solv_acsblty_indv = core_ext_indv[res]
-            print(solv_acsblty_combined)
-            print(solv_acsblty_indv)
 
             if solv_acsblty_indv == 0 and solv_acsblty_combined == 0:
                 core_ext_combined[res] = ''
             elif solv_acsblty_indv != 0 and solv_acsblty_combined == 0:
                 buried_surface_area = solv_acsblty_indv
+                buried_surface_area_dict[res] = buried_surface_area
                 if buried_surface_area >= 5:
                     # 20% is an arbitrarily selected value that I have found to
                     # discriminate well between core and external residues
@@ -322,6 +322,7 @@ class naccess_solv_acsblty_calcs():
             elif solv_acsblty_indv != 0 and solv_acsblty_combined != 0:
                 buried_surface_area = ((solv_acsblty_indv - solv_acsblty_combined)
                                        / solv_acsblty_indv)
+                buried_surface_area_dict[res] = buried_surface_area
                 if buried_surface_area >= 0.20:
                     # 20% is an arbitrarily selected value that I have found to
                     # discriminate well between core and external residues
@@ -336,7 +337,12 @@ class naccess_solv_acsblty_calcs():
                 and dssp_df['ATMNAME'][row] == 'CA'
                 ):
                 core_ext_list[row] = core_ext_combined[res_id]
-        core_ext_df = pd.DataFrame({'CORE_OR_EXT': core_ext_list})
+            if (res_id in list(buried_surface_area_dict.keys())
+                and dssp_df['ATMNAME'][row] == 'CA'
+                ):
+                buried_surface_area_list[row] = buried_surface_area_dict[res_id]
+        core_ext_df = pd.DataFrame({'CORE_OR_EXT': core_ext_list,
+                                    'BURIED_SURFACE_AREA': buried_surface_area_list})
         dssp_df = pd.concat([dssp_df, core_ext_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
 

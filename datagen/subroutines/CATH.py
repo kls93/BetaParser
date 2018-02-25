@@ -29,7 +29,7 @@ def gen_domain_desc_list(orig_dir):
     return domains_desc
 
 
-def domain_desc_filter(code, domains_desc):
+def domain_desc_filter(cathcode, domains_desc):
     # Filters the domain descriptions list for beta-structures (either
     # sandwiches or barrels depending upon the user's choice), picking out PDB
     # accession codes and sequences, whose values are stored in a dataframe.
@@ -45,50 +45,51 @@ def domain_desc_filter(code, domains_desc):
         # Prevents cathcodes at the same level of the hierarchy with
         # overlapping codes (e.g. 2.60.40.10 and 2.60.40.1090) from being
         # mistaken for one another
-        if (
-                (code.count('.') == 3 and 'CATHCODE  {}\n'.format(code) in domain)
-                or
-                (code.count('.') < 3 and 'CATHCODE  {}.'.format(code) in domain)
-        ):
-            dseqs_list = []
-            sseqs_consec_list = []
-            sseqs_list = []
-            sseqs_start_stop_list = []
+        for code in cathcode.split('_'):
+            if (
+                    (code.count('.') == 3 and 'CATHCODE  {}\n'.format(code) in domain)
+                    or
+                    (code.count('.') < 3 and 'CATHCODE  {}.'.format(code) in domain)
+            ):
+                dseqs_list = []
+                sseqs_consec_list = []
+                sseqs_list = []
+                sseqs_start_stop_list = []
 
-            domain_sublist = domain.split('\n')
-            for index, line in enumerate(domain_sublist):
-                if line.startswith('SSEQS') and domain_sublist[index+1].startswith('SSEQS'):
-                    sseqs_consec_list.append(index)
-            for index in sseqs_consec_list:
-                domain_sublist[index+1] = ''.join(domain_sublist[index:index+2])
-                domain_sublist[index] = ''
+                domain_sublist = domain.split('\n')
+                for index, line in enumerate(domain_sublist):
+                    if line.startswith('SSEQS') and domain_sublist[index+1].startswith('SSEQS'):
+                        sseqs_consec_list.append(index)
+                for index in sseqs_consec_list:
+                    domain_sublist[index+1] = ''.join(domain_sublist[index:index+2])
+                    domain_sublist[index] = ''
 
-            for line in domain_sublist:
-                if line.startswith('DOMAIN'):
-                    domain_pdb_ids.append(line[10:14])
-                    domain_ids.append(line[10:].strip())
-                    chain = line[14:].strip()
-                    chain = ''.join([char for char in chain if char.isalpha()])
-                    domain_chains.append(chain)
-                elif line.startswith('CATHCODE'):
-                    domain_cathcodes.append(line[10:])
-                elif line.startswith('DSEQS'):
-                    line = line.replace('DSEQS', '')
-                    line = line.replace(' ', '')
-                    dseqs_list.append(line)
-                elif line.startswith('SSEQS'):
-                    line = line.replace('SSEQS', '')
-                    line = line.replace(' ', '')
-                    sseqs_list.append(line)
-                elif line.startswith('SRANGE'):
-                    line = line.replace('SRANGE', '')
-                    start_stop = line.split()
-                    start_stop = [item.strip() for item in start_stop if item.strip() != '']
-                    sseqs_start_stop_list.append(start_stop)
-            dseqs = ''.join(dseqs_list)
-            domain_dseqs.append(dseqs)
-            domain_sseqs.append(sseqs_list)
-            domain_sseqs_start_stop.append(sseqs_start_stop_list)
+                for line in domain_sublist:
+                    if line.startswith('DOMAIN'):
+                        domain_pdb_ids.append(line[10:14])
+                        domain_ids.append(line[10:].strip())
+                        chain = line[14:].strip()
+                        chain = ''.join([char for char in chain if char.isalpha()])
+                        domain_chains.append(chain)
+                    elif line.startswith('CATHCODE'):
+                        domain_cathcodes.append(line[10:])
+                    elif line.startswith('DSEQS'):
+                        line = line.replace('DSEQS', '')
+                        line = line.replace(' ', '')
+                        dseqs_list.append(line)
+                    elif line.startswith('SSEQS'):
+                        line = line.replace('SSEQS', '')
+                        line = line.replace(' ', '')
+                        sseqs_list.append(line)
+                    elif line.startswith('SRANGE'):
+                        line = line.replace('SRANGE', '')
+                        start_stop = line.split()
+                        start_stop = [item.strip() for item in start_stop if item.strip() != '']
+                        sseqs_start_stop_list.append(start_stop)
+                dseqs = ''.join(dseqs_list)
+                domain_dseqs.append(dseqs)
+                domain_sseqs.append(sseqs_list)
+                domain_sseqs_start_stop.append(sseqs_start_stop_list)
 
     domain_df = pd.DataFrame({'PDB_CODE': domain_pdb_ids,
                               'DOMAIN_ID': domain_ids,

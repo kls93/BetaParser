@@ -64,41 +64,72 @@ def gen_run_parameters(args):
     # Requires user input if the (all-beta) structural domain the user wishes
     # to analyse is not specified in the input file / is not recognised
     if 'id' in run_parameters:
-        if (run_parameters['structuredatabase'] == 'CATH'
-                and not run_parameters['id'].startswith('2')
-                ):
-            print('DataGen is currently only suitable for generation and '
-                  'analysis of\nall-beta structures')
-            run_parameters.pop('id')
-        elif (run_parameters['structuredatabase'] == 'SCOP'
-              and not run_parameters['id'].startswith('b')
-              ):
-            print('DataGen is currently only suitable for generation and '
-                  'analysis of\nall-beta structures')
-            run_parameters.pop('id')
+        if run_parameters['structuredatabase'] == 'CATH':
+            if (
+                type(run_parameters['id']) == list
+                    and not all(run_parameters['id'][index].startswith('2') for
+                                index, code in enumerate(run_parameters['id']))
+                ) or (
+                type(run_parameters['id']) != list
+                    and run_parameters['id'][0] != '2'
+            ):
+                print('DataGen is currently only suitable for generation and '
+                      'analysis of\nall-beta structures')
+                run_parameters.pop('id')
+        elif run_parameters['structuredatabase'] == 'SCOP':
+            if (
+                type(run_parameters['id']) == list
+                    and not all(run_parameters['id'][index].startswith('2') for
+                                index, code in enumerate(run_parameters['id']))
+                ) or (
+                type(run_parameters['id']) != list
+                    and run_parameters['id'][0] != '2'
+            ):
+                print('DataGen is currently only suitable for generation and '
+                      'analysis of\nall-beta structures')
+                run_parameters.pop('id')
     if not 'id' in run_parameters:
         if run_parameters['structuredatabase'] == 'CATH':
-            print('Specify CATHCODE:')
+            print('Specify list of CATHCODEs:')
             run = ''
-            while not run.startswith('2'):
+            while (len(run) == 0
+                    or all(run[index][0] not in ['2'] for index, code in enumerate(run))
+                   ):
                 run = input(prompt).lower()
-                if run.startswith('2'):
+                run = run.replace(' ', '')
+                run = run.replace('[', '')
+                run = run.replace(']', '')
+                run = [cathcode for cathcode in run.split(',')]
+                if (len(run) != 0
+                    and all(run[index].startswith('2') for index, code in enumerate(run))
+                    ):
                     run_parameters['id'] = run
                     break
                 else:
                     print('DataGen is currently only suitable for '
                           'generation and analysis of\nall-beta structures')
         elif run_parameters['structuredatabase'] == 'SCOP':
-            print('Specify SCOP code:')
+            print('Specify list of SCOP codes:')
             run = ''
-            while not run.startswith('b'):
+            while (len(run) == 0
+                    or all(run[index][0] not in ['b'] for index, code in enumerate(run))
+                   ):
                 run = input(prompt).lower()
-                if run.startswith('b'):
+                run = run.replace(' ', '')
+                run = run.replace('[', '')
+                run = run.replace(']', '')
+                run = [scopcode for scopcode in run.split(',')]
+                if (len(run) != 0
+                    and all(run[index].startswith('b') for index, code in enumerate(run))
+                    ):
                     run_parameters['id'] = run
                     break
                 else:
                     print('DataGen is currently only suitable for '
                           'generation and analysis of\nall-beta structures')
+    # Joins list of CATH / SCOP database codes together
+    if type(run_parameters['id']) == list:
+        run_parameters['id'] = '_'.join(run_parameters['id'])
 
     # Requires user input if the absolute file path of the working directory is
     # not specified in the input file / is not recognised

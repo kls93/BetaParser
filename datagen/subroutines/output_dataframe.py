@@ -145,6 +145,7 @@ class gen_output(run_stages):
         fasta_seq = []
         int_ext = []
         core_ext = []
+        buried_surface_area = []
         tm_ext = []
         bckbn_phi_psi = []
         solv_acsblty = []
@@ -259,6 +260,19 @@ class gen_output(run_stages):
                     elif strand_or_res == 'res':
                         core_ext += core_ext_list
 
+                # Generates list of percentage values for the surface area of
+                # each residue that is buried in the sandwich as compared with
+                # the individual parent sheet
+                if self.code[0:4] in ['2.60']:
+                    buried_surface_area_list = strand_df['BURIED_SURFACE_AREA'].tolist()
+                    if reverse is True:
+                        buried_surface_area_list.reverse()
+
+                    if strand_or_res == 'strand':
+                        buried_surface_area.append(buried_surface_area_list)
+                    elif strand_or_res == 'res':
+                        buried_surface_area += buried_surface_area_list
+
                 # Generates list of transmembrane and external residues in the
                 # strand - MUST COME AFTER REVERSAL (OR NOT) OF RES_IDS_LIST
                 if self.code[0:4] in ['2.40']:
@@ -322,11 +336,12 @@ class gen_output(run_stages):
                                             'RES_ID': res_ids,
                                             'FASTA': fasta_seq,
                                             'CORE_OR_EXT': core_ext,
+                                            'BURIED_SURFACE_AREA': buried_surface_area,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_acsblty})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[6]] + [cols[2]] + [cols[4]] + [cols[3]] + [cols[1]]
-                    + [cols[0]] + [cols[5]])
+            cols = ([cols[7]] + [cols[3]] + [cols[5]] + [cols[4]] + [cols[2]]
+                    + [cols[1]] + [cols[0]] + [cols[6]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
