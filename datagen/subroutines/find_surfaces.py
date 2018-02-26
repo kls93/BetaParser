@@ -390,14 +390,12 @@ class int_ext_pipeline():
         # collapsed along the central axis that runs through its pore in order
         # to avoid misclassification of residues in frayed edges of the barrel.
 
-        print(domain_id)
-
         # Checks that correct number of sheets has been retained for analysis
-        if len(sheets) != 1:
+        if len(list(sheets.keys())) != 1:
             print('ERROR: more than 1 sheet retained in {} following solvent '
                   'accessibility calculation'.format(domain_id))
             sec_struct_dfs_dict[domain_id] = None
-            for sheet in sheets:
+            for sheet in list(sheets.keys()):
                 domain_sheets_dict[sheet] = None
             unprocessed_list.append(domain_id)
 
@@ -409,15 +407,14 @@ class int_ext_pipeline():
         sheets_df = sheets_df.reset_index(drop=True)
 
         # Finds network of interacting neighbouring strands
-        networks = list(sheets.values())
-        G = networks[0]
-        strands = interior_exterior_calcs.find_strands_network(G)
+        G = list(sheets.values())[0]
+        strands = barrel_interior_exterior_calcs.find_strands_network(G)
 
         # Finds axis through barrel pore
-        xyz_coords = interior_exterior_calcs.find_z_axis(strands, sheets_df)
+        xyz_coords = barrel_interior_exterior_calcs.find_z_axis(strands, sheets_df)
 
         # Aligns barrel with z = 0
-        xy_dict = interior_exterior_calcs.rotate_translate_barrel(
+        xy_dict = barrel_interior_exterior_calcs.rotate_translate_barrel(
             domain_id, xyz_coords, sheets
         )
 
@@ -426,12 +423,12 @@ class int_ext_pipeline():
         int_ext_dict = OrderedDict()
 
         # Calculates average xy coordinates of the barrel C_alpha atoms
-        com, unprocessed_list = interior_exterior_calcs.calc_average_coordinates(
+        com, unprocessed_list = barrel_interior_exterior_calcs.calc_average_coordinates(
             domain_id, xy_dict, sheets_df, unprocessed_list
         )
 
         # Calculates interior- and exterior-facing residues
-        int_ext_dict = interior_exterior_calcs.calc_int_ext(
+        int_ext_dict = barrel_interior_exterior_calcs.calc_int_ext(
             domain_id, sheets_df, xy_dict, com, int_ext_dict
         )
 
@@ -458,11 +455,11 @@ class int_ext_pipeline():
         networks = [network for key, network in domain_sheets_dict.items()
                     if domain_id in key]
 
-        if len(sheets) != 2 or len(networks) != 2:
+        if len(list(sheets.keys())) != 2 or len(networks) != 2:
             print('ERROR: incorrect number of sheets retained in {} following '
                   'solvent accessibility calculation'.format(domain_id))
             sec_struct_dfs_dict[domain_id] = None
-            for sheet in sheets:
+            for sheet in list(sheets.keys()):
                 domain_sheets_dict[sheet] = None
             unprocessed_list.append(domain_id)
 
@@ -475,7 +472,7 @@ class int_ext_pipeline():
 
         # Calculates z-axis between the two beta-sheets
         sheet_ids = [sheet.replace('{}_sheet_'.format(domain_id), '') for sheet
-                     in sheets if sheet != '']
+                     in list(sheets.keys()) if sheet != '']
         sheets_df = dssp_df[dssp_df['SHEET_NUM'].isin(sheet_ids)]
         sheets_df = sheets_df.reset_index(drop=True)
         xyz_coords = sandwich_interior_exterior_calcs.find_z_axis(
