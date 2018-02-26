@@ -103,7 +103,7 @@ class gen_output(run_stages):
                           if strand != '']
 
             for strand_num in df_strands:
-                num_of_edges = len(G.neighbors(strand_num))
+                num_of_edges = len(list(G.neighbors(strand_num)))
                 if num_of_edges == 1:
                     edge_id = 'edge'
                 elif num_of_edges > 1:

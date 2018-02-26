@@ -20,23 +20,23 @@ class barrel_interior_exterior_calcs():
     def find_strands_network(G):
         # Finds network of interacting neighbouring strands
         nodes_dict = {}
-        strands = nx.nodes(G)
+        strands = list(G.nodes())
 
         for strand in strands:
-            nodes_dict[strand] = len(G.neighbors(strand))
+            nodes_dict[strand] = len(list(G.neighbors(strand)))
 
         # Removes edge strands to find a closed circle of interacting strands
         # (note that this approach assumes only one closed circle is present in
         # the input network)
         while min(list(nodes_dict.values())) < 2:
             for strand in strands:
-                if len(G.neighbors(strand)) < 2:
+                if len(list(G.neighbors(strand))) < 2:
                     G.remove_node(strand)
                     del nodes_dict[strand]
 
-            strands = nx.nodes(G)
+            strands = list(G.nodes())
             for strand in strands:
-                nodes_dict[strand] = len(G.neighbors(strand))
+                nodes_dict[strand] = len(list(G.neighbors(strand)))
 
         # Makes list of strands in closed circle network
         strands = nx.cycle_basis(G)[0]  # Finds first complete cycle
@@ -224,7 +224,7 @@ class sandwich_interior_exterior_calcs():
         for G in networks:
             strands = nx.nodes(G)
             for strand in strands:
-                if len(G.neighbors(strand)) == 1:
+                if len(list(G.neighbors(strand))) == 1:
                     edges.append(strand)
 
         # Finds centre of mass of the C_alpha atoms of each edge strand
@@ -258,7 +258,7 @@ class sandwich_interior_exterior_calcs():
         # the sandwich)
         dist_dict = {}
         for strand in edges:
-            if ((strand_1 != strand) and (strand_1 not in G.neighbors(strand))):
+            if ((strand_1 != strand) and (strand_1 not in list(G.neighbors(strand)))):
                 dist = math.sqrt(((edge_com_dict[strand][0][0] -
                                    edge_com_dict[strand_1][0][0])**2)
                                  + ((edge_com_dict[strand][1][0] -

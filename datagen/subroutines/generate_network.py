@@ -121,7 +121,7 @@ class network_calcs():
             G.add_edge(pair[0], pair[1], attr=strand_pairs[pair])
 
         # Discards sheets with fewer than 3 beta-strands
-        if nx.number_of_nodes(G) > 2:
+        if G.number_of_nodes() > 2:
             domain_sheets['{}_sheet_{}'.format(domain_id, sheet)] = G
             domain_sheets_dict['{}_sheet_{}'.format(domain_id, sheet)] = G
             # Adds strand pairs in retained sheets to edge_labels
