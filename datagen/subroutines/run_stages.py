@@ -141,14 +141,15 @@ class run_stages():
         sec_struct_dfs_dict, domain_sheets_dict = beta_structure.run_naccess(
             sec_struct_dfs_dict, domain_sheets_dict
         )
-        if self.code[0:4] in ['2.60']:
-            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_core_ext(
-                sec_struct_dfs_dict, domain_sheets_dict
-            )
 
         if self.code[0:4] in ['2.40']:
             beta_structure = find_interior_exterior_surfaces(self.run_parameters)
             sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
+                sec_struct_dfs_dict, domain_sheets_dict
+            )
+
+        if self.code[0:4] in ['2.60']:
+            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_core_ext(
                 sec_struct_dfs_dict, domain_sheets_dict
             )
 

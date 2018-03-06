@@ -1,6 +1,7 @@
 
 import sys
 import math
+import copy
 import itertools
 import isambard
 import pandas as pd
@@ -17,13 +18,22 @@ else:
 
 class barrel_interior_exterior_calcs():
 
-    def find_strands_network(G):
-        # Finds network of interacting neighbouring strands
+    def find_strands_network(G, domain_id, unprocessed_list):
+        # Finds network of interacting neighbouring strands (used to remove
+        # additional strands that don't form part of the main barrel (and so
+        # which may disrupt z-axis alignment in subsequent steps))
         nodes_dict = {}
         strands = list(G.nodes())
+        orig_strands = copy.copy(strands)
 
         for strand in strands:
             nodes_dict[strand] = len(list(G.neighbors(strand)))
+
+        # If no closed circle of interacting strands, takes all strands
+        # forwards for further analysis
+        if len(nx.cycle_basis(G)) == 0:
+            unprocessed_list.append(domain_id)
+            return orig_strands, unprocessed_list
 
         # Removes edge strands to find a closed circle of interacting strands
         # (note that this approach assumes only one closed circle is present in
@@ -35,13 +45,17 @@ class barrel_interior_exterior_calcs():
                     del nodes_dict[strand]
 
             strands = list(G.nodes())
-            for strand in strands:
-                nodes_dict[strand] = len(list(G.neighbors(strand)))
+            if len(strands) == 0:
+                break
+            else:
+                for strand in strands:
+                    nodes_dict[strand] = len(list(G.neighbors(strand)))
 
         # Makes list of strands in closed circle network
-        strands = nx.cycle_basis(G)[0]  # Finds first complete cycle
+        strand_cycles = nx.cycle_basis(G)
+        strands = max(strand_cycles, key=len)  # Finds longest complete cycle
 
-        return strands
+        return strands, unprocessed_list
 
     def find_z_axis(strands, sheets_df):
         # Finds axis through the barrel pore as the line that passes through
@@ -140,8 +154,7 @@ class barrel_interior_exterior_calcs():
 
         return xy_dict
 
-    def calc_average_coordinates(domain_id, xy_dict, sheets_df,
-                                 unprocessed_list):
+    def calc_average_coordinates(domain_id, xy_dict, sheets_df):
         # Calculates average xy coordinates of the barrel C_alpha atoms
         x_sum = 0
         y_sum = 0
@@ -153,17 +166,12 @@ class barrel_interior_exterior_calcs():
                 y_sum += xy_dict[res_id][1][0]
                 count += 1
 
-        if count > 0:
-            x_average = x_sum / count
-            y_average = y_sum / count
-            com = np.array([[x_average],
-                            [y_average]])
-        else:
-            print('ERROR: Unable to identify xyz coordinates for interior / '
-                  'exterior calculation')
-            unprocessed_list.append(domain_id)
+        x_average = x_sum / count
+        y_average = y_sum / count
+        com = np.array([[x_average],
+                        [y_average]])
 
-        return com, unprocessed_list
+        return com
 
     def calc_int_ext(domain_id, sheets_df, xy_dict, com, int_ext_dict):
         # Calculates whether a residue faces towards the interior or the
@@ -175,11 +183,12 @@ class barrel_interior_exterior_calcs():
             res_dict[res_id] = sheets_df['RESNAME'].tolist()[index]
 
         for res_id in list(res_dict.keys()):
-            if ((not 'GLY' in res_dict[res_id])
+            if (
+                (not 'GLY' in res_dict[res_id])
                 and all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
-                                for x in ['N', 'CA', 'C', 'O', 'CB']
-                                )
-                ):
+                        for x in ['N', 'CA', 'C', 'O', 'CB']
+                        )
+            ):
                 # Calculates angle between C_alpha, C_beta and the centre of
                 # mass
                 c_alpha_x = xy_dict['{}_CA'.format(res_id)][0][0]
@@ -401,14 +410,27 @@ class int_ext_pipeline():
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-        # Creates dataframe of residues in barrel
+        # Creates dataframe of CA atoms in barrel
         sheet_num = list(sheets.keys())[0].replace('{}_sheet_'.format(domain_id), '')
         sheets_df = dssp_df[dssp_df['SHEET_NUM'] == sheet_num]
         sheets_df = sheets_df.reset_index(drop=True)
 
         # Finds network of interacting neighbouring strands
         G = list(sheets.values())[0]
-        strands = barrel_interior_exterior_calcs.find_strands_network(G)
+        strands, unprocessed_list = barrel_interior_exterior_calcs.find_strands_network(
+            G, domain_id, unprocessed_list
+        )
+
+        # Checks complete circle of hydrogen bonded strands is present in domain
+        if domain_id in unprocessed_list:
+            print('ERROR: domain {} does not contain closed circular network '
+                  'of hydrogen-bonded strands'.format(domain_id))
+            sec_struct_dfs_dict[domain_id] = None
+            for sheet in list(sheets.keys()):
+                domain_sheets_dict[sheet] = None
+            unprocessed_list.append(domain_id)
+
+            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
         # Finds axis through barrel pore
         xyz_coords = barrel_interior_exterior_calcs.find_z_axis(strands, sheets_df)
@@ -423,8 +445,8 @@ class int_ext_pipeline():
         int_ext_dict = OrderedDict()
 
         # Calculates average xy coordinates of the barrel C_alpha atoms
-        com, unprocessed_list = barrel_interior_exterior_calcs.calc_average_coordinates(
-            domain_id, xy_dict, sheets_df, unprocessed_list
+        com = barrel_interior_exterior_calcs.calc_average_coordinates(
+            domain_id, xy_dict, sheets_df
         )
 
         # Calculates interior- and exterior-facing residues
@@ -436,8 +458,8 @@ class int_ext_pipeline():
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(int_ext_dict.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                ):
                 int_ext_list[row] = int_ext_dict[res_id]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
@@ -493,8 +515,8 @@ class int_ext_pipeline():
         int_ext_list = ['']*dssp_df.shape[0]
         for row in range(dssp_df.shape[0]):
             if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                ):
                 int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)

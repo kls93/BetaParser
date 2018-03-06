@@ -178,6 +178,26 @@ class network_calcs():
             'Beta_strands/{}_network.png'.format(domain_id)
         )
 
+    def remove_small_sheets(domain_id, dssp_df, domain_sheets):
+        # Removes sheets formed from 2 or fewer beta-strands from residues
+        # dataframe (dssp_df)
+        res_id_to_remove = []
+        sheets = [sheet.replace('{}_sheet_'.format(domain_id), '') for sheet in
+                  list(domain_sheets.keys())]
+        sheets.append('')
+
+        for row in range(dssp_df.shape[0]):
+            if dssp_df['SHEET_NUM'][row] not in sheets:
+                res_id_to_remove.append(dssp_df['RES_ID'][row])
+
+        for row in range(dssp_df.shape[0]):
+            if dssp_df['RES_ID'][row] in res_id_to_remove:
+                dssp_df.loc[row, 'REC'] = None
+        dssp_df = dssp_df[dssp_df['REC'].notnull()]
+        dssp_df = dssp_df.reset_index(drop=True)
+
+        return dssp_df
+
 
 class calculate_beta_network(run_stages):
 
@@ -216,7 +236,6 @@ class calculate_beta_network(run_stages):
                     domain_id, sheet, strand_pairs, edge_labels, domain_sheets,
                     domain_sheets_dict
                 )
-            sec_struct_dfs_dict[domain_id] = dssp_df
 
             if (
                     domain_sheets and
@@ -227,6 +246,10 @@ class calculate_beta_network(run_stages):
             ):
                 network_calcs.write_network_pdb(domain_id, dssp_df, domain_sheets)
                 network_calcs.draw_network(domain_id, domain_sheets, edge_labels)
+                dssp_df = network_calcs.remove_small_sheets(
+                    domain_id, dssp_df, domain_sheets
+                )
+                sec_struct_dfs_dict[domain_id] = dssp_df
             else:
                 sec_struct_dfs_dict[domain_id] = None
                 for sheet_id in list(domain_sheets.keys()):

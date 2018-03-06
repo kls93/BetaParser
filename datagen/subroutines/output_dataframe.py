@@ -25,11 +25,13 @@ class output_calcs():
         pdb_code = domain_id[0:4]
         res_ids_list = strand_df['RES_ID'].tolist()
         strand_coordinates = OrderedDict()
+        in_database = False
         lower_bound = 0
         upper_bound = 0
         reverse = False
 
         if os.path.isfile('{}/{}.pdb'.format(opm_database, pdb_code)):
+            in_database = True
             with open('{}/{}.pdb'.format(opm_database, pdb_code), 'r') as opm_file:
                 for line in opm_file:
                     if line[17:20].strip() != 'DUM':  # Don't put as 'and'
@@ -37,7 +39,7 @@ class output_calcs():
                         if line[0:6].strip() in ['ATOM', 'HETATM']:
                             chain_res_num = line[21:27].replace(' ', '')
                             if (line[12:16].strip() == 'CA'
-                                    and chain_res_num in res_ids_list
+                                        and chain_res_num in res_ids_list
                                     ):
                                 strand_coordinates[chain_res_num] = float(line[46:54])
                     else:
@@ -53,10 +55,10 @@ class output_calcs():
                 if z_coordinates[0] < z_coordinates[-1]:
                     reverse = True
 
-        return (reverse, res_ids_list, strand_coordinates, lower_bound,
-                upper_bound, unprocessed_list)
+        return (in_database, reverse, res_ids_list, strand_coordinates,
+                lower_bound, upper_bound, unprocessed_list)
 
-    def determine_tm_or_ext(domain_id, strand_id, res_ids_list,
+    def determine_tm_or_ext(domain_id, strand_id, res_ids_list, in_database,
                             strand_coordinates, lower_bound, upper_bound,
                             unprocessed_list):
         # If the parent structure is in the OPM database, labels residues in an
@@ -66,7 +68,10 @@ class output_calcs():
 
         tm_ext_list = [''] * len(res_ids_list)
 
-        if '{}_strand_{}'.format(domain_id, strand_id) not in unprocessed_list:
+        if (
+            in_database is True
+            and '{}_strand_{}'.format(domain_id, strand_id) not in unprocessed_list
+        ):
             for index, res_id in enumerate(res_ids_list):
                 z_coord = strand_coordinates[res_id]
                 if z_coord < lower_bound or z_coord > upper_bound:
@@ -113,7 +118,7 @@ class gen_output(run_stages):
             edge_or_central_list = ['']*dssp_df.shape[0]
             for row in range(dssp_df.shape[0]):
                 if (dssp_df['STRAND_NUM'][row] in list(edge_or_central_dict.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
+                            and dssp_df['ATMNAME'][row] == 'CA'
                         ):
                     edge_or_central_list[row] = edge_or_central_dict[dssp_df['STRAND_NUM'][row]]
             df_edge_or_central = pd.DataFrame({'EDGE_OR_CNTRL': edge_or_central_list})
@@ -163,8 +168,9 @@ class gen_output(run_stages):
 
                 # If the strand's parent structure is in the OPM database,
                 # determines the orientation of the strand in the OM
-                (reverse, res_ids_list, strand_coordinates, lower_bound, upper_bound,
-                 unprocessed_list) = output_calcs.determine_strand_orientation(
+                (in_database, reverse, res_ids_list, strand_coordinates,
+                 lower_bound, upper_bound, unprocessed_list
+                 ) = output_calcs.determine_strand_orientation(
                     domain_id, strand_num, strand_df, opm_database, unprocessed_list
                 )
 
@@ -277,8 +283,9 @@ class gen_output(run_stages):
                 # strand - MUST COME AFTER REVERSAL (OR NOT) OF RES_IDS_LIST
                 if self.code[0:4] in ['2.40']:
                     tm_ext_list = output_calcs.determine_tm_or_ext(
-                        domain_id, strand_num, res_ids_list, strand_coordinates,
-                        lower_bound, upper_bound, unprocessed_list
+                        domain_id, strand_num, res_ids_list, in_database,
+                        strand_coordinates, lower_bound, upper_bound,
+                        unprocessed_list
                     )
                     # Don't need to reverse list as will match res_ids_list
                     # order (which has already been reversed)

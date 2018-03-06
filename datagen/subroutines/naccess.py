@@ -51,7 +51,7 @@ class naccess_solv_acsblty_calcs():
         max_solv_acsblty = max(list(solv_acsblty_dict.keys()))
         beta_barrel = solv_acsblty_dict[max_solv_acsblty]
         solv_acsblty_dict = OrderedDict()
-        solv_acsblty_dict[max_solv_acsblty] = beta_barrel
+        solv_acsblty_dict[max_solv_acsblty] = [beta_barrel]
 
         return solv_acsblty_dict
 
