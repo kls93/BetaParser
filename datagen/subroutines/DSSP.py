@@ -221,24 +221,3 @@ class beta_structure_dssp_classification(run_stages):
             sec_struct_dfs_dict[domain_id] = filtered_extnd_df
 
         return all_atoms_dfs_dict, sec_struct_dfs_dict
-
-    def write_dssp_sec_struct_pdb(self, sec_struct_dfs_dict):
-        # Writes a PDB file of the residues that DSSP classifies as forming a
-        # beta-strand (secondary structure code = 'E'). Individual beta-strands
-        # are separated by 'TER' cards
-        for domain_id, dssp_df in sec_struct_dfs_dict.items():
-            print('Writing PDB file of beta-strands in {}'.format(domain_id))
-
-            strand_number_set = [strand for strand in set(dssp_df['STRAND_NUM'].tolist())
-                                 if strand != '']
-
-            with open('Beta_strands/{}.pdb'.format(domain_id), 'w') as new_pdb_file:
-                for strand in strand_number_set:
-                    dssp_df_strand = dssp_df[dssp_df['STRAND_NUM'] == strand]
-                    chain_res_num = dssp_df_strand['RES_ID'].tolist()
-
-                    for row in range(dssp_df.shape[0]):
-                        if dssp_df['RES_ID'][row] in chain_res_num:
-                            new_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
-
-                    new_pdb_file.write('TER'.ljust(80)+'\n')

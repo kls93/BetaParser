@@ -39,8 +39,8 @@ class output_calcs():
                         if line[0:6].strip() in ['ATOM', 'HETATM']:
                             chain_res_num = line[21:27].replace(' ', '')
                             if (line[12:16].strip() == 'CA'
-                                        and chain_res_num in res_ids_list
-                                    ):
+                                    and chain_res_num in res_ids_list
+                                ):
                                 strand_coordinates[chain_res_num] = float(line[46:54])
                     else:
                         if float(line[46:54]) > upper_bound:
@@ -81,6 +81,35 @@ class output_calcs():
 
         return tm_ext_list
 
+    def determine_strand_position_sandwich(strand_df):
+        strand_abs_displacement = ['']*strand_df.shape[0]
+        strand_percentage_displacement = ['']*strand_df.shape[0]
+        strand_centre = (strand_df.shape[0] - 1) / 2
+
+        for row in range(strand_df.shape[0]):
+            diff = abs(row - strand_centre)
+            strand_abs_displacement[row] = diff
+
+            percentage = (abs(row - strand_centre) / strand_centre) * 100
+            strand_percentage_displacement[row] = round(percentage, 1)
+
+        return strand_abs_displacement, strand_percentage_displacement
+
+    def determine_strand_position_barrel(strand_df, tm_ext_list):
+        membrane_loc = ['']*strand_df.shape[0]
+
+        if 'transmembrane' in tm_ext_list:
+            max_depth = (len(tm_ext_list) - tm_ext_list[::-1].index('transmembrane')) + 1
+
+            count = 0
+            for row in range(strand_df.shape[0]):
+                if tm_ext_list[row] == 'transmembrane':
+                    count += 1
+                    percentage = (count / max_depth) * 100
+                    membrane_loc[row] = round(percentage, 1)
+
+        return membrane_loc
+
 
 class gen_output(run_stages):
 
@@ -118,8 +147,8 @@ class gen_output(run_stages):
             edge_or_central_list = ['']*dssp_df.shape[0]
             for row in range(dssp_df.shape[0]):
                 if (dssp_df['STRAND_NUM'][row] in list(edge_or_central_dict.keys())
-                            and dssp_df['ATMNAME'][row] == 'CA'
-                        ):
+                        and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
                     edge_or_central_list[row] = edge_or_central_dict[dssp_df['STRAND_NUM'][row]]
             df_edge_or_central = pd.DataFrame({'EDGE_OR_CNTRL': edge_or_central_list})
             dssp_df = pd.concat([dssp_df, df_edge_or_central], axis=1)
@@ -148,6 +177,9 @@ class gen_output(run_stages):
         res_ids = []
         edge_or_central = []
         fasta_seq = []
+        strand_abs_pos = []
+        strand_percentage_pos = []
+        tm_pos = []
         int_ext = []
         core_ext = []
         buried_surface_area = []
@@ -257,7 +289,7 @@ class gen_output(run_stages):
 
                 # Generates list of residues that form the beta-sandwich core
                 if self.code[0:4] in ['2.60']:
-                    core_ext_list = strand_df['CORE_OR_EXT'].tolist()
+                    core_ext_list = strand_df['CORE_OR_SURFACE'].tolist()
                     if reverse is True:
                         core_ext_list.reverse()
 
@@ -270,7 +302,7 @@ class gen_output(run_stages):
                 # each residue that is buried in the sandwich as compared with
                 # the individual parent sheet
                 if self.code[0:4] in ['2.60']:
-                    buried_surface_area_list = strand_df['BURIED_SURFACE_AREA'].tolist()
+                    buried_surface_area_list = strand_df['BURIED_SURFACE_AREA (%)'].tolist()
                     if reverse is True:
                         buried_surface_area_list.reverse()
 
@@ -293,6 +325,30 @@ class gen_output(run_stages):
                         tm_ext.append(tm_ext_list)
                     elif strand_or_res == 'res':
                         tm_ext += tm_ext_list
+
+                # Determines positions of residues relative to centre of strand
+                # in sandwiches
+                if self.code[0:4] in ['2.60']:
+                    (strand_abs_displacement, strand_percentage_displacement
+                     ) = output_calcs.determine_strand_position_sandwich(strand_df)
+
+                    if strand_or_res == 'strand':
+                        strand_abs_pos.append(strand_abs_displacement)
+                        strand_percentage_pos.append(strand_percentage_displacement)
+                    elif strand_or_res == 'res':
+                        strand_abs_pos += strand_abs_displacement
+                        strand_percentage_pos += strand_percentage_displacement
+
+                # Determines positions of residues in TM region of strand in
+                # beta-barrel - MUST COME AFTER TM / EXTERNAL CALCULATION
+                if self.code[0:4] in ['2.40']:
+                    membrane_loc = output_calcs.determine_strand_position_barrel(
+                        strand_df, tm_ext_list
+                    )
+                    if strand_or_res == 'strand':
+                        tm_pos.append(membrane_loc)
+                    elif strand_or_res == 'res':
+                        tm_pos += membrane_loc
 
                 # Generates list of phi and psi angles along the strand
                 phi = strand_df['PHI'].tolist()
@@ -326,13 +382,15 @@ class gen_output(run_stages):
                                             'SHEAR_NUMBER': shear_number,
                                             'RES_ID': res_ids,
                                             'FASTA': fasta_seq,
+                                            'STRAND_POS(%)': tm_pos,
                                             'INT_EXT': int_ext,
                                             'TM_OR_EXT': tm_ext,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_acsblty})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[6]] + [cols[7]] + [cols[9]] + [cols[4]] + [cols[3]] +
-                    [cols[1]] + [cols[2]] + [cols[8]] + [cols[0]] + [cols[5]])
+            cols = ([cols[6]] + [cols[8]] + [cols[10]] + [cols[4]] + [cols[3]] +
+                    [cols[1]] + [cols[2]] + [cols[7]] + [cols[9]] + [cols[0]] +
+                    [cols[5]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
@@ -342,13 +400,15 @@ class gen_output(run_stages):
                                             'EDGE_OR_CNTRL': edge_or_central,
                                             'RES_ID': res_ids,
                                             'FASTA': fasta_seq,
-                                            'CORE_OR_EXT': core_ext,
-                                            'BURIED_SURFACE_AREA': buried_surface_area,
+                                            'STRAND_POS(ABS)': strand_abs_pos,
+                                            'STRAND_POS(%)': strand_percentage_pos,
+                                            'CORE_OR_SURFACE': core_ext,
+                                            'BURIED_SURFACE_AREA()%)': buried_surface_area,
                                             'BCKBN_GEOM': bckbn_phi_psi,
                                             'SOLV_ACSBLTY': solv_acsblty})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[7]] + [cols[3]] + [cols[5]] + [cols[4]] + [cols[2]]
-                    + [cols[1]] + [cols[0]] + [cols[6]])
+            cols = ([cols[7]] + [cols[3]] + [cols[5]] + [cols[4]] + [cols[8]] +
+                    [cols[9]] + [cols[2]] + [cols[1]] + [cols[0]] + [cols[6]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))

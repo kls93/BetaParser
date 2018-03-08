@@ -108,7 +108,6 @@ class run_stages():
         all_atoms_dfs_dict, sec_struct_dfs_dict = beta_structure.get_dssp_sec_struct_df(
             dssp_residues_dict, all_atoms_dfs_dict
         )
-        beta_structure.write_dssp_sec_struct_pdb(sec_struct_dfs_dict)
         del dssp_residues_dict  # To save memory and reduce the number of
         # variables considered
 
@@ -141,15 +140,14 @@ class run_stages():
         sec_struct_dfs_dict, domain_sheets_dict = beta_structure.run_naccess(
             sec_struct_dfs_dict, domain_sheets_dict
         )
-
-        if self.code[0:4] in ['2.40']:
-            beta_structure = find_interior_exterior_surfaces(self.run_parameters)
-            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
+        if self.code[0:4] in ['2.60']:
+            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_core_ext(
                 sec_struct_dfs_dict, domain_sheets_dict
             )
 
-        if self.code[0:4] in ['2.60']:
-            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_core_ext(
+        beta_structure = find_interior_exterior_surfaces(self.run_parameters)
+        if self.code[0:4] in ['2.40', '2.60']:
+            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
                 sec_struct_dfs_dict, domain_sheets_dict
             )
 
@@ -190,7 +188,7 @@ class run_stages():
             del opm_df  # To save memory and reduce the number of variables
             # considered
 
-        if self.code[0:4] in ['2.60']:
+        elif self.code[0:4] in ['2.60']:
             sec_struct_dfs_dict = output.identify_edge_central(
                 domain_sheets_dict, sec_struct_dfs_dict
             )

@@ -169,8 +169,8 @@ def find_barrel_shear_number(self, sec_struct_dfs_dict):
                 shear_pairs = [[h_bonded_res_2_b, h_bonded_res_3_a],
                                [h_bonded_res_2_a, h_bonded_res_3_b]]
                 if (not any(x in [None, 0] for x in [dssp_num for pair in
-                                                     shear_pairs for dssp_num in pair])
-                    ):
+                                                         shear_pairs for dssp_num in pair])
+                        ):
                     for pair in shear_pairs:
                         print(pair)  # DELETE ME
                         if int(res_1) in pair:

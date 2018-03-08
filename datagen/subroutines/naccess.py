@@ -172,8 +172,8 @@ class naccess_solv_acsblty_calcs():
         # accessibility calculations show that none of the retained beta-sheets
         # are in contact with one another
         if (code[0:4] in ['2.60']
-                and max(list(solv_acsblty_dict.keys())) == 0.0
-            ):
+                    and max(list(solv_acsblty_dict.keys())) == 0.0
+                ):
             unprocessed_list.append(domain_id)
             sec_struct_dfs_dict[domain_id] = None
             for sheet_id in sheets:
@@ -202,8 +202,8 @@ class naccess_solv_acsblty_calcs():
                     dssp_df.loc[row, 'REC'] = None
 
                 if (res_id in list(res_solv_acsblty.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                        and dssp_df['ATMNAME'][row] == 'CA'
+                        ):
                     solv_acsblty_list[row] = res_solv_acsblty[res_id]
 
         solv_acsblty_df = pd.DataFrame({'SOLV_ACSBLTY': solv_acsblty_list})
@@ -213,6 +213,26 @@ class naccess_solv_acsblty_calcs():
         sec_struct_dfs_dict[domain_id] = dssp_df
 
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+
+    def write_domain_pdb(domain_id, dssp_df, sheets):
+        # Writes a PDB file of the residues that form the beta-barrel /
+        # -sandwich as determined from sheet surface solvent accessibility
+        # calculations performed in the previous steps. Individual beta-strands
+        # are separated by 'TER' cards
+        print('Writing PDB file of beta-strands in {}'.format(domain_id))
+
+        strand_number_set = [strand for strand in set(dssp_df['STRAND_NUM'].tolist())
+                             if strand != '']
+
+        with open('Beta_strands/{}.pdb'.format(domain_id), 'w') as new_pdb_file:
+            for strand in strand_number_set:
+                dssp_df_strand = dssp_df[dssp_df['STRAND_NUM'] == strand]
+                chain_res_num = dssp_df_strand['RES_ID'].tolist()
+
+                for row in range(dssp_df.shape[0]):
+                    if dssp_df['RES_ID'][row] in chain_res_num:
+                        new_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
+                    new_pdb_file.write('TER'.ljust(80)+'\n')
 
     def calc_core_residues_sandwich(domain_id, dssp_df, sheets,
                                     sec_struct_dfs_dict, domain_sheets_dict,
@@ -318,31 +338,31 @@ class naccess_solv_acsblty_calcs():
                     # discriminate well between core and external residues
                     core_ext_combined[res] = 'core'
                 elif buried_surface_area < 5:
-                    core_ext_combined[res] = 'external'
+                    core_ext_combined[res] = 'surface'
             elif solv_acsblty_indv != 0 and solv_acsblty_combined != 0:
-                buried_surface_area = ((solv_acsblty_indv - solv_acsblty_combined)
-                                       / solv_acsblty_indv)
+                buried_surface_area = round((((solv_acsblty_indv - solv_acsblty_combined)
+                                              / solv_acsblty_indv) * 100), 3)
                 buried_surface_area_dict[res] = buried_surface_area
-                if buried_surface_area >= 0.20:
+                if buried_surface_area >= 20:
                     # 20% is an arbitrarily selected value that I have found to
                     # discriminate well between core and external residues
                     core_ext_combined[res] = 'core'
-                elif buried_surface_area < 0.20:
-                    core_ext_combined[res] = 'external'
+                elif buried_surface_area < 20:
+                    core_ext_combined[res] = 'surface'
 
         # Updates dataframe with solvent accessibility information
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(core_ext_combined.keys())
-                and dssp_df['ATMNAME'][row] == 'CA'
-                ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
                 core_ext_list[row] = core_ext_combined[res_id]
             if (res_id in list(buried_surface_area_dict.keys())
-                and dssp_df['ATMNAME'][row] == 'CA'
-                ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
                 buried_surface_area_list[row] = buried_surface_area_dict[res_id]
-        core_ext_df = pd.DataFrame({'CORE_OR_EXT': core_ext_list,
-                                    'BURIED_SURFACE_AREA': buried_surface_area_list})
+        core_ext_df = pd.DataFrame({'CORE_OR_SURFACE': core_ext_list,
+                                    'BURIED_SURFACE_AREA (%)': buried_surface_area_list})
         dssp_df = pd.concat([dssp_df, core_ext_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
 
@@ -402,6 +422,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
                 res_solv_acsblty, sec_struct_dfs_dict, domain_sheets_dict,
                 unprocessed_list_2
             )
+            naccess_solv_acsblty_calcs.write_domain_pdb(domain_id, dssp_df, sheets)
 
         sec_struct_dfs_dict = OrderedDict(
             {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
