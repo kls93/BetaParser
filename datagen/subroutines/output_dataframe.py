@@ -99,7 +99,7 @@ class output_calcs():
         membrane_loc = ['']*strand_df.shape[0]
 
         if 'transmembrane' in tm_ext_list:
-            max_depth = (len(tm_ext_list) - tm_ext_list[::-1].index('transmembrane')) + 1
+            max_depth = (len(tm_ext_list) - tm_ext_list[::-1].index('transmembrane'))
 
             count = 0
             for row in range(strand_df.shape[0]):
@@ -184,7 +184,10 @@ class gen_output(run_stages):
         core_ext = []
         buried_surface_area = []
         tm_ext = []
-        bckbn_phi_psi = []
+        omega = []
+        phi = []
+        psi = []
+        chi = []
         solv_acsblty = []
 
         unprocessed_list = []
@@ -350,19 +353,27 @@ class gen_output(run_stages):
                     elif strand_or_res == 'res':
                         tm_pos += membrane_loc
 
-                # Generates list of phi and psi angles along the strand
-                phi = strand_df['PHI'].tolist()
-                psi = strand_df['PSI'].tolist()
+                # Generates list of torsion angles along the strand
+                omega_angles = strand_df['OMEGA'].tolist()
+                phi_angles = strand_df['PHI'].tolist()
+                psi_angles = strand_df['PSI'].tolist()
+                chi_angles = strand_df['CHI_ANGLES'].tolist()
                 if reverse is True:
-                    phi.reverse()
-                    psi.reverse()
-                bckbn_geom = [[phi[index], psi[index]] for index, value in
-                              enumerate(phi)]
+                    omega_angles.reverse()
+                    phi_angles.reverse()
+                    psi_angles.reverse()
+                    chi_angles.reverse()
 
                 if strand_or_res == 'strand':
-                    bckbn_phi_psi.append(bckbn_geom)
+                    omega.append(omega_angles)
+                    phi.append(phi_angles)
+                    psi.append(psi_angles)
+                    chi.append(chi_angles)
                 elif strand_or_res == 'res':
-                    bckbn_phi_psi += bckbn_geom
+                    omega += omega_angles
+                    phi += phi_angles
+                    psi += psi_angles
+                    chi += chi_angles
 
                 # Generates list of residue solvent accessibility along the
                 # strand
@@ -385,12 +396,15 @@ class gen_output(run_stages):
                                             'STRAND_POS(%)': tm_pos,
                                             'INT_EXT': int_ext,
                                             'TM_OR_EXT': tm_ext,
-                                            'BCKBN_GEOM': bckbn_phi_psi,
+                                            'OMEGA': omega,
+                                            'PHI': phi,
+                                            'PSI': psi,
+                                            'CHI_ANGLES': chi,
                                             'SOLV_ACSBLTY': solv_acsblty})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[6]] + [cols[8]] + [cols[10]] + [cols[4]] + [cols[3]] +
-                    [cols[1]] + [cols[2]] + [cols[7]] + [cols[9]] + [cols[0]] +
-                    [cols[5]])
+            cols = ([cols[9]] + [cols[11]] + [cols[13]] + [cols[7]] + [cols[6]]
+                    + [cols[1]] + [cols[10]] + [cols[2]] + [cols[12]] +
+                    [cols[3]] + [cols[4]] + [cols[5]] + [cols[0]] + [cols[8]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
@@ -404,11 +418,15 @@ class gen_output(run_stages):
                                             'STRAND_POS(%)': strand_percentage_pos,
                                             'CORE_OR_SURFACE': core_ext,
                                             'BURIED_SURFACE_AREA()%)': buried_surface_area,
-                                            'BCKBN_GEOM': bckbn_phi_psi,
+                                            'OMEGA': omega,
+                                            'PHI': phi,
+                                            'PSI': psi,
+                                            'CHI_ANGLES': chi,
                                             'SOLV_ACSBLTY': solv_acsblty})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[7]] + [cols[3]] + [cols[5]] + [cols[4]] + [cols[8]] +
-                    [cols[9]] + [cols[2]] + [cols[1]] + [cols[0]] + [cols[6]])
+            cols = ([cols[9]] + [cols[3]] + [cols[8]] + [cols[4]] + [cols[12]]
+                    + [cols[11]] + [cols[2]] + [cols[0]] + [cols[5]] +
+                    [cols[6]] + [cols[7]] + [cols[1]] + [cols[10]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))

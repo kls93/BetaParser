@@ -122,7 +122,7 @@ class barrel_interior_exterior_calcs():
 
         # Creates ampal object from barrel
         barrel = isambard.ampal.convert_pdb_to_ampal(
-            'Beta_strands/{}.pdb'.format(list(sheets.keys())[0])
+            'Beta_strands/{}.pdb'.format(domain_id)
         )
 
         # Aligns the barrel with z = 0

@@ -129,9 +129,11 @@ class run_stages():
         if __name__ == 'subroutines.run_stages':
             from subroutines.naccess import calculate_solvent_accessible_surface_area
             from subroutines.find_surfaces import find_interior_exterior_surfaces
+            from subroutines.dihedral_angles import dihedral_angles
         else:
             from datagen.subroutines.naccess import calculate_solvent_accessible_surface_area
             from datagen.subroutines.find_surfaces import find_interior_exterior_surfaces
+            from datagen.subroutines.dihedral_angles import dihedral_angles
 
         with open('Input_ISAMBARD_variables.pkl', 'rb') as pickle_file:
             sec_struct_dfs_dict, domain_sheets_dict = pickle.load(pickle_file)
@@ -150,6 +152,9 @@ class run_stages():
             sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
                 sec_struct_dfs_dict, domain_sheets_dict
             )
+
+        beta_structure = dihedral_angles(self.run_parameters)
+        sec_struct_dfs_dict = beta_structure.calc_dihedral_angles(sec_struct_dfs_dict)
 
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
@@ -201,3 +206,6 @@ class run_stages():
             'res', sec_struct_dfs_dict, opm_database, tilt_angles,
             strand_numbers, shear_numbers
         )
+
+
+# TODO: Pick out neighbouring residues within an X Angstrom radius

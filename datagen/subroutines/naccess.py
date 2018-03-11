@@ -232,7 +232,7 @@ class naccess_solv_acsblty_calcs():
                 for row in range(dssp_df.shape[0]):
                     if dssp_df['RES_ID'][row] in chain_res_num:
                         new_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
-                    new_pdb_file.write('TER'.ljust(80)+'\n')
+                new_pdb_file.write('TER'.ljust(80)+'\n')
 
     def calc_core_residues_sandwich(domain_id, dssp_df, sheets,
                                     sec_struct_dfs_dict, domain_sheets_dict,

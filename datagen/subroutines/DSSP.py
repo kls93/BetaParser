@@ -117,8 +117,6 @@ class beta_structure_dssp_classification(run_stages):
             sheet_number_list = []
             orientation_list = []
             bridge_pair_list = []
-            phi = []
-            psi = []
             lines = []
 
             # Extracts secondary structure information from the DSSP file lines
@@ -127,8 +125,6 @@ class beta_structure_dssp_classification(run_stages):
                     chain_res_num.append(line[11:12].strip() + line[5:11].replace(' ', ''))
                     dssp_num.append(line[0:5].strip())
                     secondary_structure = line[16:17]
-                    phi.append(float(line[91:97]))
-                    psi.append(float(line[97:103]))
                     lines.append(line.strip('\n'))
                     if secondary_structure == 'E':
                         sec_struct_assignment.append(secondary_structure)
@@ -170,8 +166,6 @@ class beta_structure_dssp_classification(run_stages):
             sheet_number_list_extnd_df = ['']*row_num
             orientation_list_extnd_df = ['']*row_num
             bridge_pair_list_extnd_df = ['']*row_num
-            phi_extnd_df = ['']*row_num
-            psi_extnd_df = ['']*row_num
             lines_extnd_df = ['']*row_num
 
             # Fills lists created in the previous step
@@ -187,24 +181,20 @@ class beta_structure_dssp_classification(run_stages):
                             sheet_number_list_extnd_df[row] = sheet_number_list[index_3]
                             orientation_list_extnd_df[row] = orientation_list[index_3]
                             bridge_pair_list_extnd_df[row] = bridge_pair_list[index_3]
-                            phi_extnd_df[row] = phi[index_3]
-                            psi_extnd_df[row] = psi[index_3]
                             lines_extnd_df[row] = lines[index_3]
                             break
 
             # Appends DSSP info to dataframe of PDB info
-            dssp_df = pd.DataFrame({'DSSP_NUM': dssp_num_extnd_df,
+            dssp_df = pd.DataFrame({'DSSP_FILE_LINES': lines_extnd_df,
+                                    'DSSP_NUM': dssp_num_extnd_df,
                                     'SHEET?': sec_struct_assignment_extnd_df,
                                     'STRAND_NUM': strand_number_list_extnd_df,
                                     'SHEET_NUM': sheet_number_list_extnd_df,
                                     'ORIENTATION': orientation_list_extnd_df,
-                                    'H-BONDS': bridge_pair_list_extnd_df,
-                                    'PHI': phi_extnd_df,
-                                    'PSI': psi_extnd_df,
-                                    'DSSP_FILE_LINES': lines_extnd_df})
+                                    'H-BONDS': bridge_pair_list_extnd_df})
             cols = dssp_df.columns.tolist()
-            cols = ([cols[0]] + [cols[1]] + [cols[6]] + [cols[8]] + [cols[7]]
-                    + [cols[3]] + [cols[2]] + [cols[4]] + [cols[5]])
+            cols = ([cols[0]] + [cols[1]] + [cols[4]] + [cols[6]] + [cols[5]]
+                    + [cols[3]] + [cols[2]])
             dssp_df = dssp_df[cols]
 
             extnd_df = pd.concat([pdb_df, dssp_df], axis=1)
