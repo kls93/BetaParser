@@ -99,7 +99,7 @@ class output_calcs():
         membrane_loc = ['']*strand_df.shape[0]
 
         if 'transmembrane' in tm_ext_list:
-            max_depth = (len(tm_ext_list) - tm_ext_list[::-1].index('transmembrane'))
+            max_depth = tm_ext_list.count('transmembrane')
 
             count = 0
             for row in range(strand_df.shape[0]):
@@ -177,6 +177,7 @@ class gen_output(run_stages):
         res_ids = []
         edge_or_central = []
         fasta_seq = []
+        z_coords = []
         strand_abs_pos = []
         strand_percentage_pos = []
         tm_pos = []
@@ -277,6 +278,21 @@ class gen_output(run_stages):
                     fasta_seq.append(sequence)
                 elif strand_or_res == 'res':
                     fasta_seq += sequence
+
+                # Generates list of strand z-coordinates
+                if self.code[0:4] in ['2.40']:
+                    if strand_coordinates:
+                        strand_z_coords = list(strand_coordinates.values())
+                    else:
+                        strand_z_coords = ['']*len(res_ids_list)
+
+                    if reverse is True:
+                        strand_z_coords.reverse()
+
+                    if strand_or_res == 'strand':
+                        z_coords.append(strand_z_coords)
+                    elif strand_or_res == 'res':
+                        z_coords += strand_z_coords
 
                 # Generates list of interior and exterior facing residues in
                 # the strand
@@ -393,6 +409,7 @@ class gen_output(run_stages):
                                             'SHEAR_NUMBER': shear_number,
                                             'RES_ID': res_ids,
                                             'FASTA': fasta_seq,
+                                            'Z_COORDS': z_coords,
                                             'STRAND_POS(%)': tm_pos,
                                             'INT_EXT': int_ext,
                                             'TM_OR_EXT': tm_ext,
@@ -403,8 +420,9 @@ class gen_output(run_stages):
                                             'SOLV_ACSBLTY': solv_acsblty})
             cols = beta_strands_df.columns.tolist()
             cols = ([cols[9]] + [cols[11]] + [cols[13]] + [cols[7]] + [cols[6]]
-                    + [cols[1]] + [cols[10]] + [cols[2]] + [cols[12]] +
-                    [cols[3]] + [cols[4]] + [cols[5]] + [cols[0]] + [cols[8]])
+                    + [cols[1]] + [cols[10]] + [cols[14]] + [cols[2]] +
+                    [cols[12]] + [cols[3]] + [cols[4]] + [cols[5]] + [cols[0]]
+                    + [cols[8]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
