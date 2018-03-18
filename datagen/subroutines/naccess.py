@@ -340,14 +340,14 @@ class naccess_solv_acsblty_calcs():
                 elif buried_surface_area < 5:
                     core_ext_combined[res] = 'surface'
             elif solv_acsblty_indv != 0 and solv_acsblty_combined != 0:
-                buried_surface_area = round((((solv_acsblty_indv - solv_acsblty_combined)
+                buried_surface_area = round(((solv_acsblty_combined
                                               / solv_acsblty_indv) * 100), 3)
                 buried_surface_area_dict[res] = buried_surface_area
-                if buried_surface_area >= 20:
+                if buried_surface_area <= 80:
                     # 20% is an arbitrarily selected value that I have found to
                     # discriminate well between core and external residues
                     core_ext_combined[res] = 'core'
-                elif buried_surface_area < 20:
+                elif buried_surface_area > 80:
                     core_ext_combined[res] = 'surface'
 
         # Updates dataframe with solvent accessibility information
@@ -374,7 +374,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
     def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
 
-    def run_naccess(self, sec_struct_dfs_dict, domain_sheets_dict):
+    def calc_sasa(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Pipeline function for running naccess to calculate solvent accessible
         # surface area
         if __name__ == 'subroutines.naccess':

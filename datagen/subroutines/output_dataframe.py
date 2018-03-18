@@ -40,7 +40,7 @@ class output_calcs():
                             chain_res_num = line[21:27].replace(' ', '')
                             if (line[12:16].strip() == 'CA'
                                     and chain_res_num in res_ids_list
-                                ):
+                                    ):
                                 strand_coordinates[chain_res_num] = float(line[46:54])
                     else:
                         if float(line[46:54]) > upper_bound:
@@ -113,8 +113,9 @@ class output_calcs():
 
 class gen_output(run_stages):
 
-    def __init__(self, run_parameters):
+    def __init__(self, run_parameters, radius):
         run_stages.__init__(self, run_parameters)
+        self.radius = radius
 
     def identify_edge_central(self, domain_sheets_dict, sec_struct_dfs_dict):
         # Uses domain_networks_dict to identify whether strands are edge or
@@ -148,7 +149,7 @@ class gen_output(run_stages):
             for row in range(dssp_df.shape[0]):
                 if (dssp_df['STRAND_NUM'][row] in list(edge_or_central_dict.keys())
                         and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                        ):
                     edge_or_central_list[row] = edge_or_central_dict[dssp_df['STRAND_NUM'][row]]
             df_edge_or_central = pd.DataFrame({'EDGE_OR_CNTRL': edge_or_central_list})
             dssp_df = pd.concat([dssp_df, df_edge_or_central], axis=1)
@@ -190,6 +191,7 @@ class gen_output(run_stages):
         psi = []
         chi = []
         solv_acsblty = []
+        neighbours = []
 
         unprocessed_list = []
 
@@ -402,6 +404,16 @@ class gen_output(run_stages):
                 elif strand_or_res == 'res':
                     solv_acsblty += solv_acsblty_list
 
+                # Generates list of neighbouring residues
+                neighbours_list = strand_df['NEIGHBOURS'].tolist()
+                if reverse is True:
+                    neighbours_list.reverse()
+
+                if strand_or_res == 'strand':
+                    neighbours.append(neighbours_list)
+                elif strand_or_res == 'res':
+                    neighbours += neighbours_list
+
         if self.code[0:4] in ['2.40']:
             beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
                                             'TILT_ANGLE(DEGREES)': tilt_angle,
@@ -417,12 +429,15 @@ class gen_output(run_stages):
                                             'PHI': phi,
                                             'PSI': psi,
                                             'CHI_ANGLES': chi,
-                                            'SOLV_ACSBLTY': solv_acsblty})
+                                            'SOLV_ACSBLTY': solv_acsblty,
+                                            'NEIGHBOURING_RESIDUES(<{}A)'.format(
+                                                self.radius
+                                            ): neighbours})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[9]] + [cols[11]] + [cols[13]] + [cols[7]] + [cols[6]]
-                    + [cols[1]] + [cols[10]] + [cols[14]] + [cols[2]] +
-                    [cols[12]] + [cols[3]] + [cols[4]] + [cols[5]] + [cols[0]]
-                    + [cols[8]])
+            cols = ([cols[10]] + [cols[12]] + [cols[14]] + [cols[8]] +
+                    [cols[5]] + [cols[1]] + [cols[11]] + [cols[15]] + [cols[2]]
+                    + [cols[13]] + [cols[4]] + [cols[5]] + [cols[6]] +
+                    [cols[0]] + [cols[9]] + [cols[3]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
@@ -440,11 +455,14 @@ class gen_output(run_stages):
                                             'PHI': phi,
                                             'PSI': psi,
                                             'CHI_ANGLES': chi,
-                                            'SOLV_ACSBLTY': solv_acsblty})
+                                            'SOLV_ACSBLTY': solv_acsblty,
+                                            'NEIGHBOURING_RESIDUES(<{}A)'.format(
+                                                self.radius
+                                            ): neighbours})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[9]] + [cols[3]] + [cols[8]] + [cols[4]] + [cols[12]]
-                    + [cols[11]] + [cols[2]] + [cols[0]] + [cols[5]] +
-                    [cols[6]] + [cols[7]] + [cols[1]] + [cols[10]])
+            cols = ([cols[10]] + [cols[3]] + [cols[9]] + [cols[4]] + [cols[13]]
+                    + [cols[12]] + [cols[2]] + [cols[0]] + [cols[6]] +
+                    [cols[7]] + [cols[8]] + [cols[1]] + [cols[11]] + [cols[5]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))

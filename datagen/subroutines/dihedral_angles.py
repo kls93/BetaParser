@@ -106,7 +106,7 @@ class side_chain_torsion_angles():
 
 
 class backbone_geometry():
-    # Maybe calculate rise per rsidue, residues per turn and radius of helix
+    # TODO Maybe calculate rise per rsidue, residues per turn and radius of helix
 
     def __init__(self, pdb):
         self.pdb = pdb

@@ -101,8 +101,8 @@ def gen_run_parameters(args):
                 run = run.replace(']', '')
                 run = [cathcode for cathcode in run.split(',')]
                 if (len(run) != 0
-                    and all(run[index].startswith('2') for index, code in enumerate(run))
-                    ):
+                        and all(run[index].startswith('2') for index, code in enumerate(run))
+                        ):
                     run_parameters['id'] = run
                     break
                 else:
@@ -120,8 +120,8 @@ def gen_run_parameters(args):
                 run = run.replace(']', '')
                 run = [scopcode for scopcode in run.split(',')]
                 if (len(run) != 0
-                    and all(run[index].startswith('b') for index, code in enumerate(run))
-                    ):
+                        and all(run[index].startswith('b') for index, code in enumerate(run))
+                        ):
                     run_parameters['id'] = run
                     break
                 else:
@@ -313,22 +313,49 @@ def find_cdhit_input(args):
     return cdhit_entries, cdhit_output
 
 
-def find_opm_database(args):
+def find_radius(args):
+    # Determines radius of sphere for location of nearest neighbours
+    if vars(args)['radius']:
+        radius = vars(args)['radius']
+    else:
+        radius = 0
+        print('Select radius of sphere for identification of neighbouring '
+              'residues:')
+        while radius == 0:
+            radius = input(prompt)
+            try:
+                radius = float(radius)
+                if radius <= 0:
+                    print('Specified radius must be greater than 0')
+                    radius = 0
+                else:
+                    break
+            except ValueError:
+                print('Specified radius must be a number')
+                radius = 0
+
+    return radius
+
+
+def find_opm_database(args, run_parameters):
     # Locates local copy of OPM database (for determining strand orientation of
     # beta barrels in stage 4)
-    if vars(args)['opm']:
-        opm_database = vars(args)['opm']
-        opm_database.replace('\\', '/')
-        opm_database = '/' + opm_database.strip('/')
-    else:
-        opm_database = ''
-
-    while not os.path.isdir(opm_database):
-        print('Specify absolute file path of OPM database:')
-        opm_database = '/' + input(prompt).strip('/')
-        if not os.path.isdir(opm_database):
-            print('Specified file path not recognised')
+    opm_database = ''
+    if (run_parameters['structuredatabase'] == 'CATH'
+            and run_parameters['id'][0:4] in ['2.40']):
+        if vars(args)['opm']:
+            opm_database = vars(args)['opm']
+            opm_database.replace('\\', '/')
+            opm_database = '/' + opm_database.strip('/')
         else:
-            break
+            opm_database = ''
+
+        while not os.path.isdir(opm_database):
+            print('Specify absolute file path of OPM database:')
+            opm_database = '/' + input(prompt).strip('/')
+            if not os.path.isdir(opm_database):
+                print('Specified file path not recognised')
+            else:
+                break
 
     return opm_database

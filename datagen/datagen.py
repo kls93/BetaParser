@@ -11,12 +11,14 @@ import argparse
 def main():
     if __name__ == '__main__':
         from subroutines.run_parameters import (
-            gen_run_parameters, find_cdhit_input, find_opm_database
+            gen_run_parameters, find_cdhit_input, find_radius,
+            find_opm_database
         )
         from subroutines.run_stages import run_stages
     else:
         from datagen.subroutines.run_parameters import (
-            gen_run_parameters, find_cdhit_input, find_opm_database
+            gen_run_parameters, find_cdhit_input, find_radius,
+            find_opm_database
         )
         from datagen.subroutines.run_stages import run_stages
     orig_dir = os.getcwd()
@@ -32,6 +34,9 @@ def main():
                         'of the analysis pipeline')
     parser.add_argument('--opm', help='OPTIONAL: Specifies the absolute file '
                         'path of a local copy of the OPM database')
+    parser.add_argument('--radius', help='OPTIONAL: Specifies the radius of '
+                        'the sphere drawn around each atom when calculating '
+                        'the identities of its nearest neighbouring residues')
     args = parser.parse_args()
 
     # Extracts run parameters and initialises run_stages object
@@ -56,11 +61,12 @@ def main():
     # Runs naccess upon each structure to calculate the solvent accessible
     # surface area of its beta-sheets and thus identify those which interact
     elif stage in ['3']:
-        analysis.run_stage_3()
+        radius = find_radius(args)
+        analysis.run_stage_3(radius)
     # Analyses the summary of structural characteristics of the dataset via
     # random forest machine learning
     elif stage in ['4']:
-        opm_database = find_opm_database(args)
+        opm_database = find_opm_database(args, run_parameters)
         analysis.run_stage_4(orig_dir, opm_database)
 
 

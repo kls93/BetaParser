@@ -173,7 +173,10 @@ class extract_beta_structure_coords(run_stages):
                             element.append(pdb_file_lines[index_4][76:78].strip())
                             charge.append(pdb_file_lines[index_4][78:80].strip())
                             chain_num_ins.append(pdb_file_lines[index_4][21:27].replace(' ', ''))
-                            lines.append(pdb_file_lines[index_4].strip('\n'))
+
+                            line_start = pdb_file_lines[index_4][:16]
+                            line_end = pdb_file_lines[index_4][17:].strip('\n')
+                            lines.append(line_start + ' ' + line_end)
 
                         pdb_file.write('TER'.ljust(80)+'\n')
                         pdb_file.close()

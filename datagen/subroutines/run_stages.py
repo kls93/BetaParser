@@ -123,23 +123,25 @@ class run_stages():
         with open('Input_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
 
-    def run_stage_3(self):
+    def run_stage_3(self, radius):
         # To be run within ISAMBARD. **NOTE** solvent accessibility
         # calculations must be run first.
         if __name__ == 'subroutines.run_stages':
             from subroutines.naccess import calculate_solvent_accessible_surface_area
             from subroutines.find_surfaces import find_interior_exterior_surfaces
             from subroutines.dihedral_angles import dihedral_angles
+            from subroutines.neighbouring_residues import nearest_neighbours
         else:
             from datagen.subroutines.naccess import calculate_solvent_accessible_surface_area
             from datagen.subroutines.find_surfaces import find_interior_exterior_surfaces
             from datagen.subroutines.dihedral_angles import dihedral_angles
+            from datagen.subroutines.neighbouring_residues import nearest_neighbours
 
         with open('Input_ISAMBARD_variables.pkl', 'rb') as pickle_file:
             sec_struct_dfs_dict, domain_sheets_dict = pickle.load(pickle_file)
 
         beta_structure = calculate_solvent_accessible_surface_area(self.run_parameters)
-        sec_struct_dfs_dict, domain_sheets_dict = beta_structure.run_naccess(
+        sec_struct_dfs_dict, domain_sheets_dict = beta_structure.calc_sasa(
             sec_struct_dfs_dict, domain_sheets_dict
         )
         if self.code[0:4] in ['2.60']:
@@ -148,7 +150,7 @@ class run_stages():
             )
 
         beta_structure = find_interior_exterior_surfaces(self.run_parameters)
-        if self.code[0:4] in ['2.40', '2.60']:
+        if self.code[0:4] in ['2.40']:
             sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
                 sec_struct_dfs_dict, domain_sheets_dict
             )
@@ -156,8 +158,14 @@ class run_stages():
         beta_structure = dihedral_angles(self.run_parameters)
         sec_struct_dfs_dict = beta_structure.calc_dihedral_angles(sec_struct_dfs_dict)
 
+        beta_structure = nearest_neighbours(self.run_parameters, radius)
+        sec_struct_dfs_dict = beta_structure.calculate_nearest_neighbours(
+            sec_struct_dfs_dict
+        )
+
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
-            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
+            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict, radius),
+                        pickle_file)
 
     def run_stage_4(self, orig_dir, opm_database):
         if __name__ == 'subroutines.run_stages':
@@ -172,9 +180,9 @@ class run_stages():
             from datagen.subroutines.output_dataframe import gen_output
 
         with open('Output_ISAMBARD_variables.pkl', 'rb') as pickle_file:
-            sec_struct_dfs_dict, domain_sheets_dict = pickle.load(pickle_file)
+            sec_struct_dfs_dict, domain_sheets_dict, radius = pickle.load(pickle_file)
 
-        output = gen_output(self.run_parameters)
+        output = gen_output(self.run_parameters, radius)
 
         tilt_angles = OrderedDict()
         strand_numbers = OrderedDict()
@@ -206,6 +214,3 @@ class run_stages():
             'res', sec_struct_dfs_dict, opm_database, tilt_angles,
             strand_numbers, shear_numbers
         )
-
-
-# TODO: Pick out neighbouring residues within an X Angstrom radius
