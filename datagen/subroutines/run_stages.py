@@ -150,10 +150,9 @@ class run_stages():
             )
 
         beta_structure = find_interior_exterior_surfaces(self.run_parameters)
-        if self.code[0:4] in ['2.40']:
-            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
-                sec_struct_dfs_dict, domain_sheets_dict
-            )
+        sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
+            sec_struct_dfs_dict, domain_sheets_dict
+        )
 
         beta_structure = dihedral_angles(self.run_parameters)
         sec_struct_dfs_dict = beta_structure.calc_dihedral_angles(sec_struct_dfs_dict)

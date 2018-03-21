@@ -245,8 +245,6 @@ class sandwich_interior_exterior_calcs():
                     if pair_2[0] not in list(h_bonds_dict.keys()):
                         h_bonds_dict[pair_2[0]] = pair_2[1]
 
-        print(h_bonds_dict)
-
         # Calculates vectors between C_alpha atoms of hydrogen bonded residues
         vectors_array = np.empty((len(list(h_bonds_dict.keys())), 3))
         for index, res_1 in enumerate(h_bonds_dict.keys()):
@@ -276,8 +274,6 @@ class sandwich_interior_exterior_calcs():
             vectors_array[index][2] = xyz_2[2][0] - xyz_1[2][0]
 
         vector = np.mean(vectors_array, axis=0)
-        print(vectors_array)
-        print(vector)
 
         return vector
 
@@ -318,88 +314,86 @@ class sandwich_interior_exterior_calcs():
                                       [y_coord_atom]])
                 xy_dict[atom_id] = xy_coords
 
+        x_sum = 0
+        y_sum = 0
+        count = 0
+        for res in list(xy_dict.keys()):
+            if 'CA' in res:
+                x_sum += xy_dict[res][0][0]
+                y_sum += xy_dict[res][1][0]
+                count += 1
+        x_avrg = x_sum / count
+        y_avrg = y_sum / count
+
         with open('my_sandwich.pdb', 'w') as pdb_file:
             for line in sandwich_pdb_string:
                 pdb_file.write('{}\n'.format(line))
             pdb_file.write('HETATM    1  N   DUM     1       0.000  0.000   0.000\n')
             pdb_file.write('HETATM    2  O   DUM     2       0.000  0.000   1.000\n')
+            pdb_file.write('HETATM    3  C   DUM     3       {}{}0.000\n'.format(
+                str(round(x_avrg, 3)).rjust(8), str(round(y_avrg, 3)).rjust(8)))
 
         return xy_dict
 
     def calc_int_ext(domain_id, dssp_df, xy_dict):
         # Determines whether a residue is interior- or exterior-facing from
-        # whether its C_beta atom lies within the polygon formed from the
-        # xy-coordinates of the backbone (N, C_alpha and C) atoms of the
-        # sandwich
+        # whether its C_beta atom lies on the same side of the plane between
+        # its N and C atoms as the centre of mass of the sandwich or not
+        # TODO: Update from 2D to 3D (so that alignment along the z-axis is no
+        # longer necessary)
         print('Determining interior and exterior residues in {}'.format(domain_id))
 
-        int_ext_dict = OrderedDict()
+        int_ext_dict = {}
 
-        backbone_coords = []
+        x_sum = 0
+        y_sum = 0
+        count = 0
         for res in list(xy_dict.keys()):
-            if any(x in res for x in ['N', 'CA', 'C']):
-                backbone_coords.append((xy_dict[res][0][0], xy_dict[res][1][0]))
-        outline = Polygon(backbone_coords)
-        print(backbone_coords)
+            if 'CA' in res:
+                x_sum += xy_dict[res][0][0]
+                y_sum += xy_dict[res][1][0]
+                count += 1
+        x_avrg = x_sum / count
+        y_avrg = y_sum / count
 
-        for res in list(xy_dict.keys()):
-            if 'CB' in res:
-                point = Point(xy_dict[res][0][0], xy_dict[res][1][0])
-                if outline.contains(point):
-                    int_ext_dict[res.split('_')[0]] = 'interior'
-                elif not outline.contains(point):
-                    int_ext_dict[res.split('_')[0]] = 'exterior'
+        res_list = list(set(dssp_df['RES_ID'].tolist()))
+        for res in res_list:
+            n = False
+            c = False
+            cb = False
 
-        print(int_ext_dict)
-        import sys
-        sys.exit()
+            xy_sub_dict = {key: value for key, value in xy_dict.items() if res
+                           in key}
+            for atom in list(xy_sub_dict.keys()):
+                if atom.endswith('_N'):
+                    n = True
+                    n_dist = math.sqrt(((xy_sub_dict[atom][0][0] - x_avrg)**2)
+                                       + ((xy_sub_dict[atom][1][0] - y_avrg)**2))
+                    n_x_coord = xy_sub_dict[atom][0][0]
+                    n_y_coord = xy_sub_dict[atom][1][0]
+                elif atom.endswith('_C'):
+                    c = True
+                    c_dist = math.sqrt(((xy_sub_dict[atom][0][0] - x_avrg)**2)
+                                       + ((xy_sub_dict[atom][1][0] - y_avrg)**2))
+                    c_x_coord = xy_sub_dict[atom][0][0]
+                    c_y_coord = xy_sub_dict[atom][1][0]
+                elif atom.endswith('_CB'):
+                    cb = True
+                    cb_x_coord = xy_sub_dict[atom][0][0]
+                    cb_y_coord = xy_sub_dict[atom][1][0]
+
+            distance_com = (((x_avrg-n_x_coord)*(c_y_coord-n_y_coord)) -
+                            ((y_avrg-n_y_coord)*(c_x_coord-n_x_coord)))
+            distance_cb = (((cb_x_coord-n_x_coord)*(c_y_coord-n_y_coord)) -
+                           ((cb_y_coord-n_y_coord)*(c_x_coord-n_x_coord)))
+
+            if all(x is True for x in [n, c, cb]):
+            if (distance_com < 0 and distance_cb < 0) or (distance_com > 0 and distance_cb > 0):
+                int_ext_dict[res] = 'interior'
+            else:
+                int_ext_dict[res] = 'exterior'
 
         return int_ext_dict
-
-    """
-    def calc_int_ext(domain_id, sheets_df, dssp_df, xy_dict):
-        # Determines whether a residue is interior- or exterior-facing from
-        # whether its C_beta atom is closer to the centre of mass of the
-        # sandwich than its C_alpha atom
-        print('Determining interior and exterior residues in {}'.format(domain_id))
-
-        int_ext_dict = OrderedDict()
-        com = np.array([[0.0],
-                        [0.0]])
-
-        for res_id in list(xy_dict.keys()):
-            print(res_id)
-            ca = np.array([])
-            cb = np.array([])
-            for row in range(dssp_df.shape[0]):
-                if (
-                    res_id.split('_')[0] == dssp_df['RES_ID'][row]
-                    and dssp_df['ATMNAME'][row] == 'CA'
-                    and dssp_df['RESNAME'][row] != 'GLY'
-                ):
-                    ca = np.array([[dssp_df['XPOS'][row]],
-                                   [dssp_df['YPOS'][row]]])
-                elif (
-                    res_id.split('_')[0] == dssp_df['RES_ID'][row]
-                    and dssp_df['ATMNAME'][row] == 'CB'
-                    and dssp_df['RESNAME'][row] != 'GLY'
-                ):
-                    cb = np.array([[dssp_df['XPOS'][row]],
-                                   [dssp_df['YPOS'][row]]])
-
-            if ca.size > 0 and cb.size > 0:
-                ca_com = math.sqrt((ca[0][0] - com[0][0])**2 + (ca[1][0] - com[1][0])**2)
-                cb_com = math.sqrt((cb[0][0] - com[0][0])**2 + (cb[1][0] - com[1][0])**2)
-
-                if ca_com > cb_com:
-                    int_ext_dict[res_id.split('_')[0]] = 'interior'
-                elif ca_com < cb_com:
-                    int_ext_dict[res_id.split('_')[0]] = 'exterior'
-
-        print(int_ext_dict)
-
-        return int_ext_dict
-    """
 
 
 class int_ext_pipeline():
@@ -472,8 +466,8 @@ class int_ext_pipeline():
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(int_ext_dict.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                ):
                 int_ext_list[row] = int_ext_dict[res_id]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
@@ -522,8 +516,8 @@ class int_ext_pipeline():
         int_ext_list = ['']*dssp_df.shape[0]
         for row in range(dssp_df.shape[0]):
             if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                ):
                 int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
