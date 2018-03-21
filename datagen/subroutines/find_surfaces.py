@@ -314,33 +314,13 @@ class sandwich_interior_exterior_calcs():
                                       [y_coord_atom]])
                 xy_dict[atom_id] = xy_coords
 
-        x_sum = 0
-        y_sum = 0
-        count = 0
-        for res in list(xy_dict.keys()):
-            if 'CA' in res:
-                x_sum += xy_dict[res][0][0]
-                y_sum += xy_dict[res][1][0]
-                count += 1
-        x_avrg = x_sum / count
-        y_avrg = y_sum / count
-
-        with open('my_sandwich.pdb', 'w') as pdb_file:
-            for line in sandwich_pdb_string:
-                pdb_file.write('{}\n'.format(line))
-            pdb_file.write('HETATM    1  N   DUM     1       0.000  0.000   0.000\n')
-            pdb_file.write('HETATM    2  O   DUM     2       0.000  0.000   1.000\n')
-            pdb_file.write('HETATM    3  C   DUM     3       {}{}0.000\n'.format(
-                str(round(x_avrg, 3)).rjust(8), str(round(y_avrg, 3)).rjust(8)))
-
         return xy_dict
 
     def calc_int_ext(domain_id, dssp_df, xy_dict):
         # Determines whether a residue is interior- or exterior-facing from
         # whether its C_beta atom lies on the same side of the plane between
         # its N and C atoms as the centre of mass of the sandwich or not
-        # TODO: Update from 2D to 3D (so that alignment along the z-axis is no
-        # longer necessary)
+
         print('Determining interior and exterior residues in {}'.format(domain_id))
 
         int_ext_dict = {}
