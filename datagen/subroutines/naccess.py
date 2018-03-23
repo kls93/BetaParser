@@ -35,6 +35,8 @@ class naccess_solv_acsblty_calcs():
                     sheet_sub_strings.append(new_line)
             sheet_string = ''.join(sheet_sub_strings)
 
+            # Runs NACCESS to calculate solvent accessible surface area of
+            # every residue in domain
             print('Calculating solvent accessible surface area for {}'.format(sheet_id))
             naccess_out = isambard.external_programs.naccess.run_naccess(
                 sheet_string, 'rsa', path=False, include_hetatms=True
@@ -51,7 +53,7 @@ class naccess_solv_acsblty_calcs():
         max_solv_acsblty = max(list(solv_acsblty_dict.keys()))
         beta_barrel = solv_acsblty_dict[max_solv_acsblty]
         solv_acsblty_dict = OrderedDict()
-        solv_acsblty_dict[max_solv_acsblty] = [beta_barrel]
+        solv_acsblty_dict[max_solv_acsblty] = [beta_barrel]  # Must be a list!
 
         return solv_acsblty_dict
 
@@ -59,6 +61,8 @@ class naccess_solv_acsblty_calcs():
         # Calculates the solvent accessibility of beta-sheets to identify the
         # two which share the largest buried surface area and hence form the
         # beta-sandwich in domain X
+
+        # Generates all possible combinations of beta-sheets in the domain
         combinations = list(itertools.combinations(list(sheets.keys()), 2))
         solv_acsblty_dict = OrderedDict()
         for sheet_pair in combinations:
@@ -79,6 +83,8 @@ class naccess_solv_acsblty_calcs():
                         sheet_sub_strings.append(new_line)
             sheet_string = ''.join(sheet_sub_strings)
 
+            # Runs NACCESS to calculate solvent accessible surface area of
+            # every residue in sheet pair complex
             naccess_out = isambard.external_programs.naccess.run_naccess(
                 sheet_string, 'rsa', path=False, include_hetatms=True
             )
@@ -106,6 +112,9 @@ class naccess_solv_acsblty_calcs():
                         # conformer)
                         sheet_sub_strings.append(new_line)
                 sheet_string = ''.join(sheet_sub_strings)
+
+                # Runs NACCESS to calculate solvent accessible surface area of
+                # every residue in individual sheet
                 naccess_out = isambard.external_programs.naccess.run_naccess(
                     sheet_string, 'rsa', path=False, include_hetatms=True
                 )
@@ -117,6 +126,10 @@ class naccess_solv_acsblty_calcs():
                 sheet_solv_acsblty = float(sheet_solv_acsblty.split()[1])
                 sum_sheet_solv_acsblty += sheet_solv_acsblty
 
+            # Calculates absolute surface area buried in the sheet complex from
+            # the difference between the summed solvent accessibility of the
+            # individual sheets and the solvent accessibility of the sheet pair
+            # complex
             buried_surface_area = sum_sheet_solv_acsblty - complex_solv_acsblty
             solv_acsblty_dict[buried_surface_area] = [sheet_pair[0], sheet_pair[1]]
 
@@ -142,6 +155,9 @@ class naccess_solv_acsblty_calcs():
                 # conformer id of the retained conformer)
                 sheet_sub_strings.append(new_line)
         sheet_string = ''.join(sheet_sub_strings)
+
+        # Runs NACCESS to calculate solvent accessible surface area of every
+        # residue in domain
         naccess_out = isambard.external_programs.naccess.run_naccess(
             sheet_string, 'rsa', path=False, include_hetatms=True
         )
@@ -187,7 +203,7 @@ class naccess_solv_acsblty_calcs():
             # Removes sheets that do not form part of the sandwich / barrel
             # from further analysis
             for sheet_id in sheets:
-                if sheet_id not in sandwich:
+                if not sheet_id in sandwich:
                     domain_sheets_dict[sheet_id] = None
 
             sheets_retained = [sheet_id.replace('{}_sheet_'.format(domain_id), '')
@@ -198,7 +214,7 @@ class naccess_solv_acsblty_calcs():
             for row in range(dssp_df.shape[0]):
                 res_id = dssp_df['RES_ID'][row]
 
-                if res_id not in chain_res_num:
+                if not res_id in chain_res_num:
                     dssp_df.loc[row, 'REC'] = None
 
                 if (res_id in list(res_solv_acsblty.keys())
@@ -253,8 +269,9 @@ class naccess_solv_acsblty_calcs():
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-        # Initialises records of interior / exterior facing residues
         print('Determining interior and exterior facing residues in {}'.format(domain_id))
+
+        # Initialises records of core / surface residues
         core_ext_list = ['']*dssp_df.shape[0]
         buried_surface_area_list = ['']*dssp_df.shape[0]
         core_ext_combined = OrderedDict()
@@ -277,6 +294,9 @@ class naccess_solv_acsblty_calcs():
                     # conformer id of the retained conformer)
                     sheet_sub_strings.append(new_line)
         sheet_string = ''.join(sheet_sub_strings)
+
+        # Runs NACCESS to calculate solvent accessible surface area of every
+        # residue in beta-sheet pair
         naccess_out = isambard.external_programs.naccess.run_naccess(
             sheet_string, 'rsa', path=False, include_hetatms=True
         )
@@ -306,6 +326,9 @@ class naccess_solv_acsblty_calcs():
                     # conformer id of the retained conformer)
                     sheet_sub_strings.append(new_line)
             sheet_string = ''.join(sheet_sub_strings)
+
+            # Runs NACCESS to calculate solvent accessible surface area of every
+            # residue in domain
             naccess_out = isambard.external_programs.naccess.run_naccess(
                 sheet_string, 'rsa', path=False, include_hetatms=True
             )
@@ -321,33 +344,31 @@ class naccess_solv_acsblty_calcs():
 
         # Determines solvent accessibility of each residue in the beta-sheet
         # assembly as compared to its individual parent beta-sheet. If the
-        # solvent accessibility is lower in the assembly, the residue is
-        # assigned as 'interior', if it is the same it is assigned as
-        # 'exterior', otherwise an error is thrown.
+        # solvent accessibility is reduced by >= 20% in the assembly, the
+        # residue is classified as 'core', else it is classified as 'surface'.
         for res in list(core_ext_combined.keys()):
             solv_acsblty_combined = core_ext_combined[res]
             solv_acsblty_indv = core_ext_indv[res]
 
-            if solv_acsblty_indv == 0 and solv_acsblty_combined == 0:
-                core_ext_combined[res] = ''
-            elif solv_acsblty_indv != 0 and solv_acsblty_combined == 0:
+            if solv_acsblty_indv != 0 and solv_acsblty_combined == 0:
                 buried_surface_area = solv_acsblty_indv
                 buried_surface_area_dict[res] = buried_surface_area
                 if buried_surface_area >= 5:
-                    # 20% is an arbitrarily selected value that I have found to
-                    # discriminate well between core and external residues
+                    # 5 is an arbitrarily selected value that I have found to
+                    # discriminate well between core and surface residues
                     core_ext_combined[res] = 'core'
                 elif buried_surface_area < 5:
                     core_ext_combined[res] = 'surface'
+
             elif solv_acsblty_indv != 0 and solv_acsblty_combined != 0:
-                buried_surface_area = round(((solv_acsblty_combined
-                                              / solv_acsblty_indv) * 100), 3)
+                buried_surface_area = round((((solv_acsblty_indv - solv_acsblty_combined)
+                                              / solv_acsblty_indv) * 100), 1)
                 buried_surface_area_dict[res] = buried_surface_area
-                if buried_surface_area <= 80:
+                if buried_surface_area >= 20:
                     # 20% is an arbitrarily selected value that I have found to
-                    # discriminate well between core and external residues
+                    # discriminate well between core and surface residues
                     core_ext_combined[res] = 'core'
-                elif buried_surface_area > 80:
+                elif buried_surface_area < 20:
                     core_ext_combined[res] = 'surface'
 
         # Updates dataframe with solvent accessibility information
@@ -362,7 +383,7 @@ class naccess_solv_acsblty_calcs():
                     ):
                 buried_surface_area_list[row] = buried_surface_area_dict[res_id]
         core_ext_df = pd.DataFrame({'CORE_OR_SURFACE': core_ext_list,
-                                    'BURIED_SURFACE_AREA (%)': buried_surface_area_list})
+                                    'BURIED_SURFACE_AREA(%)': buried_surface_area_list})
         dssp_df = pd.concat([dssp_df, core_ext_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
 
@@ -377,10 +398,6 @@ class calculate_solvent_accessible_surface_area(run_stages):
     def calc_sasa(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Pipeline function for running naccess to calculate solvent accessible
         # surface area
-        if __name__ == 'subroutines.naccess':
-            from subroutines.naccess import naccess_solv_acsblty_calcs
-        else:
-            from datagen.subroutines.naccess import naccess_solv_acsblty_calcs
 
         unprocessed_list_1 = []
         unprocessed_list_2 = []
@@ -395,7 +412,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
                 or (self.code[0:4] in ['2.60'] and len(list(sheets.keys())) < 2)
             ):
                 print('ERROR: No / only 1 beta-sheet/s retained for {}'.format(domain_id))
-                unprocessed_list.append(domain_id)
+                unprocessed_list_1.append(domain_id)
                 continue
 
             if self.code[0:4] in ['2.40']:
@@ -443,9 +460,10 @@ class calculate_solvent_accessible_surface_area(run_stages):
 
         return sec_struct_dfs_dict, domain_sheets_dict
 
-    def identify_core_ext(self, sec_struct_dfs_dict, domain_sheets_dict):
-        # Pipeline function to identify interior and exterior-facing residues
-        # in barrels / sandwiches
+    def identify_core_surface(self, sec_struct_dfs_dict, domain_sheets_dict):
+        # Pipeline function to identify residues that form part of the
+        # (hydrophobic) core of a beta-sandwich domain
+
         unprocessed_list = []
 
         for domain_id in list(sec_struct_dfs_dict.keys()):

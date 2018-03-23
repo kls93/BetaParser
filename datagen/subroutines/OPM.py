@@ -9,7 +9,7 @@ else:
     from datagen.subroutines.run_stages import run_stages
 
 
-class extract_strand_tilt_and_TM_regions(run_stages):
+class extract_barrel_info_from_OPM(run_stages):
 
     def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
@@ -99,6 +99,7 @@ class calculate_barrel_geometry(run_stages):
         run_stages.__init__(self, run_parameters)
 
     def find_barrel_strand_number(self, sec_struct_dfs_dict):
+        # Calculates number of strands in barrel
         strand_numbers = OrderedDict()
 
         for domain_id, dssp_df in sec_struct_dfs_dict.items():

@@ -15,12 +15,11 @@ class output_calcs():
 
     def determine_strand_orientation(domain_id, strand_id, strand_df,
                                      opm_database, unprocessed_list):
-        # Determines orientation of input strand in barrel. If the N-terminus
-        # is in the periplasm (Z-coordinate = negative) and C-terminus is
-        # extracellular (Z-coordinate = positive), the strand orientation is
-        # reversed in the output dataframe.
-        print('Determining strand orientation in {} strand '
-              '{}'.format(domain_id, strand_id))
+        # Determines orientation of input strand in domain if that domain is in
+        # the OPM database. If the N-terminus is in the periplasm
+        # (Z-coordinate = negative) and C-terminus is extracellular
+        # (Z-coordinate = positive), the strand orientation is reversed in the
+        # output dataframe.
 
         pdb_code = domain_id[0:4]
         res_ids_list = strand_df['RES_ID'].tolist()
@@ -31,7 +30,10 @@ class output_calcs():
         reverse = False
 
         if os.path.isfile('{}/{}.pdb'.format(opm_database, pdb_code)):
+            print('Determining strand orientation in {} strand '
+                  '{}'.format(domain_id, strand_id))
             in_database = True
+
             with open('{}/{}.pdb'.format(opm_database, pdb_code), 'r') as opm_file:
                 for line in opm_file:
                     if line[17:20].strip() != 'DUM':  # Don't put as 'and'
@@ -82,6 +84,8 @@ class output_calcs():
         return tm_ext_list
 
     def determine_strand_position_sandwich(strand_df):
+        # Calculates displacement (both absolute and percentage), measured in
+        # number of residues, of each residue from the centre of the strand
         strand_abs_displacement = ['']*strand_df.shape[0]
         strand_percentage_displacement = ['']*strand_df.shape[0]
         strand_centre = (strand_df.shape[0] - 1) / 2
@@ -96,6 +100,10 @@ class output_calcs():
         return strand_abs_displacement, strand_percentage_displacement
 
     def determine_strand_position_barrel(strand_df, tm_ext_list):
+        # Calculates position of residues within the barrel TM region (position
+        # is measured as a percentage of the total number of TM residues in the
+        # strand, with the extracellular environment and the periplasm
+        # corresponding to 0% and 100%, respectively)
         membrane_loc = ['']*strand_df.shape[0]
 
         if 'transmembrane' in tm_ext_list:
@@ -172,6 +180,7 @@ class gen_output(run_stages):
         # Initialises lists of properties to be displayed in the dataframe
         # columns
         domain_strand_ids = []
+        sheet_number = []
         tilt_angle = []
         strand_number = []
         shear_number = []
@@ -183,7 +192,7 @@ class gen_output(run_stages):
         strand_percentage_pos = []
         tm_pos = []
         int_ext = []
-        core_ext = []
+        core_surf = []
         buried_surface_area = []
         tm_ext = []
         omega = []
@@ -218,6 +227,13 @@ class gen_output(run_stages):
                 elif strand_or_res == 'res':
                     domain_strand_ids += ['{}_strand_{}'.format(
                         domain_id, strand_num)]*len(res_ids_list)
+
+                # Lists parent sheet of each strand
+                sheet = strand_df['SHEET_NUM'].tolist()[0]
+                if strand_or_res == 'strand':
+                    sheet_number.append(sheet)
+                elif strand_or_res == 'res':
+                    sheet_number += ['{}'.format(sheet)]*len(res_ids_list)
 
                 # Lists tilt angle of strand
                 if self.code[0:4] in ['2.40']:
@@ -298,32 +314,31 @@ class gen_output(run_stages):
 
                 # Generates list of interior and exterior facing residues in
                 # the strand
-                if self.code[0:4] in ['2.40']:
-                    int_ext_list = strand_df['INT_EXT'].tolist()
-                    if reverse is True:
-                        int_ext_list.reverse()
+                int_ext_list = strand_df['INT_EXT'].tolist()
+                if reverse is True:
+                    int_ext_list.reverse()
 
-                    if strand_or_res == 'strand':
-                        int_ext.append(int_ext_list)
-                    elif strand_or_res == 'res':
-                        int_ext += int_ext_list
+                if strand_or_res == 'strand':
+                    int_ext.append(int_ext_list)
+                elif strand_or_res == 'res':
+                    int_ext += int_ext_list
 
                 # Generates list of residues that form the beta-sandwich core
                 if self.code[0:4] in ['2.60']:
-                    core_ext_list = strand_df['CORE_OR_SURFACE'].tolist()
+                    core_surf_list = strand_df['CORE_OR_SURFACE'].tolist()
                     if reverse is True:
-                        core_ext_list.reverse()
+                        core_surf_list.reverse()
 
                     if strand_or_res == 'strand':
-                        core_ext.append(core_ext_list)
+                        core_surf.append(core_surf_list)
                     elif strand_or_res == 'res':
-                        core_ext += core_ext_list
+                        core_surf += core_surf_list
 
                 # Generates list of percentage values for the surface area of
                 # each residue that is buried in the sandwich as compared with
                 # the individual parent sheet
                 if self.code[0:4] in ['2.60']:
-                    buried_surface_area_list = strand_df['BURIED_SURFACE_AREA (%)'].tolist()
+                    buried_surface_area_list = strand_df['BURIED_SURFACE_AREA(%)'].tolist()
                     if reverse is True:
                         buried_surface_area_list.reverse()
 
@@ -353,6 +368,10 @@ class gen_output(run_stages):
                     (strand_abs_displacement, strand_percentage_displacement
                      ) = output_calcs.determine_strand_position_sandwich(strand_df)
 
+                    if reverse is True:
+                        strand_abs_displacement.reverse()
+                        strand_percentage_displacement.reverse()
+
                     if strand_or_res == 'strand':
                         strand_abs_pos.append(strand_abs_displacement)
                         strand_percentage_pos.append(strand_percentage_displacement)
@@ -366,6 +385,9 @@ class gen_output(run_stages):
                     membrane_loc = output_calcs.determine_strand_position_barrel(
                         strand_df, tm_ext_list
                     )
+
+                    # Don't need to reverse list as will match tm_ext_list
+                    # order (which has already been reversed)
                     if strand_or_res == 'strand':
                         tm_pos.append(membrane_loc)
                     elif strand_or_res == 'res':
@@ -414,6 +436,7 @@ class gen_output(run_stages):
                 elif strand_or_res == 'res':
                     neighbours += neighbours_list
 
+        # Generates csv file of beta-barrel dataset
         if self.code[0:4] in ['2.40']:
             beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
                                             'TILT_ANGLE(DEGREES)': tilt_angle,
@@ -442,14 +465,17 @@ class gen_output(run_stages):
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
 
+        # Generates csv file of beta-sandwich dataset
         elif self.code[0:4] in ['2.60']:
             beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
+                                            'SHEET_ID': sheet_number,
                                             'EDGE_OR_CNTRL': edge_or_central,
                                             'RES_ID': res_ids,
                                             'FASTA': fasta_seq,
                                             'STRAND_POS(ABS)': strand_abs_pos,
                                             'STRAND_POS(%)': strand_percentage_pos,
-                                            'CORE_OR_SURFACE': core_ext,
+                                            'INT_EXT': int_ext,
+                                            'CORE_OR_SURFACE': core_surf,
                                             'BURIED_SURFACE_AREA()%)': buried_surface_area,
                                             'OMEGA': omega,
                                             'PHI': phi,
@@ -460,9 +486,10 @@ class gen_output(run_stages):
                                                 self.radius
                                             ): neighbours})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[10]] + [cols[3]] + [cols[9]] + [cols[4]] + [cols[13]]
-                    + [cols[12]] + [cols[2]] + [cols[0]] + [cols[6]] +
-                    [cols[7]] + [cols[8]] + [cols[1]] + [cols[11]] + [cols[5]])
+            cols = ([cols[13]] + [cols[11]] + [cols[3]] + [cols[10]] + [cols[4]]
+                    + [cols[15]] + [cols[14]] + [cols[5]] + [cols[2]] +
+                    [cols[0]] + [cols[7]] + [cols[8]] + [cols[9]] + [cols[1]]
+                    + [cols[12]] + [cols[6]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))

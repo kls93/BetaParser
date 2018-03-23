@@ -1,14 +1,11 @@
 
-import sys
 import math
 import copy
-import itertools
 import isambard
 import pandas as pd
 import numpy as np
 import networkx as nx
 from collections import OrderedDict
-from shapely.geometry import Polygon, Point
 
 if __name__ == 'subroutines.find_surfaces':
     from subroutines.run_stages import run_stages
@@ -29,8 +26,9 @@ class barrel_interior_exterior_calcs():
         for strand in strands:
             nodes_dict[strand] = len(list(G.neighbors(strand)))
 
-        # If no closed circle of interacting strands, takes all strands
-        # forwards for further analysis
+        # If no closed circle of interacting strands, the domain isn't
+        # technically a barrel and so DataGen is unable to further analyse the
+        # domain
         if len(nx.cycle_basis(G)) == 0:
             unprocessed_list.append(domain_id)
             return orig_strands, unprocessed_list
@@ -45,11 +43,8 @@ class barrel_interior_exterior_calcs():
                     del nodes_dict[strand]
 
             strands = list(G.nodes())
-            if len(strands) == 0:
-                break
-            else:
-                for strand in strands:
-                    nodes_dict[strand] = len(list(G.neighbors(strand)))
+            for strand in strands:
+                nodes_dict[strand] = len(list(G.neighbors(strand)))
 
         # Makes list of strands in closed circle network
         strand_cycles = nx.cycle_basis(G)
@@ -74,7 +69,8 @@ class barrel_interior_exterior_calcs():
 
             row_num = strand_df.shape[0]
             # If there is an odd number of strands, the central residue plus
-            # its C-terminal residue are selected as the two central residues
+            # its immediate C-terminal residue are selected as the two central
+            # residues
             if row_num % 2 == 1:
                 row_num += 1
 
@@ -115,7 +111,7 @@ class barrel_interior_exterior_calcs():
 
         return xyz_coords
 
-    def rotate_translate_barrel(domain_id, xyz_coords, sheets):
+    def rotate_translate_barrel(domain_id, xyz_coords):
         # Aligns the barrel to z = 0 using the reference axis through the
         # barrel pore calculated in the previous step
         print('Aligning {} barrel with z = 0'.format(domain_id))
@@ -133,8 +129,8 @@ class barrel_interior_exterior_calcs():
         translation, angle, axis, point = isambard.geometry.find_transformations(
             s1, e1, s2, e2
         )
-        barrel.rotate(angle, axis, point=point)  # Rotation must be performed
-        # before translation
+        barrel.rotate(angle, axis, point=point)  # ROTATION MUST BE PERFORMED
+        # BEFORE TRANSLATION
         barrel.translate(translation)
 
         # Generates dictionary of residues and their new xyz coordinates
@@ -161,7 +157,9 @@ class barrel_interior_exterior_calcs():
         count = 0
 
         for res_id in list(xy_dict.keys()):
-            if res_id.split('_')[0] in sheets_df['RES_ID'].tolist():
+            if (res_id.split('_')[0] in sheets_df['RES_ID'].tolist()
+                    and res_id.split('_')[1] == 'CA'
+                    ):
                 x_sum += xy_dict[res_id][0][0]
                 y_sum += xy_dict[res_id][1][0]
                 count += 1
@@ -183,12 +181,9 @@ class barrel_interior_exterior_calcs():
             res_dict[res_id] = sheets_df['RESNAME'].tolist()[index]
 
         for res_id in list(res_dict.keys()):
-            if (
-                (not 'GLY' in res_dict[res_id])
-                and all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
-                        for x in ['N', 'CA', 'C', 'O', 'CB']
-                        )
-            ):
+            if (all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
+                        for x in ['N', 'CA', 'C', 'O', 'CB'])
+                    ):
                 # Calculates angle between C_alpha, C_beta and the centre of
                 # mass
                 c_alpha_x = xy_dict['{}_CA'.format(res_id)][0][0]
@@ -247,7 +242,7 @@ class sandwich_interior_exterior_calcs():
 
         # Calculates vectors between C_alpha atoms of hydrogen bonded residues
         vectors_array = np.empty((len(list(h_bonds_dict.keys())), 3))
-        for index, res_1 in enumerate(h_bonds_dict.keys()):
+        for index, res_1 in enumerate(list(h_bonds_dict.keys())):
             res_2 = h_bonds_dict[res_1]
             xyz_1 = np.array([])
             xyz_2 = np.array([])
@@ -289,14 +284,14 @@ class sandwich_interior_exterior_calcs():
 
         # Aligns the sandwich with z = 0
         s1 = [0.0, 0.0, 0.0]
-        e1 = [vector[0], vector[1], vector[2]]
+        e1 = [vector[0][0], vector[0][1], vector[0][2]]
         s2 = [0.0, 0.0, 0.0]
         e2 = [0.0, 0.0, 1.0]
         translation, angle, axis, point = isambard.geometry.find_transformations(
             s1, e1, s2, e2
         )
-        sandwich.rotate(angle, axis, point=point)  # Rotation must be performed
-        # before translation
+        sandwich.rotate(angle, axis, point=point)  # ROTATION MUST BE PERFORMED
+        # BEFORE TRANSLATION
         sandwich.translate(translation)
 
         # Generates dictionary of residues and their new xyz coordinates
@@ -317,14 +312,15 @@ class sandwich_interior_exterior_calcs():
         return xy_dict
 
     def calc_int_ext(domain_id, dssp_df, xy_dict):
-        # Determines whether a residue is interior- or exterior-facing from
-        # whether its C_beta atom lies on the same side of the plane between
-        # its N and C atoms as the centre of mass of the sandwich or not
+        # Determines whether a residue is interior- or exterior-facing, based
+        # upon whether or not its C_beta atom lies on the same side of the
+        # plane between its N and C atoms as the centre of mass of the sandwich
 
         print('Determining interior and exterior residues in {}'.format(domain_id))
 
         int_ext_dict = {}
 
+        # Calculates centre of mass of C_alpha atoms in sandwich
         x_sum = 0
         y_sum = 0
         count = 0
@@ -336,6 +332,14 @@ class sandwich_interior_exterior_calcs():
         x_avrg = x_sum / count
         y_avrg = y_sum / count
 
+        # For each residue, calculates whether the centre of mass and its
+        # C-beta atom lie on the same side of the plane formed between the
+        # residue's N and C atoms (= 'interior'), or on different sides
+        # (= 'exterior') (using the equation d=(x−x1)(y2−y1)−(y−y1)(x2−x1),
+        # where (x1, y1) and (x2, y2) describe the plane and (x, y) the point
+        # of interest (see https://math.stackexchange.com/questions/274712/
+        # calculate-on-which-side-of-a-straight-line-is-a-given-point-located
+        # ?noredirect=1&lq=1))
         res_list = list(set(dssp_df['RES_ID'].tolist()))
         for res in res_list:
             n = False
@@ -362,16 +366,18 @@ class sandwich_interior_exterior_calcs():
                     cb_x_coord = xy_sub_dict[atom][0][0]
                     cb_y_coord = xy_sub_dict[atom][1][0]
 
-            distance_com = (((x_avrg-n_x_coord)*(c_y_coord-n_y_coord)) -
-                            ((y_avrg-n_y_coord)*(c_x_coord-n_x_coord)))
-            distance_cb = (((cb_x_coord-n_x_coord)*(c_y_coord-n_y_coord)) -
-                           ((cb_y_coord-n_y_coord)*(c_x_coord-n_x_coord)))
-
             if all(x is True for x in [n, c, cb]):
-            if (distance_com < 0 and distance_cb < 0) or (distance_com > 0 and distance_cb > 0):
-                int_ext_dict[res] = 'interior'
-            else:
-                int_ext_dict[res] = 'exterior'
+                distance_com = (((x_avrg-n_x_coord)*(c_y_coord-n_y_coord)) -
+                                ((y_avrg-n_y_coord)*(c_x_coord-n_x_coord)))
+                distance_cb = (((cb_x_coord-n_x_coord)*(c_y_coord-n_y_coord)) -
+                               ((cb_y_coord-n_y_coord)*(c_x_coord-n_x_coord)))
+
+                if ((distance_com < 0 and distance_cb < 0)
+                        or (distance_com > 0 and distance_cb > 0)
+                    ):
+                    int_ext_dict[res] = 'interior'
+                else:
+                    int_ext_dict[res] = 'exterior'
 
         return int_ext_dict
 
@@ -385,7 +391,8 @@ class int_ext_pipeline():
         # between the centre of mass of the C_alpha atoms of the barrel and the
         # residue in question is less or greater than 90 degrees. The barrel is
         # collapsed along the central axis that runs through its pore in order
-        # to avoid misclassification of residues in frayed edges of the barrel.
+        # to avoid misclassification of residues in the frayed edges of the
+        # barrel.
 
         # Checks that correct number of sheets has been retained for analysis
         if len(list(sheets.keys())) != 1:
@@ -398,7 +405,7 @@ class int_ext_pipeline():
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-        # Creates dataframe of CA atoms in barrel
+        # Creates dataframe of C_alpha atoms in barrel
         sheet_num = list(sheets.keys())[0].replace('{}_sheet_'.format(domain_id), '')
         sheets_df = dssp_df[dssp_df['SHEET_NUM'] == sheet_num]
         sheets_df = sheets_df.reset_index(drop=True)
@@ -416,7 +423,6 @@ class int_ext_pipeline():
             sec_struct_dfs_dict[domain_id] = None
             for sheet in list(sheets.keys()):
                 domain_sheets_dict[sheet] = None
-            unprocessed_list.append(domain_id)
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
@@ -425,7 +431,7 @@ class int_ext_pipeline():
 
         # Aligns barrel with z = 0
         xy_dict = barrel_interior_exterior_calcs.rotate_translate_barrel(
-            domain_id, xyz_coords, sheets
+            domain_id, xyz_coords
         )
 
         # Initialises records of interior / exterior facing residues
@@ -442,7 +448,7 @@ class int_ext_pipeline():
             domain_id, sheets_df, xy_dict, com, int_ext_dict
         )
 
-        # Updates dataframe with solvent accessibility information
+        # Updates dataframe to identify interior- / exterior-facing residues
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(int_ext_dict.keys())
@@ -462,10 +468,7 @@ class int_ext_pipeline():
 
         # Checks that correct number of sheets have been retained in the
         # beta-sandwich
-        networks = [network for key, network in domain_sheets_dict.items()
-                    if domain_id in key]
-
-        if len(list(sheets.keys())) != 2 or len(networks) != 2:
+        if len(list(sheets.keys())) != 2:
             print('ERROR: incorrect number of sheets retained in {} following '
                   'solvent accessibility calculation'.format(domain_id))
             sec_struct_dfs_dict[domain_id] = None
@@ -477,7 +480,7 @@ class int_ext_pipeline():
 
         # Calculates z-axis between the two beta-sheets
         sheet_ids = [sheet.replace('{}_sheet_'.format(domain_id), '') for sheet
-                     in list(sheets.keys()) if sheet != '']
+                     in set(sheets.keys()) if sheet != '']
         sheets_df = dssp_df[dssp_df['SHEET_NUM'].isin(sheet_ids)]
         sheets_df = sheets_df.reset_index(drop=True)
         vector = sandwich_interior_exterior_calcs.find_z_axis(sheets_df)
@@ -492,7 +495,7 @@ class int_ext_pipeline():
             domain_id, dssp_df, xy_dict
         )
 
-        # Updates dataframe with solvent accessibility information
+        # Updates dataframe to identify interior- / exterior-facing residues
         int_ext_list = ['']*dssp_df.shape[0]
         for row in range(dssp_df.shape[0]):
             if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())

@@ -137,31 +137,45 @@ class run_stages():
             from datagen.subroutines.dihedral_angles import dihedral_angles
             from datagen.subroutines.neighbouring_residues import nearest_neighbours
 
+        # Loads pickled variables generated from running stage 2.
         with open('Input_ISAMBARD_variables.pkl', 'rb') as pickle_file:
             sec_struct_dfs_dict, domain_sheets_dict = pickle.load(pickle_file)
 
+        # Runs NACCESS to calculate the solvent accessible surface area of
+        # each individual residue
         beta_structure = calculate_solvent_accessible_surface_area(self.run_parameters)
         sec_struct_dfs_dict, domain_sheets_dict = beta_structure.calc_sasa(
             sec_struct_dfs_dict, domain_sheets_dict
         )
+        # For beta-sandwiches, calculates the surface area buried by each
+        # individual residue within the sandwich core - this value is then used
+        # to classify the residue as 'core' or 'surface'
         if self.code[0:4] in ['2.60']:
-            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_core_ext(
+            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_core_surface(
                 sec_struct_dfs_dict, domain_sheets_dict
             )
 
+        # For each individual residue, calculates whether it faces in towards
+        # or outwards from the centre of the beta_barrel/sheet
         beta_structure = find_interior_exterior_surfaces(self.run_parameters)
         sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
             sec_struct_dfs_dict, domain_sheets_dict
         )
 
+        # Calculates the backbone and side chain dihedral angles of each
+        # individual residue
         beta_structure = dihedral_angles(self.run_parameters)
         sec_struct_dfs_dict = beta_structure.calc_dihedral_angles(sec_struct_dfs_dict)
 
+        # For each residue, determines the RES_IDs of all residues with at
+        # least one atom within a user-specified radius (measured in Angstroms)
+        # of its C_alpha atom
         beta_structure = nearest_neighbours(self.run_parameters, radius)
         sec_struct_dfs_dict = beta_structure.calculate_nearest_neighbours(
             sec_struct_dfs_dict
         )
 
+        # Pickles variables required for running stage 4
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict, radius),
                         pickle_file)
@@ -169,12 +183,12 @@ class run_stages():
     def run_stage_4(self, orig_dir, opm_database):
         if __name__ == 'subroutines.run_stages':
             from subroutines.OPM import (
-                extract_strand_tilt_and_TM_regions, calculate_barrel_geometry
+                extract_barrel_info_from_OPM, calculate_barrel_geometry
             )
             from subroutines.output_dataframe import gen_output
         else:
             from datagen.subroutines.OPM import (
-                extract_strand_tilt_and_TM_regions, calculate_barrel_geometry
+                extract_barrel_info_from_OPM, calculate_barrel_geometry
             )
             from datagen.subroutines.output_dataframe import gen_output
 
@@ -183,11 +197,15 @@ class run_stages():
 
         output = gen_output(self.run_parameters, radius)
 
+        # For beta-barrel domains, calculates the strand number, plus, if the
+        # barrel is in the OPM database, extracts its average strand tilt
+        # number from the database
+        # TODO: Fix shear number calculation
         tilt_angles = OrderedDict()
         strand_numbers = OrderedDict()
         shear_numbers = OrderedDict()
         if self.code[0:4] in ['2.40']:
-            beta_structure = extract_strand_tilt_and_TM_regions(self.run_parameters)
+            beta_structure = extract_barrel_info_from_OPM(self.run_parameters)
 
             opm_df = beta_structure.parse_opm(orig_dir)
             tilt_angles = beta_structure.find_strand_tilt(
@@ -200,15 +218,22 @@ class run_stages():
             del opm_df  # To save memory and reduce the number of variables
             # considered
 
+        # Classifies each beta-strand as either 'edge' or 'central' based upon
+        # the number of strands with which it forms backbone hydrogen-bonding
+        # interactions
         elif self.code[0:4] in ['2.60']:
             sec_struct_dfs_dict = output.identify_edge_central(
                 domain_sheets_dict, sec_struct_dfs_dict
             )
 
+        # Writes a csv file of the beta-barrel/sandwich dataset organised such
+        # that each row in the file represents an individual beta-strand.
         output.write_beta_strand_dataframe(
             'strand', sec_struct_dfs_dict, opm_database, tilt_angles,
             strand_numbers, shear_numbers
         )
+        # Writes a csv file of the beta-barrel/sandwich dataset organised such
+        # that each row in the file represents an individual residue.
         output.write_beta_strand_dataframe(
             'res', sec_struct_dfs_dict, opm_database, tilt_angles,
             strand_numbers, shear_numbers

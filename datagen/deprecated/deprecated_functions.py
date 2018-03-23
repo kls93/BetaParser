@@ -169,8 +169,8 @@ def find_barrel_shear_number(self, sec_struct_dfs_dict):
                 shear_pairs = [[h_bonded_res_2_b, h_bonded_res_3_a],
                                [h_bonded_res_2_a, h_bonded_res_3_b]]
                 if (not any(x in [None, 0] for x in [dssp_num for pair in
-                                                         shear_pairs for dssp_num in pair])
-                        ):
+                                                     shear_pairs for dssp_num in pair])
+                    ):
                     for pair in shear_pairs:
                         print(pair)  # DELETE ME
                         if int(res_1) in pair:
@@ -267,3 +267,50 @@ def find_barrel_shear_number():
 
         shear = scipy.stats.mode(shear_estimates)
         shear_numbers[domain_id] = shear
+
+
+def calculate_alpha_angle(sheets_df, barrel):
+    # Calculates average angle between beta-strands and central axis
+    alpha_angles = []
+    for strand in list(set(sheets_df['STRAND_NUM'].tolist())):
+        strand_df = sheets_df[sheets_df['STRAND_NUM'] == strand]
+        strand_df = strand_df.reset_index(drop=True)
+        max_row = strand_df.shape[0] - 1
+
+        x_1 = barrel['{}'.format(strand_df['CHAIN'][0])]['{}'.format(
+            strand_df['RESNUM'][0])]['CA'].x
+        y_1 = barrel['{}'.format(strand_df['CHAIN'][0])]['{}'.format(
+            strand_df['RESNUM'][0])]['CA'].y
+        z_1 = barrel['{}'.format(strand_df['CHAIN'][0])]['{}'.format(
+            strand_df['RESNUM'][0])]['CA'].z
+        x_n = barrel['{}'.format(strand_df['CHAIN'][max_row])]['{}'.format(
+            strand_df['RESNUM'][max_row])]['CA'].x
+        y_n = barrel['{}'.format(strand_df['CHAIN'][max_row])]['{}'.format(
+            strand_df['RESNUM'][max_row])]['CA'].y
+        z_n = barrel['{}'.format(strand_df['CHAIN'][max_row])]['{}'.format(
+            strand_df['RESNUM'][max_row])]['CA'].z
+
+        vector_1 = np.array([[x_n-x_1],
+                             [y_n-y_1],
+                             [z_n-z_1]])
+        vector_2 = np.array([[0], [0], [1]])
+        angle = isambard.tools.geometry.angle_between_vectors(
+            vector_1, vector_2, radians=True
+        )
+        alpha_angles.append(angle)
+    alpha = np.mean(alpha_angles)
+
+    return alpha
+
+
+def calc_shear_number(domain_id, sheets_df, alpha):
+    print('Calculating {} barrel shear number'.format(domain_id))
+
+    n = len(set(sheets_df['STRAND_NUM'].tolist()))
+    shear = math.tan(alpha)*n*(4.4/3.3)
+    shear = int(math.ceil(float(abs(shear)/2.0))*2.0)
+
+    print(set(sheets_df['STRAND_NUM'].tolist()))
+    print(n)
+    print(alpha)
+    print(shear)

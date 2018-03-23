@@ -1,5 +1,4 @@
 
-import copy
 import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -40,7 +39,6 @@ class network_calcs():
             orientation_2 = sheet_df['ORIENTATION'].tolist()[index][0]
             res_num_3 = int(pair[1])
             orientation_3 = sheet_df['ORIENTATION'].tolist()[index][1]
-            strand_1, strand_2, strand_3 = None, None, None
 
             """
             # Commented out to avoid warnings for beta-bridge pairs
@@ -63,6 +61,7 @@ class network_calcs():
                           res_num, res_num))
             """
 
+            strand_1, strand_2, strand_3 = None, None, None
             # Identifies corresponding strand numbers of bridge pairs
             for key in list(strands_dict.keys()):
                 if res_num_1 in strands_dict[key]:
@@ -80,16 +79,16 @@ class network_calcs():
                 strand_pair = [strand_1, strand_2]
                 strand_pair = (min(strand_pair), max(strand_pair))  # Tuple
                 # because dictionary keys cannot be lists
-                if strand_pair not in strand_pairs:
+                if not strand_pair in strand_pairs:
                     strand_pairs[strand_pair] = orientation_2
             if strand_1 is not None and strand_3 is not None:
                 strand_pair = [strand_1, strand_3]
                 strand_pair = (min(strand_pair), max(strand_pair))  # Tuple
                 # because dictionary keys cannot be lists
-                if strand_pair not in strand_pairs:
+                if not strand_pair in strand_pairs:
                     strand_pairs[strand_pair] = orientation_3
 
-        # Removes strands with no hydrogen bonding pairs from the dssp_df
+        # Removes strands with no hydrogen bonding pairs from dssp_df
         strands_in_df = [strand for strand in set(sheet_df['STRAND_NUM'].tolist())
                          if strand != '']
         strands_in_dict = [strand for strand_pair in list(strand_pairs.keys())
@@ -97,7 +96,7 @@ class network_calcs():
 
         strands_to_remove = []
         for strand in strands_in_df:
-            if strand not in strands_in_dict:
+            if not strand in strands_in_dict:
                 strands_to_remove.append(strand)
 
         res_id_to_remove = []
@@ -129,7 +128,7 @@ class network_calcs():
             # pairs within an individual beta-sheet, the edge_labels dictionary
             # lists all retained strand pairs within an individual domain)
             for key in strand_pairs:
-                if key not in edge_labels:
+                if not key in edge_labels:
                     edge_labels[key] = strand_pairs[key]
 
         return edge_labels, domain_sheets, domain_sheets_dict
@@ -187,7 +186,7 @@ class network_calcs():
         sheets.append('')
 
         for row in range(dssp_df.shape[0]):
-            if dssp_df['SHEET_NUM'][row] not in sheets:
+            if not dssp_df['SHEET_NUM'][row] in sheets:
                 res_id_to_remove.append(dssp_df['RES_ID'][row])
 
         for row in range(dssp_df.shape[0]):
@@ -213,12 +212,12 @@ class calculate_beta_network(run_stages):
         else:
             from datagen.subroutines.generate_network import network_calcs
 
-        sec_struct_dfs_dict_copy = copy.copy(sec_struct_dfs_dict)
         domain_sheets_dict = OrderedDict()
 
         unprocessed_list = []
 
-        for domain_id, dssp_df in sec_struct_dfs_dict_copy.items():
+        for domain_id in list(sec_struct_dfs_dict.keys()):
+            dssp_df = sec_struct_dfs_dict[domain_id]
             edge_labels = {}
             domain_sheets = {}
 
