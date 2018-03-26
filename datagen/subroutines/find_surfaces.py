@@ -264,9 +264,14 @@ class sandwich_interior_exterior_calcs():
                                       [z_2]])
                     break
 
-            vectors_array[index][0] = xyz_2[0][0] - xyz_1[0][0]
-            vectors_array[index][1] = xyz_2[1][0] - xyz_1[1][0]
-            vectors_array[index][2] = xyz_2[2][0] - xyz_1[2][0]
+            # Excludes beta-bridge pairs from the z-axis calculation (since
+            # these residues will be included in the DSSP hydrogen-bonding
+            # interactions, but not in the dataframe of residues in the
+            # beta-sheets)
+            if xyz_1.size and xyz_2.size:
+                vectors_array[index][0] = xyz_2[0][0] - xyz_1[0][0]
+                vectors_array[index][1] = xyz_2[1][0] - xyz_1[1][0]
+                vectors_array[index][2] = xyz_2[2][0] - xyz_1[2][0]
 
         vector = np.mean(vectors_array, axis=0)
 
@@ -284,7 +289,7 @@ class sandwich_interior_exterior_calcs():
 
         # Aligns the sandwich with z = 0
         s1 = [0.0, 0.0, 0.0]
-        e1 = [vector[0][0], vector[0][1], vector[0][2]]
+        e1 = [vector[0], vector[1], vector[2]]
         s2 = [0.0, 0.0, 0.0]
         e2 = [0.0, 0.0, 1.0]
         translation, angle, axis, point = isambard.geometry.find_transformations(
