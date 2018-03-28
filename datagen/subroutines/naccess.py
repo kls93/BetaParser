@@ -157,18 +157,18 @@ class naccess_solv_acsblty_calcs():
         sheet_string = ''.join(sheet_sub_strings)
 
         # Runs NACCESS to calculate solvent accessible surface area of every
-        # residue in domain
+        # residue side chain in domain
         naccess_out = isambard.external_programs.naccess.run_naccess(
             sheet_string, 'rsa', path=False, include_hetatms=True
         )
         naccess_out = naccess_out.split('\n')
         for line in naccess_out:
-            if line[0:3] in ['RES', 'HEM']:
+            if line[0:3] in ['RES', 'HEM'] and line[5:8] != 'GLY':
                 chain = line[8:9].strip()
                 res_num = line[9:13].strip()
                 ins_code = line[13:14].strip()
                 chain_res_num = chain + res_num + ins_code
-                res_solv_acsblty[chain_res_num] = float(line[14:22])
+                res_solv_acsblty[chain_res_num] = float(line[29:35])
 
         return res_solv_acsblty
 
@@ -188,7 +188,7 @@ class naccess_solv_acsblty_calcs():
         # accessibility calculations show that none of the retained beta-sheets
         # are in contact with one another
         if (code[0:4] in ['2.60']
-                    and max(list(solv_acsblty_dict.keys())) == 0.0
+                and max(list(solv_acsblty_dict.keys())) == 0.0
                 ):
             unprocessed_list.append(domain_id)
             sec_struct_dfs_dict[domain_id] = None
@@ -218,7 +218,7 @@ class naccess_solv_acsblty_calcs():
                     dssp_df.loc[row, 'REC'] = None
 
                 if (res_id in list(res_solv_acsblty.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
+                            and dssp_df['ATMNAME'][row] == 'CA'
                         ):
                     solv_acsblty_list[row] = res_solv_acsblty[res_id]
 
@@ -269,13 +269,13 @@ class naccess_solv_acsblty_calcs():
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-        print('Determining interior and exterior facing residues in {}'.format(domain_id))
+        print('Determining core and surface residues in {}'.format(domain_id))
 
         # Initialises records of core / surface residues
-        core_ext_list = ['']*dssp_df.shape[0]
+        core_surf_list = ['']*dssp_df.shape[0]
         buried_surface_area_list = ['']*dssp_df.shape[0]
-        core_ext_combined = OrderedDict()
-        core_ext_indv = OrderedDict()
+        core_surf_combined = OrderedDict()
+        core_surf_indv = OrderedDict()
         buried_surface_area_dict = OrderedDict()
 
         # Calculates solvent accessibility of both sheets in pair
@@ -301,14 +301,15 @@ class naccess_solv_acsblty_calcs():
             sheet_string, 'rsa', path=False, include_hetatms=True
         )
         naccess_out = naccess_out.split('\n')
-        naccess_out = [line for line in naccess_out if line != '']
+        naccess_out = [line for line in naccess_out if line != '' and line[5:8]
+                       != 'GLY']
         for line in naccess_out:
             if line[0:3] in ['RES', 'HEM']:
                 chain = line[8:9].strip()
                 res_num = line[9:13].strip()
                 ins_code = line[13:14].strip()
                 chain_res_num = chain + res_num + ins_code
-                core_ext_combined[chain_res_num] = float(line[14:22])
+                core_surf_combined[chain_res_num] = float(line[29:35])
 
         # Calculates solvent accessibility of sheets in pair individually
         for sheet_id in sheets:
@@ -333,58 +334,49 @@ class naccess_solv_acsblty_calcs():
                 sheet_string, 'rsa', path=False, include_hetatms=True
             )
             naccess_out = naccess_out.split('\n')
-            naccess_out = [line for line in naccess_out if line != '']
+            naccess_out = [line for line in naccess_out if line != '' and
+                           line[5:8] != 'GLY']
             for line in naccess_out:
                 if line[0:3] in ['RES', 'HEM']:
                     chain = line[8:9].strip()
                     res_num = line[9:13].strip()
                     ins_code = line[13:14].strip()
                     chain_res_num = chain + res_num + ins_code
-                    core_ext_indv[chain_res_num] = float(line[14:22])
+                    core_surf_indv[chain_res_num] = float(line[29:35])
 
         # Determines solvent accessibility of each residue in the beta-sheet
         # assembly as compared to its individual parent beta-sheet. If the
         # solvent accessibility is reduced by >= 20% in the assembly, the
         # residue is classified as 'core', else it is classified as 'surface'.
-        for res in list(core_ext_combined.keys()):
-            solv_acsblty_combined = core_ext_combined[res]
-            solv_acsblty_indv = core_ext_indv[res]
+        for res in list(core_surf_combined.keys()):
+            solv_acsblty_combined = core_surf_combined[res]
+            solv_acsblty_indv = core_surf_indv[res]
 
-            if solv_acsblty_indv != 0 and solv_acsblty_combined == 0:
-                buried_surface_area = solv_acsblty_indv
-                buried_surface_area_dict[res] = buried_surface_area
-                if buried_surface_area >= 5:
-                    # 5 is an arbitrarily selected value that I have found to
-                    # discriminate well between core and surface residues
-                    core_ext_combined[res] = 'core'
-                elif buried_surface_area < 5:
-                    core_ext_combined[res] = 'surface'
-
-            elif solv_acsblty_indv != 0 and solv_acsblty_combined != 0:
+            if solv_acsblty_indv != 0:
                 buried_surface_area = round((((solv_acsblty_indv - solv_acsblty_combined)
                                               / solv_acsblty_indv) * 100), 1)
                 buried_surface_area_dict[res] = buried_surface_area
                 if buried_surface_area >= 20:
                     # 20% is an arbitrarily selected value that I have found to
                     # discriminate well between core and surface residues
-                    core_ext_combined[res] = 'core'
+                    core_surf_combined[res] = 'core'
                 elif buried_surface_area < 20:
-                    core_ext_combined[res] = 'surface'
+                    core_surf_combined[res] = 'surface'
 
         # Updates dataframe with solvent accessibility information
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
-            if (res_id in list(core_ext_combined.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
+            if (res_id in list(core_surf_combined.keys())
+                        and dssp_df['ATMNAME'][row] == 'CA'
                     ):
-                core_ext_list[row] = core_ext_combined[res_id]
+                core_surf_list[row] = core_surf_combined[res_id]
             if (res_id in list(buried_surface_area_dict.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
+                        and dssp_df['ATMNAME'][row] == 'CA'
                     ):
                 buried_surface_area_list[row] = buried_surface_area_dict[res_id]
-        core_ext_df = pd.DataFrame({'CORE_OR_SURFACE': core_ext_list,
-                                    'BURIED_SURFACE_AREA(%)': buried_surface_area_list})
-        dssp_df = pd.concat([dssp_df, core_ext_df], axis=1)
+        core_surf_df = pd.DataFrame({'CORE_OR_SURFACE': core_surf_list,
+                                     'BURIED_SURFACE_AREA(%)': buried_surface_area_list})
+        dssp_df = pd.concat([dssp_df, core_surf_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
 
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list

@@ -158,7 +158,7 @@ class barrel_interior_exterior_calcs():
 
         for res_id in list(xy_dict.keys()):
             if (res_id.split('_')[0] in sheets_df['RES_ID'].tolist()
-                    and res_id.split('_')[1] == 'CA'
+                        and res_id.split('_')[1] == 'CA'
                     ):
                 x_sum += xy_dict[res_id][0][0]
                 y_sum += xy_dict[res_id][1][0]
@@ -174,7 +174,7 @@ class barrel_interior_exterior_calcs():
     def calc_int_ext(domain_id, sheets_df, xy_dict, com, int_ext_dict):
         # Calculates whether a residue faces towards the interior or the
         # exterior of the barrel
-        print('Identifying interior and exterior residues in {}'.format(domain_id))
+        print('Determining interior and exterior residues in {}'.format(domain_id))
 
         res_dict = OrderedDict()
         for index, res_id in enumerate(sheets_df['RES_ID'].tolist()):
@@ -218,8 +218,24 @@ class barrel_interior_exterior_calcs():
 
 class sandwich_interior_exterior_calcs():
 
-    def find_z_axis(sheets_df):
+    def find_z_axis(G, sheets_df):
         # Finds axis between the two sheets of the beta-sandwiches
+        """
+        # Generates dataframe of longest strand and its longest neighbouring
+        # strand
+        strands = set(sheets_df['STRAND_NUM'].tolist())
+        strand_len = [0]*max(strands)
+
+        for row in range(sheets_df.shape[0]):
+            if sheets_df['ATMNAME'][row] == 'CA':
+                strand_len[(sheets_df['STRAND_NUM'][row]) - 1] += 1
+
+        longest_strand = strand_len.index(max(strand_len)) + 1
+        sheets_df = sheets_df[~sheets_df['STRAND_NUM'].isin([longest_strand])]
+        sheets_df = sheets_df.reset_index(drop=True)
+        sheets_df = sheets_df.iloc[::5, :]
+        sheets_df = sheets_df.reset_index(drop=True)
+        """
 
         # Extracts hydrogen bonded residues
         h_bonds_dict = {}
@@ -277,7 +293,7 @@ class sandwich_interior_exterior_calcs():
 
         return vector
 
-    def align_sandwich(domain_id, sheets, vector):
+    def align_sandwich(domain_id, vector):
         # Aligns the sandwich to z = 0 using the reference axis through the
         # sandwich core calculated in the previous step
         print('Aligning {} sandwich with z = 0'.format(domain_id))
@@ -313,6 +329,11 @@ class sandwich_interior_exterior_calcs():
                 xy_coords = np.array([[x_coord_atom],
                                       [y_coord_atom]])
                 xy_dict[atom_id] = xy_coords
+
+        with open('/home/ks17361/{}.pdb'.format(domain_id), 'w') as pdb_file:
+            pdb_file.write(sandwich.make_pdb())
+            pdb_file.write('HETATM    1  C   DUM     1       0.000   0.000  -2.000')
+            pdb_file.write('HETATM    2  C   DUM     2       0.000   0.000   2.000')
 
         return xy_dict
 
@@ -378,7 +399,7 @@ class sandwich_interior_exterior_calcs():
                                ((cb_y_coord-n_y_coord)*(c_x_coord-n_x_coord)))
 
                 if ((distance_com < 0 and distance_cb < 0)
-                        or (distance_com > 0 and distance_cb > 0)
+                    or (distance_com > 0 and distance_cb > 0)
                     ):
                     int_ext_dict[res] = 'interior'
                 else:
@@ -457,7 +478,7 @@ class int_ext_pipeline():
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(int_ext_dict.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
+                and dssp_df['ATMNAME'][row] == 'CA'
                 ):
                 int_ext_list[row] = int_ext_dict[res_id]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
@@ -488,11 +509,18 @@ class int_ext_pipeline():
                      in set(sheets.keys()) if sheet != '']
         sheets_df = dssp_df[dssp_df['SHEET_NUM'].isin(sheet_ids)]
         sheets_df = sheets_df.reset_index(drop=True)
-        vector = sandwich_interior_exterior_calcs.find_z_axis(sheets_df)
+
+        networks = list(sheets.values())
+        G = networks[0]
+        for num in range(1, len(networks)):
+            H = networks[num]
+            G = nx.compose(G, H)
+
+        vector = sandwich_interior_exterior_calcs.find_z_axis(G, sheets_df)
 
         # Aligns the beta-sandwich with z = 0
         xy_dict = sandwich_interior_exterior_calcs.align_sandwich(
-            domain_id, sheets, vector
+            domain_id, vector
         )
 
         # Labels residues as interior or exterior
@@ -504,7 +532,7 @@ class int_ext_pipeline():
         int_ext_list = ['']*dssp_df.shape[0]
         for row in range(dssp_df.shape[0]):
             if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
+                and dssp_df['ATMNAME'][row] == 'CA'
                 ):
                 int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})

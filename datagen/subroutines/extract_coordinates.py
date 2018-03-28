@@ -248,7 +248,10 @@ class extract_beta_structure_coords(run_stages):
     def remove_alternate_conformers(self, all_atoms_dfs_dict):
         # Retains only the most probable alternate conformers. In the case
         # where more than one conformer is equally most probable, (only) that
-        # which is listed first in the input PDB file is retained.
+        # which is listed first in the input PDB file is retained. Also removes
+        # all hydrogen atoms (for fair comparison of e.g. solvent accessible
+        # surface area, and nearest neighbouring residues, etc., between
+        # different structures).
         for domain_id in list(all_atoms_dfs_dict.keys()):
             pdb_df = all_atoms_dfs_dict[domain_id]
 
@@ -288,11 +291,16 @@ class extract_beta_structure_coords(run_stages):
                 alternate_conformers[a] = b
 
             for row in range(pdb_df.shape[0]):
+                # Removes alternate conformers
                 if (pdb_df['RES_ID'][row] in alternate_conformers
                         and pdb_df['CONFORMER'][row] not in
                         [alternate_conformers[pdb_df['RES_ID'][row]], '']
                         ):
                     pdb_df.loc[row, 'REC'] = None
+                # Removes hydrogens
+                if pdb_df['ELEMENT'][row] == 'H':
+                    pdb_df.loc[row, 'REC'] = None
+
             pdb_df = pdb_df[pdb_df['REC'].notnull()]
             pdb_df = pdb_df.reset_index(drop=True)
 
