@@ -330,11 +330,6 @@ class sandwich_interior_exterior_calcs():
                                       [y_coord_atom]])
                 xy_dict[atom_id] = xy_coords
 
-        with open('/home/ks17361/{}.pdb'.format(domain_id), 'w') as pdb_file:
-            pdb_file.write(sandwich.make_pdb())
-            pdb_file.write('HETATM    1  C   DUM     1       0.000   0.000  -2.000')
-            pdb_file.write('HETATM    2  C   DUM     2       0.000   0.000   2.000')
-
         return xy_dict
 
     def calc_int_ext(domain_id, dssp_df, xy_dict):
