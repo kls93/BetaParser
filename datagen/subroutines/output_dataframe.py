@@ -42,7 +42,7 @@ class output_calcs():
                             chain_res_num = line[21:27].replace(' ', '')
                             if (line[12:16].strip() == 'CA'
                                     and chain_res_num in res_ids_list
-                                    ):
+                                ):
                                 strand_coordinates[chain_res_num] = float(line[46:54])
                     else:
                         if float(line[46:54]) > upper_bound:
@@ -157,7 +157,7 @@ class gen_output(run_stages):
             for row in range(dssp_df.shape[0]):
                 if (dssp_df['STRAND_NUM'][row] in list(edge_or_central_dict.keys())
                         and dssp_df['ATMNAME'][row] == 'CA'
-                        ):
+                    ):
                     edge_or_central_list[row] = edge_or_central_dict[dssp_df['STRAND_NUM'][row]]
             df_edge_or_central = pd.DataFrame({'EDGE_OR_CNTRL': edge_or_central_list})
             dssp_df = pd.concat([dssp_df, df_edge_or_central], axis=1)
@@ -201,6 +201,7 @@ class gen_output(run_stages):
         chi = []
         solv_acsblty = []
         neighbours = []
+        h_bonds_list = []
 
         unprocessed_list = []
 
@@ -436,6 +437,26 @@ class gen_output(run_stages):
                 elif strand_or_res == 'res':
                     neighbours += neighbours_list
 
+                # Generates list of neighbouring residues
+                backbone_h_bonds = []
+                dssp_to_pdb = dict(zip(dssp_df['DSSP_NUM'].tolist(),
+                                       dssp_df['RESNUM'].tolist()))
+                for row in range(strand_df.shape[0]):
+                    h_bonds = strand_df['H-BONDS'][row]
+                    h_bonds_renum = []
+                    for dssp_num in h_bonds:
+                        if dssp_num in list(dssp_to_pdb.keys()):
+                            h_bonds_renum.append(int(dssp_to_pdb[dssp_num]))
+                    backbone_h_bonds.append(h_bonds_renum)
+
+                if reverse is True:
+                    backbone_h_bonds.reverse()
+
+                if strand_or_res == 'strand':
+                    h_bonds_list.append(backbone_h_bonds)
+                elif strand_or_res == 'res':
+                    h_bonds_list += backbone_h_bonds
+
         # Generates csv file of beta-barrel dataset
         if self.code[0:4] in ['2.40']:
             beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
@@ -455,12 +476,13 @@ class gen_output(run_stages):
                                             'SOLV_ACSBLTY': solv_acsblty,
                                             'NEIGHBOURING_RESIDUES(<{}A)'.format(
                                                 self.radius
-                                            ): neighbours})
+                                            ): neighbours,
+                                            'BACKBONE_H_BONDS': h_bonds_list})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[10]] + [cols[12]] + [cols[14]] + [cols[8]] +
-                    [cols[5]] + [cols[1]] + [cols[11]] + [cols[15]] + [cols[2]]
-                    + [cols[13]] + [cols[4]] + [cols[5]] + [cols[6]] +
-                    [cols[0]] + [cols[9]] + [cols[3]])
+            cols = ([cols[11]] + [cols[13]] + [cols[15]] + [cols[9]] +
+                    [cols[8]] + [cols[2]] + [cols[12]] + [cols[16]] + [cols[3]]
+                    + [cols[14]] + [cols[5]] + [cols[6]] + [cols[7]] +
+                    [cols[1]] + [cols[10]] + [cols[4]] + [cols[0]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
@@ -476,7 +498,7 @@ class gen_output(run_stages):
                                             'STRAND_POS(%)': strand_percentage_pos,
                                             'INT_EXT': int_ext,
                                             'CORE_OR_SURFACE': core_surf,
-                                            'BURIED_SURFACE_AREA()%)': buried_surface_area,
+                                            'BURIED_SURFACE_AREA(%)': buried_surface_area,
                                             'OMEGA': omega,
                                             'PHI': phi,
                                             'PSI': psi,
@@ -484,12 +506,13 @@ class gen_output(run_stages):
                                             'SOLV_ACSBLTY': solv_acsblty,
                                             'NEIGHBOURING_RESIDUES(<{}A)'.format(
                                                 self.radius
-                                            ): neighbours})
+                                            ): neighbours,
+                                            'BACKBONE_H_BONDS': h_bonds_list})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[13]] + [cols[11]] + [cols[3]] + [cols[10]] + [cols[4]]
-                    + [cols[15]] + [cols[14]] + [cols[5]] + [cols[2]] +
-                    [cols[0]] + [cols[7]] + [cols[8]] + [cols[9]] + [cols[1]]
-                    + [cols[12]] + [cols[6]])
+            cols = ([cols[14]] + [cols[12]] + [cols[4]] + [cols[11]] +
+                    [cols[5]] + [cols[16]] + [cols[15]] + [cols[6]] + [cols[3]]
+                    + [cols[1]] + [cols[8]] + [cols[9]] + [cols[10]] +
+                    [cols[2]] + [cols[13]] + [cols[7]] + [cols[0]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
