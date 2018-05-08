@@ -41,7 +41,7 @@ class output_calcs():
                         if line[0:6].strip() in ['ATOM', 'HETATM']:
                             chain_res_num = line[21:27].replace(' ', '')
                             if (line[12:16].strip() == 'CA'
-                                    and chain_res_num in res_ids_list
+                                and chain_res_num in res_ids_list
                                 ):
                                 strand_coordinates[chain_res_num] = float(line[46:54])
                     else:
@@ -156,7 +156,7 @@ class gen_output(run_stages):
             edge_or_central_list = ['']*dssp_df.shape[0]
             for row in range(dssp_df.shape[0]):
                 if (dssp_df['STRAND_NUM'][row] in list(edge_or_central_dict.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
+                    and dssp_df['ATMNAME'][row] == 'CA'
                     ):
                     edge_or_central_list[row] = edge_or_central_dict[dssp_df['STRAND_NUM'][row]]
             df_edge_or_central = pd.DataFrame({'EDGE_OR_CNTRL': edge_or_central_list})
@@ -166,8 +166,8 @@ class gen_output(run_stages):
         return sec_struct_dfs_dict
 
     def write_beta_strand_dataframe(self, strand_or_res, sec_struct_dfs_dict,
-                                    opm_database, tilt_angles, strand_numbers,
-                                    shear_numbers):
+                                    all_atoms_dfs_dict, opm_database,
+                                    tilt_angles, strand_numbers, shear_numbers):
         # Generates dataframes of residues and strands in the retained domains.
         if __name__ == 'subroutines.output_dataframe':
             from subroutines.output_dataframe import output_calcs
@@ -202,6 +202,10 @@ class gen_output(run_stages):
         solv_acsblty = []
         neighbours = []
         h_bonds_list = []
+        minus_1_list = []
+        plus_1_list = []
+        minus_2_list = []
+        plus_2_list = []
 
         unprocessed_list = []
 
@@ -437,16 +441,17 @@ class gen_output(run_stages):
                 elif strand_or_res == 'res':
                     neighbours += neighbours_list
 
-                # Generates list of neighbouring residues
+                # Generates list of residues forming backbone hydrogen-bonds
+                # with the residue in question
                 backbone_h_bonds = []
                 dssp_to_pdb = dict(zip(dssp_df['DSSP_NUM'].tolist(),
-                                       dssp_df['RESNUM'].tolist()))
+                                       dssp_df['RES_ID'].tolist()))
                 for row in range(strand_df.shape[0]):
                     h_bonds = strand_df['H-BONDS'][row]
                     h_bonds_renum = []
                     for dssp_num in h_bonds:
                         if dssp_num in list(dssp_to_pdb.keys()):
-                            h_bonds_renum.append(int(dssp_to_pdb[dssp_num]))
+                            h_bonds_renum.append(dssp_to_pdb[dssp_num])
                     backbone_h_bonds.append(h_bonds_renum)
 
                 if reverse is True:
@@ -456,6 +461,48 @@ class gen_output(run_stages):
                     h_bonds_list.append(backbone_h_bonds)
                 elif strand_or_res == 'res':
                     h_bonds_list += backbone_h_bonds
+
+                # Generates list of residues in +/-1 and +/2 positions to the
+                # residue in question
+                minus_1 = []
+                plus_1 = []
+                minus_2 = []
+                plus_2 = []
+                all_atom_df = all_atoms_dfs_dict[domain_id]
+
+                for row in range(strand_df.shape[0]):
+                    # BUT BEWARE COUNTING NON-SEQUENTIAL RESIDUES USING THIS METHOD
+                    res_id = strand_df['RES_ID'][row]
+                    all_atom_df_index = all_atom_df['RES_ID'].tolist().index(res_id)
+                    try:
+                        m_1 = all_atom_df['FASTA'].tolist()[all_atom_df_index-1]
+                        p_1 = all_atom_df['FASTA'].tolist()[all_atom_df_index+1]
+                        m_2 = all_atom_df['FASTA'].tolist()[all_atom_df_index-2]
+                        p_2 = all_atom_df['FASTA'].tolist()[all_atom_df_index+2]
+                        print(m_1)
+                        print(p_1)
+                        print(m_2)
+                        print(p_2)
+                    except KeyError:
+                        m_1 = ''
+                        p_1 = ''
+                        m_2 = ''
+                        p_2 = ''
+                    minus_1.append(m_1)
+                    plus_1.append(p_1)
+                    minus_2.append(m_2)
+                    plus_2.append(p_2)
+
+                if strand_or_res == 'strand':
+                    minus_1_list.append(minus_1)
+                    plus_1_list.append(plus_1)
+                    minus_2_list.append(minus_2)
+                    plus_2_list.append(plus_2)
+                elif strand_or_res == 'res':
+                    minus_1_list += minus_1
+                    plus_1_list += plus_1
+                    minus_2_list += minus_2
+                    plus_2_list += plus_2
 
         # Generates csv file of beta-barrel dataset
         if self.code[0:4] in ['2.40']:
@@ -477,12 +524,17 @@ class gen_output(run_stages):
                                             'NEIGHBOURING_RESIDUES(<{}A)'.format(
                                                 self.radius
                                             ): neighbours,
-                                            'BACKBONE_H_BONDS': h_bonds_list})
+                                            'BACKBONE_H_BONDS': h_bonds_list,
+                                            'MINUS_1_POS': minus_1_list,
+                                            'PLUS_1_POS': plus_1_list,
+                                            'MINUS_2_POS': minus_2_list,
+                                            'PLUS_2_POS': plus_2_list})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[11]] + [cols[13]] + [cols[15]] + [cols[9]] +
-                    [cols[8]] + [cols[2]] + [cols[12]] + [cols[16]] + [cols[3]]
-                    + [cols[14]] + [cols[5]] + [cols[6]] + [cols[7]] +
-                    [cols[1]] + [cols[10]] + [cols[4]] + [cols[0]])
+            cols = ([cols[15]] + [cols[17]] + [cols[19]] + [cols[13]] +
+                    [cols[12]] + [cols[2]] + [cols[20]] + [cols[16]] +
+                    [cols[3]] + [cols[18]] + [cols[7]] + [cols[8]] +
+                    [cols[11]] + [cols[1]] + [cols[14]] + [cols[6]] + [cols[0]]
+                    + [cols[4]] + [cols[9]] + [cols[5]] + [cols[10]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
@@ -507,12 +559,17 @@ class gen_output(run_stages):
                                             'NEIGHBOURING_RESIDUES(<{}A)'.format(
                                                 self.radius
                                             ): neighbours,
-                                            'BACKBONE_H_BONDS': h_bonds_list})
+                                            'BACKBONE_H_BONDS': h_bonds_list,
+                                            'MINUS_1_POS': minus_1_list,
+                                            'PLUS_1_POS': plus_1_list,
+                                            'MINUS_2_POS': minus_2_list,
+                                            'PLUS_2_POS': plus_2_list})
             cols = beta_strands_df.columns.tolist()
-            cols = ([cols[14]] + [cols[12]] + [cols[4]] + [cols[11]] +
-                    [cols[5]] + [cols[16]] + [cols[15]] + [cols[6]] + [cols[3]]
-                    + [cols[1]] + [cols[8]] + [cols[9]] + [cols[10]] +
-                    [cols[2]] + [cols[13]] + [cols[7]] + [cols[0]])
+            cols = ([cols[18]] + [cols[16]] + [cols[4]] + [cols[15]] +
+                    [cols[5]] + [cols[20]] + [cols[19]] + [cols[6]] + [cols[3]]
+                    + [cols[1]] + [cols[10]] + [cols[11]] + [cols[14]] +
+                    [cols[2]] + [cols[17]] + [cols[9]] + [cols[0]] + [cols[7]]
+                    + [cols[12]] + [cols[8]] + [cols[13]])
             beta_strands_df = beta_strands_df[cols]
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))

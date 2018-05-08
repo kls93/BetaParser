@@ -117,7 +117,7 @@ class barrel_interior_exterior_calcs():
         print('Aligning {} barrel with z = 0'.format(domain_id))
 
         # Creates ampal object from barrel
-        barrel = isambard.ampal.convert_pdb_to_ampal(
+        barrel = isambard.external_programs.reduce.assembly_plus_protons(
             'Beta_strands/{}.pdb'.format(domain_id)
         )
 
@@ -158,8 +158,8 @@ class barrel_interior_exterior_calcs():
 
         for res_id in list(xy_dict.keys()):
             if (res_id.split('_')[0] in sheets_df['RES_ID'].tolist()
-                        and res_id.split('_')[1] == 'CA'
-                    ):
+                and res_id.split('_')[1] == 'CA'
+                ):
                 x_sum += xy_dict[res_id][0][0]
                 y_sum += xy_dict[res_id][1][0]
                 count += 1
@@ -182,15 +182,21 @@ class barrel_interior_exterior_calcs():
 
         for res_id in list(res_dict.keys()):
             if (all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
-                        for x in ['N', 'CA', 'C', 'O', 'CB'])
-                    ):
-                # Calculates angle between C_alpha, C_beta and the centre of
-                # mass
+                    for x in ['N', 'CA', 'C', 'O', 'CB']))
+                or (res_id == 'GLY'
+                    and all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
+                            for x in ['N', 'CA', 'C', 'O', 'HA3'])):
+                    # Calculates angle between C_alpha, C_beta and the centre of
+                    # mass
                 c_alpha_x = xy_dict['{}_CA'.format(res_id)][0][0]
                 c_alpha_y = xy_dict['{}_CA'.format(res_id)][1][0]
 
-                c_beta_x = xy_dict['{}_CB'.format(res_id)][0][0]
-                c_beta_y = xy_dict['{}_CB'.format(res_id)][1][0]
+                try:
+                    c_beta_x = xy_dict['{}_CB'.format(res_id)][0][0]
+                    c_beta_y = xy_dict['{}_CB'.format(res_id)][1][0]
+                except KeyError:
+                    c_beta_x = xy_dict['{}_HA3'.format(res_id)][0][0]
+                    c_beta_y = xy_dict['{}_HA3'.format(res_id)][1][0]
 
                 c_alpha_beta_vector = np.array([[c_beta_x-c_alpha_x],
                                                 [c_beta_y-c_alpha_y]])
@@ -394,8 +400,8 @@ class sandwich_interior_exterior_calcs():
                                ((cb_y_coord-n_y_coord)*(c_x_coord-n_x_coord)))
 
                 if ((distance_com < 0 and distance_cb < 0)
-                    or (distance_com > 0 and distance_cb > 0)
-                    ):
+                        or (distance_com > 0 and distance_cb > 0)
+                        ):
                     int_ext_dict[res] = 'interior'
                 else:
                     int_ext_dict[res] = 'exterior'
@@ -473,8 +479,8 @@ class int_ext_pipeline():
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(int_ext_dict.keys())
-                and dssp_df['ATMNAME'][row] == 'CA'
-                ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
                 int_ext_list[row] = int_ext_dict[res_id]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
@@ -527,8 +533,8 @@ class int_ext_pipeline():
         int_ext_list = ['']*dssp_df.shape[0]
         for row in range(dssp_df.shape[0]):
             if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
-                and dssp_df['ATMNAME'][row] == 'CA'
-                ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
                 int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)

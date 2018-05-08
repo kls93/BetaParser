@@ -137,14 +137,15 @@ class naccess_solv_acsblty_calcs():
 
     def calculate_residue_solv_acsblty(domain_id):
         # Calculates solvent accessibility of individual residues (in the
-        # context of the parent CATH / SCOPe domain)
+        # context of the parent biological assembly)
         res_solv_acsblty = OrderedDict()
         sheet_sub_strings = []
 
         print('Calculating solvent accessible surface areas of individual '
               'residues in {}'.format(domain_id))
 
-        with open('Entire_domains/{}.pdb'.format(domain_id), 'r') as pdb_file:
+        with open('{}/{}/{}.pdb'.format(self.pdb_database, domain_id[1:3],
+                                        domain_id), 'r') as pdb_file:
             for line in pdb_file.readlines():
                 line_start = line[0:16]
                 line_end = line[17:]
@@ -157,13 +158,15 @@ class naccess_solv_acsblty_calcs():
         sheet_string = ''.join(sheet_sub_strings)
 
         # Runs NACCESS to calculate solvent accessible surface area of every
-        # residue side chain in domain
+        # residue side chain (note that naccess classes C_alpha atoms as
+        # side-chain rather than main chain so that Gly has a side chain sasa
+        # value) in domain
         naccess_out = isambard.external_programs.naccess.run_naccess(
             sheet_string, 'rsa', path=False, include_hetatms=True
         )
         naccess_out = naccess_out.split('\n')
         for line in naccess_out:
-            if line[0:3] in ['RES', 'HEM'] and line[5:8] != 'GLY':
+            if line[0:3] in ['RES', 'HEM']:
                 chain = line[8:9].strip()
                 res_num = line[9:13].strip()
                 ins_code = line[13:14].strip()
@@ -188,8 +191,8 @@ class naccess_solv_acsblty_calcs():
         # accessibility calculations show that none of the retained beta-sheets
         # are in contact with one another
         if (code[0:4] in ['2.60']
-                and max(list(solv_acsblty_dict.keys())) == 0.0
-                ):
+                and float(max(list(solv_acsblty_dict.keys()))) == 0.0
+            ):
             unprocessed_list.append(domain_id)
             sec_struct_dfs_dict[domain_id] = None
             for sheet_id in sheets:
@@ -218,8 +221,8 @@ class naccess_solv_acsblty_calcs():
                     dssp_df.loc[row, 'REC'] = None
 
                 if (res_id in list(res_solv_acsblty.keys())
-                            and dssp_df['ATMNAME'][row] == 'CA'
-                        ):
+                    and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
                     solv_acsblty_list[row] = res_solv_acsblty[res_id]
 
         solv_acsblty_df = pd.DataFrame({'SOLV_ACSBLTY': solv_acsblty_list})
@@ -301,8 +304,7 @@ class naccess_solv_acsblty_calcs():
             sheet_string, 'rsa', path=False, include_hetatms=True
         )
         naccess_out = naccess_out.split('\n')
-        naccess_out = [line for line in naccess_out if line != '' and line[5:8]
-                       != 'GLY']
+        naccess_out = [line for line in naccess_out if line != '' and line[5:8]]
         for line in naccess_out:
             if line[0:3] in ['RES', 'HEM']:
                 chain = line[8:9].strip()
@@ -362,17 +364,19 @@ class naccess_solv_acsblty_calcs():
                     core_surf_combined[res] = 'core'
                 elif buried_surface_area < 20:
                     core_surf_combined[res] = 'surface'
+            else:
+                core_surf_combined[res] = ''
 
         # Updates dataframe with solvent accessibility information
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(core_surf_combined.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                and dssp_df['ATMNAME'][row] == 'CA'
+                ):
                 core_surf_list[row] = core_surf_combined[res_id]
             if (res_id in list(buried_surface_area_dict.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                and dssp_df['ATMNAME'][row] == 'CA'
+                ):
                 buried_surface_area_list[row] = buried_surface_area_dict[res_id]
         core_surf_df = pd.DataFrame({'CORE_OR_SURFACE': core_surf_list,
                                      'BURIED_SURFACE_AREA(%)': buried_surface_area_list})

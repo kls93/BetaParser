@@ -26,16 +26,16 @@ class nearest_neighbours(run_stages):
 
             # Creates AMPAL object
             domain = isambard.ampal.convert_pdb_to_ampal(
-                'Beta_strands/{}.pdb'.format(domain_id)
+                '{}/{}/{}.pdb'.format(self.pdb_database, domain_id[1:3], domain_id)
             )
 
             # Creates list of res_ids ('neighbouring residues') within a
             # user-specified radius of the C_alpha atom of every residue in the
             # input domain
-            atom_list = list(domain.get_atoms())
-            atom_ca_list = [atom for atom in atom_list if atom.res_label == 'CA']
-            for atom_ca in atom_ca_list:
+            atom_ca_list = dssp_df['ATOM_NUM'].tolist()
+            for atom_num in atom_ca_list:
                 neighbouring_res = []
+                atom_ca = [atom for atom in domain.get_atoms() if atom.id == atom_num]
                 for atom in domain.is_within(self.radius, atom_ca, ligands=False):
                     # Finds res_id of neighbouring residue
                     parent_res = (atom.ampal_parent.ampal_parent.id

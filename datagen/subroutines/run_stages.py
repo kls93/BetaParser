@@ -121,7 +121,8 @@ class run_stages():
         # Pickles variables required for running stage 3 (which currently has
         # to run within ISAMBARD, hence the division of stages 2-4)
         with open('Input_ISAMBARD_variables.pkl', 'wb') as pickle_file:
-            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
+            pickle.dump((sec_struct_dfs_dict, all_atoms_dfs_dict,
+                         domain_sheets_dict), pickle_file)
 
     def run_stage_3(self, radius):
         # To be run within ISAMBARD. **NOTE** solvent accessibility
@@ -139,7 +140,8 @@ class run_stages():
 
         # Loads pickled variables generated from running stage 2.
         with open('Input_ISAMBARD_variables.pkl', 'rb') as pickle_file:
-            sec_struct_dfs_dict, domain_sheets_dict = pickle.load(pickle_file)
+            (sec_struct_dfs_dict, all_atoms_dfs_dict, domain_sheets_dict
+             ) = pickle.load(pickle_file)
 
         # Runs NACCESS to calculate the solvent accessible surface area of
         # each individual residue
@@ -177,7 +179,8 @@ class run_stages():
 
         # Pickles variables required for running stage 4
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
-            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict, radius),
+            pickle.dump((sec_struct_dfs_dict, all_atoms_dfs_dict,
+                         domain_sheets_dict, radius),
                         pickle_file)
 
     def run_stage_4(self, orig_dir, opm_database):
@@ -193,7 +196,8 @@ class run_stages():
             from datagen.subroutines.output_dataframe import gen_output
 
         with open('Output_ISAMBARD_variables.pkl', 'rb') as pickle_file:
-            sec_struct_dfs_dict, domain_sheets_dict, radius = pickle.load(pickle_file)
+            (sec_struct_dfs_dict, all_atoms_dfs_dict, domain_sheets_dict,
+             radius) = pickle.load(pickle_file)
 
         output = gen_output(self.run_parameters, radius)
 
@@ -229,12 +233,12 @@ class run_stages():
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual beta-strand.
         output.write_beta_strand_dataframe(
-            'strand', sec_struct_dfs_dict, opm_database, tilt_angles,
-            strand_numbers, shear_numbers
+            'strand', sec_struct_dfs_dict, all_atoms_dfs_dict, opm_database,
+            tilt_angles, strand_numbers, shear_numbers
         )
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual residue.
         output.write_beta_strand_dataframe(
-            'res', sec_struct_dfs_dict, opm_database, tilt_angles,
-            strand_numbers, shear_numbers
+            'res', sec_struct_dfs_dict, all_atoms_dfs_dict, opm_database,
+            tilt_angles, strand_numbers, shear_numbers
         )

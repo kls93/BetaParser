@@ -55,6 +55,8 @@ class extract_beta_structure_coords(run_stages):
         unprocessed_list = []
 
         for row in range(cdhit_domain_df.shape[0]):
+            first_chain = ''
+            count = 0
             residue_list = []
             rec = []
             atmnum = []
@@ -142,11 +144,19 @@ class extract_beta_structure_coords(run_stages):
                 # Selects the first identified sequence from the input PDB that
                 # shares greater than 95% sequence similarity with the domain
                 # segment sequence in question
+                count += 1
                 sequence_identified = False
                 for index_3, sequence in enumerate(sequences):
                     sseqs_list = []
                     similarity = SequenceMatcher(a=segment, b=sequence).ratio()
                     if similarity >= 0.95:
+                        if count == 1:
+                            first_chain = pdb_file_lines[indices[0]][21:22].strip()
+                        elif count > 1:
+                            new_chain = pdb_file_lines[indices[0]][21:22].strip()
+                            if new_chain != first_chain:
+                                break
+
                         sequence_identified = True
 
                         pdb_file = open('Entire_domains/{}.pdb'.format(
