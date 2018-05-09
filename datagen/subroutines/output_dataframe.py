@@ -119,6 +119,33 @@ class output_calcs():
         return membrane_loc
 
 
+def reverse_strand_lists(sub_list, reverse):
+    if reverse is True:
+        sub_list = sub_list[::-1]
+    return sublist()
+
+
+def append_to_output_lists(sub_list, long_list, res_ids_list, strand_or_res):
+    if strand_or_res == 'strand':
+        long_list.append(sub_list)
+    elif strand_or_res == 'res':
+        if isinstance(sub_list, list):
+            long_list += sub_list
+        else:
+            long_list += [sub_list]*len(res_ids_list)
+
+    return long_list
+
+
+def reverse_and_append(residue_property, strand_df, long_list, reverse,
+                       res_ids_list, strand_or_res):
+    sub_list = strand_df[residue_property].tolist()
+    sub_list = reverse_strand_lists(sub_list, reverse)
+    long_list = append_to_output_lists(sub_list, long_list, res_ids_list, strand_or_res)
+
+    return long_list
+
+
 class gen_output(run_stages):
 
     def __init__(self, run_parameters, radius):
@@ -216,7 +243,9 @@ class gen_output(run_stages):
         unprocessed_list = []
 
         # Extracts property values for each domain_id
-        for domain_id, dssp_df in sec_struct_dfs_dict.items():
+        for domain_id in list(sec_struct_dfs_dict.keys()):
+            dssp_df = sec_struct_dfs_dict[domain_id]
+
             strands_list = [strand_num for strand_num in set(dssp_df['STRAND_NUM'].tolist())
                             if strand_num != '']
 
@@ -253,44 +282,39 @@ class gen_output(run_stages):
                     else:
                         value = ''
 
-                    if strand_or_res == 'strand':
-                        tilt_angle.append(value)
-                    elif strand_or_res == 'res':
-                        tilt_angle += [value]*len(res_ids_list)
+                    tilt_angle = append_to_output_lists(
+                        value, tilt_angle, res_ids_list, strand_or_res
+                    )
 
                 # Lists number of strands in barrel
                 if self.code[0:4] in ['2.40']:
-                    if strand_or_res == 'strand':
-                        strand_number.append(strand_numbers[domain_id])
-                    elif strand_or_res == 'res':
-                        strand_number += [strand_numbers[domain_id]]*len(res_ids_list)
+                    strand_number = append_to_output_lists(
+                        strand_numbers[domain_id], strand_number, res_ids_list,
+                        strand_or_res
+                    )
 
                 # Lists barrel shear number
                 if self.code[0:4] in ['2.40']:
                     # shear_number.append(shear_numbers[domain_id])
-                    if strand_or_res == 'strand':
-                        shear_number.append('')
-                    elif strand_or_res == 'res':
-                        shear_number += ['']*len(res_ids_list)
+                    shear_number = append_to_output_lists(
+                        '', shear_number, res_ids_list, strand_or_res
+                    )
 
                 # Determines whether the strand is an edge or central strand
                 if self.code[0:4] in ['2.60']:
                     edge_or_central_list = [label for label in
                                             set(strand_df['EDGE_OR_CNTRL'].tolist())]
 
-                    if strand_or_res == 'strand':
-                        edge_or_central.append(edge_or_central_list[0])
-                    elif strand_or_res == 'res':
-                        edge_or_central += [edge_or_central_list[0]]*len(res_ids_list)
+                    edge_or_central = append_to_output_lists(
+                        edge_or_central_list[0], edge_or_central, res_ids_list,
+                        strand_or_res
+                    )
 
                 # Lists residue IDs in strand
-                if reverse is True:
-                    res_ids_list.reverse()
-
-                if strand_or_res == 'strand':
-                    res_ids.append(res_ids_list)
-                elif strand_or_res == 'res':
-                    res_ids += res_ids_list
+                res_ids_list = reverse_strand_lists(res_ids_list, reverse)
+                res_ids = append_to_output_lists(
+                    res_ids_list, res_ids, res_ids_list, strand_or_res
+                )
 
                 # Generates FASTA sequence of strand
                 res_list = strand_df['RESNAME'].tolist()
@@ -300,13 +324,11 @@ class gen_output(run_stages):
                         sequence += amino_acids_dict[res]
                     else:
                         sequence += 'X'
-                if reverse is True:
-                    sequence = sequence[::-1]  # Reverses string
 
-                if strand_or_res == 'strand':
-                    fasta_seq.append(sequence)
-                elif strand_or_res == 'res':
-                    fasta_seq += sequence
+                sequence = reverse_strand_lists(sequence, reverse)
+                fasta_seq = append_to_output_lists(
+                    sequence, fasta_seq, res_ids_list, strand_or_res
+                )
 
                 # Generates list of strand z-coordinates
                 if self.code[0:4] in ['2.40']:
@@ -315,48 +337,33 @@ class gen_output(run_stages):
                     else:
                         strand_z_coords = ['']*len(res_ids_list)
 
-                    if reverse is True:
-                        strand_z_coords.reverse()
-
-                    if strand_or_res == 'strand':
-                        z_coords.append(strand_z_coords)
-                    elif strand_or_res == 'res':
-                        z_coords += strand_z_coords
+                    strand_z_coords = reverse_strand_lists(strand_z_coords, reverse)
+                    z_coords = append_to_output_lists(
+                        strand_z_coords, z_coords, res_ids_list, strand_or_res
+                    )
 
                 # Generates list of interior and exterior facing residues in
                 # the strand
-                int_ext_list = strand_df['INT_EXT'].tolist()
-                if reverse is True:
-                    int_ext_list.reverse()
-
-                if strand_or_res == 'strand':
-                    int_ext.append(int_ext_list)
-                elif strand_or_res == 'res':
-                    int_ext += int_ext_list
+                int_ext = reverse_and_append(
+                    'INT_EXT', strand_df, int_ext, reverse, res_ids_list,
+                    strand_or_res
+                )
 
                 # Generates list of residues that form the beta-sandwich core
                 if self.code[0:4] in ['2.60']:
-                    core_surf_list = strand_df['CORE_OR_SURFACE'].tolist()
-                    if reverse is True:
-                        core_surf_list.reverse()
-
-                    if strand_or_res == 'strand':
-                        core_surf.append(core_surf_list)
-                    elif strand_or_res == 'res':
-                        core_surf += core_surf_list
+                    core_surf = reverse_and_append(
+                        'CORE_OR_SURFACE', strand_df, core_surf, reverse,
+                        res_ids_list, strand_or_res
+                    )
 
                 # Generates list of percentage values for the surface area of
                 # each residue that is buried in the sandwich as compared with
                 # the individual parent sheet
                 if self.code[0:4] in ['2.60']:
-                    buried_surface_area_list = strand_df['BURIED_SURFACE_AREA(%)'].tolist()
-                    if reverse is True:
-                        buried_surface_area_list.reverse()
-
-                    if strand_or_res == 'strand':
-                        buried_surface_area.append(buried_surface_area_list)
-                    elif strand_or_res == 'res':
-                        buried_surface_area += buried_surface_area_list
+                    buried_surface_area = reverse_and_append(
+                        'BURIED_SURFACE_AREA(%)', strand_df, buried_surface_area,
+                        reverse, res_ids_list, strand_or_res
+                    )
 
                 # Generates list of transmembrane and external residues in the
                 # strand - MUST COME AFTER REVERSAL (OR NOT) OF RES_IDS_LIST
@@ -368,10 +375,9 @@ class gen_output(run_stages):
                     )
                     # Don't need to reverse list as will match res_ids_list
                     # order (which has already been reversed)
-                    if strand_or_res == 'strand':
-                        tm_ext.append(tm_ext_list)
-                    elif strand_or_res == 'res':
-                        tm_ext += tm_ext_list
+                    tm_ext = append_to_output_lists(
+                        tm_ext_list, tm_ext, res_ids_list, strand_or_res
+                    )
 
                 # Determines positions of residues relative to centre of strand
                 # in sandwiches
@@ -379,16 +385,21 @@ class gen_output(run_stages):
                     (strand_abs_displacement, strand_percentage_displacement
                      ) = output_calcs.determine_strand_position_sandwich(strand_df)
 
-                    if reverse is True:
-                        strand_abs_displacement.reverse()
-                        strand_percentage_displacement.reverse()
+                    strand_abs_displacement = reverse_strand_lists(
+                        strand_abs_displacement, reverse
+                    )
+                    strand_abs_pos = append_to_output_lists(
+                        strand_abs_displacement, strand_abs_pos, res_ids_list,
+                        reverse
+                    )
 
-                    if strand_or_res == 'strand':
-                        strand_abs_pos.append(strand_abs_displacement)
-                        strand_percentage_pos.append(strand_percentage_displacement)
-                    elif strand_or_res == 'res':
-                        strand_abs_pos += strand_abs_displacement
-                        strand_percentage_pos += strand_percentage_displacement
+                    strand_percentage_displacement = reverse_strand_lists(
+                        strand_percentage_displacement, reverse
+                    )
+                    strand_percentage_pos = append_to_output_lists(
+                        strand_percentage_displacement, strand_percentage_pos,
+                        res_ids_list, strand_or_res
+                    )
 
                 # Determines positions of residues in TM region of strand in
                 # beta-barrel - MUST COME AFTER TM / EXTERNAL CALCULATION
@@ -399,56 +410,39 @@ class gen_output(run_stages):
 
                     # Don't need to reverse list as will match tm_ext_list
                     # order (which has already been reversed)
-                    if strand_or_res == 'strand':
-                        tm_pos.append(membrane_loc)
-                    elif strand_or_res == 'res':
-                        tm_pos += membrane_loc
+                    tm_pos = append_to_output_lists(
+                        membrane_loc, tm_pos, res_ids_list, strand_or_res
+                    )
 
                 # Generates list of torsion angles along the strand
-                omega_angles = strand_df['OMEGA'].tolist()
-                phi_angles = strand_df['PHI'].tolist()
-                psi_angles = strand_df['PSI'].tolist()
-                chi_angles = strand_df['CHI_ANGLES'].tolist()
-                if reverse is True:
-                    omega_angles.reverse()
-                    phi_angles.reverse()
-                    psi_angles.reverse()
-                    chi_angles.reverse()
-
-                if strand_or_res == 'strand':
-                    omega.append(omega_angles)
-                    phi.append(phi_angles)
-                    psi.append(psi_angles)
-                    chi.append(chi_angles)
-                elif strand_or_res == 'res':
-                    omega += omega_angles
-                    phi += phi_angles
-                    psi += psi_angles
-                    chi += chi_angles
+                omega = reverse_and_append(
+                    'OMEGA', strand_df, omega, reverse, res_ids_list, strand_or_res
+                )
+                phi = reverse_and_append(
+                    'PHI', strand_df, phi, reverse, res_ids_list, strand_or_res
+                )
+                psi = reverse_and_append(
+                    'PSI', strand_df, psi, reverse, res_ids_list, strand_or_res
+                )
+                chi = reverse_and_append(
+                    'CHI', strand_df, chi, reverse, res_ids_list, strand_or_res
+                )
 
                 # Generates list of residue solvent accessibility along the
                 # strand
-                solv_acsblty_list = strand_df['SOLV_ACSBLTY'].tolist()
-                if reverse is True:
-                    solv_acsblty_list.reverse()
-
-                if strand_or_res == 'strand':
-                    solv_acsblty.append(solv_acsblty_list)
-                elif strand_or_res == 'res':
-                    solv_acsblty += solv_acsblty_list
+                solv_acsblty = reverse_and_append(
+                    'SOLV_ACSBLTY', strand_df, solv_acsblty, reverse,
+                    res_ids_list, strand_or_res
+                )
 
                 # Generates list of neighbouring residues
-                neighbours_list = strand_df['NEIGHBOURS'].tolist()
-                if reverse is True:
-                    neighbours_list.reverse()
-
-                if strand_or_res == 'strand':
-                    neighbours.append(neighbours_list)
-                elif strand_or_res == 'res':
-                    neighbours += neighbours_list
+                neighbours = reverse_and_append(
+                    'NEIGHBOURS', strand_df, neighbours, reverse, res_ids_list,
+                    strand_or_res
+                )
 
                 # Generates list of residues forming backbone hydrogen-bonds
-                # with the residue in question
+                # with the residue in questio
                 bridge_pairs_list = []
                 dssp_to_pdb = dict(zip(dssp_df['DSSP_NUM'].tolist(),
                                        dssp_df['RES_ID'].tolist()))
@@ -460,77 +454,49 @@ class gen_output(run_stages):
                             bridges_renum.append(dssp_to_pdb[dssp_num])
                     bridge_pairs_list.append(bridges_renum)
 
-                if reverse is True:
-                    bridge_pairs_list.reverse()
-
-                if strand_or_res == 'strand':
-                    bridge_pairs.append(bridge_pairs_list)
-                elif strand_or_res == 'res':
-                    bridge_pairs += bridge_pairs_list
+                bridge_pairs_list = reverse_strand_lists(bridge_pairs_list, reverse)
+                bridge_pairs = append_to_output_lists(
+                    bridge_pairs_list, bridge_pairs, res_ids_list, strand_or_res
+                )
 
                 # Generates list of residues in van der Waals contact
-                van_der_waals_list = strand_df['VDW'].tolist()
-                if reverse is True:
-                    van_der_waals_list.reverse()
-
-                if strand_or_res == 'strand':
-                    van_der_waals.append(van_der_waals_list)
-                elif strand_or_res == 'res':
-                    van_der_waals += van_der_waals_list
+                van_der_waals = reverse_and_append(
+                    'VDW', strand_df, van_der_waals, reverse, res_ids_list,
+                    strand_or_res
+                )
 
                 # Generates list of residues that form hydrogen bonds with the
                 # residue in question
-                h_bonds_list = strand_df['HBOND'].tolist()
-                if reverse is True:
-                    h_bonds_list.reverse()
-
-                if strand_or_res == 'strand':
-                    h_bonds.append(h_bonds_list)
-                elif strand_or_res == 'res':
-                    h_bonds += h_bonds_list
+                h_bonds = reverse_and_append(
+                    'HBOND', strand_df, h_bonds, reverse, res_ids_list,
+                    strand_or_res
+                )
 
                 # Generates list of residues that form ionic bonds with the
                 # residue in question
-                ionic_bonds_list = strand_df['IONIC'].tolist()
-                if reverse is True:
-                    ionic_bonds_list.reverse()
-
-                if strand_or_res == 'strand':
-                    ionic.append(ionic_bonds_list)
-                elif strand_or_res == 'res':
-                    ionic += ionic_bonds_list
+                ionic = reverse_and_append(
+                    'IONIC', strand_df, ionic, reverse, res_ids_list, strand_or_res
+                )
 
                 # Generates list of disulfide bonds
-                ss_bonds_list = strand_df['SSBOND'].tolist()
-                if reverse is True:
-                    ss_bonds_list.reverse()
-
-                if strand_or_res == 'strand':
-                    ss_bonds.append(ss_bonds_list)
-                elif strand_or_res == 'res':
-                    ss_bonds += ss_bonds_list
+                ss_bonds = reverse_and_append(
+                    'SSBOND', strand_df, ss_bonds, reverse, res_ids_list,
+                    strand_or_res
+                )
 
                 # Generates list of residues that form pi-pi stacking
                 # interactions with the residue in question
-                pi_pi_stacking_list = strand_df['PIPISTACK'].tolist()
-                if reverse is True:
-                    pi_pi_stacking_list.reverse()
-
-                if strand_or_res == 'strand':
-                    pi_pi_stacking.append(pi_pi_stacking_list)
-                elif strand_or_res == 'res':
-                    pi_pi_stacking += pi_pi_stacking_list
+                pi_pi_stacking = reverse_and_append(
+                    'PIPISTACK', strand_df, pi_pi_stacking, reverse,
+                    res_ids_list, strand_or_res
+                )
 
                 # Generates list of residues that form cation_pi interactions
                 # with the residue in question
-                cation_pi_list = strand_df['PICATION'].tolist()
-                if reverse is True:
-                    cation_pi_list.reverse()
-
-                if strand_or_res == 'strand':
-                    cation_pi.append(cation_pi_list)
-                elif strand_or_res == 'res':
-                    cation_pi += cation_pi_list
+                cation_pi = reverse_and_append(
+                    'PICATION', strand_df, cation_pi, reverse, res_ids_list,
+                    strand_or_res
+                )
 
                 # Generates list of residues in +/-1 and +/2 positions to the
                 # residue in question
@@ -539,7 +505,7 @@ class gen_output(run_stages):
                 minus_2 = []
                 plus_2 = []
 
-                with (open('{}/{}/{}.pdb1'.format(self.ring_database, domain_id[1:3], domain_id), 'r')
+                with (open('{}{}/{}.pdb1'.format(self.ring_database, domain_id[1:3], domain_id), 'r')
                       as pdb_file
                       ):
                     pdb_file_lines = pdb_file.readlines()
@@ -573,6 +539,12 @@ class gen_output(run_stages):
                     minus_2.append(m_2)
                     plus_2.append(p_2)
 
+                if reverse is True:
+                    minus_1.reverse()
+                    plus_1.reverse()
+                    minus_2.reverse()
+                    plus_2.reverse()
+
                 if strand_or_res == 'strand':
                     minus_1_list.append(minus_1)
                     plus_1_list.append(plus_1)
@@ -586,71 +558,71 @@ class gen_output(run_stages):
 
         # Generates csv file of beta-barrel dataset
         if self.code[0:4] in ['2.40']:
-            beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
-                                            'TILT_ANGLE(DEGREES)': tilt_angle,
-                                            'TOTAL_STRAND_NUMBER': strand_number,
-                                            'SHEAR_NUMBER': shear_number,
-                                            'RES_ID': res_ids,
-                                            'FASTA': fasta_seq,
-                                            'Z_COORDS': z_coords,
-                                            'STRAND_POS(%)': tm_pos,
-                                            'INT_EXT': int_ext,
-                                            'TM_OR_EXT': tm_ext,
-                                            'OMEGA': omega,
-                                            'PHI': phi,
-                                            'PSI': psi,
-                                            'CHI_ANGLES': chi,
-                                            'SOLV_ACSBLTY': solv_acsblty,
-                                            'NEIGHBOURING_RESIDUES(<{}A)'.format(
-                                                self.radius
-                                            ): neighbours,
-                                            'BRIDGE_PAIRS': bridge_pairs_list,
-                                            'MINUS_1_POS': minus_1_list,
-                                            'PLUS_1_POS': plus_1_list,
-                                            'MINUS_2_POS': minus_2_list,
-                                            'PLUS_2_POS': plus_2_list})
-            cols = beta_strands_df.columns.tolist()
-            cols = ([cols[15]] + [cols[17]] + [cols[19]] + [cols[13]] +
-                    [cols[12]] + [cols[2]] + [cols[20]] + [cols[16]] +
-                    [cols[3]] + [cols[18]] + [cols[7]] + [cols[8]] +
-                    [cols[11]] + [cols[1]] + [cols[14]] + [cols[6]] + [cols[0]]
-                    + [cols[4]] + [cols[9]] + [cols[5]] + [cols[10]])
-            beta_strands_df = beta_strands_df[cols]
+            beta_strands_df_dict = OrderedDict({'STRAND_ID': domain_strand_ids,
+                                                'TILT_ANGLE(DEGREES)': tilt_angle,
+                                                'TOTAL_STRAND_NUMBER': strand_number,
+                                                'SHEAR_NUMBER': shear_number,
+                                                'RES_ID': res_ids,
+                                                'FASTA': fasta_seq,
+                                                'Z_COORDS': z_coords,
+                                                'STRAND_POS(%)': tm_pos,
+                                                'INT_EXT': int_ext,
+                                                'TM_OR_EXT': tm_ext,
+                                                'OMEGA': omega,
+                                                'PHI': phi,
+                                                'PSI': psi,
+                                                'CHI_ANGLES': chi,
+                                                'SOLV_ACSBLTY': solv_acsblty,
+                                                'NEIGHBOURING_RESIDUES(<{}A)'.format(
+                                                    self.radius
+                                                ): neighbours,
+                                                'BRIDGE_PAIRS': bridge_pairs_list,
+                                                'VDW': van_der_waals,
+                                                'HBOND': h_bonds,
+                                                'IONIC': ionic,
+                                                'SSBOND': ss_bonds,
+                                                'PIPISTACK': pi_pi_stacking,
+                                                'PICATION': cation_pi,
+                                                'MINUS_1_POS': minus_1_list,
+                                                'PLUS_1_POS': plus_1_list,
+                                                'MINUS_2_POS': minus_2_list,
+                                                'PLUS_2_POS': plus_2_list})
+            beta_strands_df = pd.DataFrame(beta_strands_df_dict)
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
 
         # Generates csv file of beta-sandwich dataset
         elif self.code[0:4] in ['2.60']:
-            beta_strands_df = pd.DataFrame({'STRAND_ID': domain_strand_ids,
-                                            'SHEET_ID': sheet_number,
-                                            'EDGE_OR_CNTRL': edge_or_central,
-                                            'RES_ID': res_ids,
-                                            'FASTA': fasta_seq,
-                                            'STRAND_POS(ABS)': strand_abs_pos,
-                                            'STRAND_POS(%)': strand_percentage_pos,
-                                            'INT_EXT': int_ext,
-                                            'CORE_OR_SURFACE': core_surf,
-                                            'BURIED_SURFACE_AREA(%)': buried_surface_area,
-                                            'OMEGA': omega,
-                                            'PHI': phi,
-                                            'PSI': psi,
-                                            'CHI_ANGLES': chi,
-                                            'SOLV_ACSBLTY': solv_acsblty,
-                                            'NEIGHBOURING_RESIDUES(<{}A)'.format(
-                                                self.radius
-                                            ): neighbours,
-                                            'BRIDGE_PAIRS': bridge_pairs_list,
-                                            'MINUS_1_POS': minus_1_list,
-                                            'PLUS_1_POS': plus_1_list,
-                                            'MINUS_2_POS': minus_2_list,
-                                            'PLUS_2_POS': plus_2_list})
-            cols = beta_strands_df.columns.tolist()
-            cols = ([cols[18]] + [cols[16]] + [cols[4]] + [cols[15]] +
-                    [cols[5]] + [cols[20]] + [cols[19]] + [cols[6]] + [cols[3]]
-                    + [cols[1]] + [cols[10]] + [cols[11]] + [cols[14]] +
-                    [cols[2]] + [cols[17]] + [cols[9]] + [cols[0]] + [cols[7]]
-                    + [cols[12]] + [cols[8]] + [cols[13]])
-            beta_strands_df = beta_strands_df[cols]
+            beta_strands_df_dict = OrderedDict({'STRAND_ID': domain_strand_ids,
+                                                'SHEET_ID': sheet_number,
+                                                'EDGE_OR_CNTRL': edge_or_central,
+                                                'RES_ID': res_ids,
+                                                'FASTA': fasta_seq,
+                                                'STRAND_POS(ABS)': strand_abs_pos,
+                                                'STRAND_POS(%)': strand_percentage_pos,
+                                                'INT_EXT': int_ext,
+                                                'CORE_OR_SURFACE': core_surf,
+                                                'BURIED_SURFACE_AREA(%)': buried_surface_area,
+                                                'OMEGA': omega,
+                                                'PHI': phi,
+                                                'PSI': psi,
+                                                'CHI_ANGLES': chi,
+                                                'SOLV_ACSBLTY': solv_acsblty,
+                                                'NEIGHBOURING_RESIDUES(<{}A)'.format(
+                                                    self.radius
+                                                ): neighbours,
+                                                'BRIDGE_PAIRS': bridge_pairs_list,
+                                                'VDW': van_der_waals,
+                                                'HBOND': h_bonds,
+                                                'IONIC': ionic,
+                                                'SSBOND': ss_bonds,
+                                                'PIPISTACK': pi_pi_stacking,
+                                                'PICATION': cation_pi,
+                                                'MINUS_1_POS': minus_1_list,
+                                                'PLUS_1_POS': plus_1_list,
+                                                'MINUS_2_POS': minus_2_list,
+                                                'PLUS_2_POS': plus_2_list})
+            beta_strands_df = pd.DataFrame(beta_strands_df_dict)
             beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
             beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
 

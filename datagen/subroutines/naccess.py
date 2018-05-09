@@ -144,8 +144,8 @@ class naccess_solv_acsblty_calcs():
         print('Calculating solvent accessible surface areas of individual '
               'residues in {}'.format(domain_id))
 
-        with open('{}/{}/{}.pdb1'.format(self.pdb_database, domain_id[1:3],
-                                         domain_id), 'r') as pdb_file:
+        with open('{}{}/{}.pdb1'.format(self.pdb_ba_database, domain_id[1:3],
+                                        domain_id), 'r') as pdb_file:
             for line in pdb_file.readlines():
                 line_start = line[0:16]
                 line_end = line[17:]
@@ -191,8 +191,8 @@ class naccess_solv_acsblty_calcs():
         # accessibility calculations show that none of the retained beta-sheets
         # are in contact with one another
         if (code[0:4] in ['2.60']
-                    and float(max(list(solv_acsblty_dict.keys()))) == 0.0
-                ):
+            and float(max(list(solv_acsblty_dict.keys()))) == 0.0
+            ):
             unprocessed_list.append(domain_id)
             sec_struct_dfs_dict[domain_id] = None
             for sheet_id in sheets:
@@ -222,7 +222,7 @@ class naccess_solv_acsblty_calcs():
 
                 if (res_id in list(res_solv_acsblty.keys())
                         and dssp_df['ATMNAME'][row] == 'CA'
-                        ):
+                    ):
                     solv_acsblty_list[row] = res_solv_acsblty[res_id]
 
         solv_acsblty_df = pd.DataFrame({'SOLV_ACSBLTY': solv_acsblty_list})
@@ -372,11 +372,11 @@ class naccess_solv_acsblty_calcs():
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(core_surf_combined.keys())
                     and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                ):
                 core_surf_list[row] = core_surf_combined[res_id]
             if (res_id in list(buried_surface_area_dict.keys())
                     and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                ):
                 buried_surface_area_list[row] = buried_surface_area_dict[res_id]
         core_surf_df = pd.DataFrame({'CORE_OR_SURFACE': core_surf_list,
                                      'BURIED_SURFACE_AREA(%)': buried_surface_area_list})

@@ -30,7 +30,7 @@ class filter_beta_structure(run_stages):
 
             middle_characters = domain_df['PDB_CODE'][row][1:3]
             cwd = os.getcwd()
-            os.chdir('{}{}'.format(self.pdb_database, middle_characters))
+            os.chdir('{}{}'.format(self.pdb_au_database, middle_characters))
 
             header_pdb_lines = []
             try:

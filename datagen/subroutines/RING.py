@@ -32,7 +32,7 @@ class calculate_residue_interaction_network(run_stages):
                 for interaction_type in list(interactions.keys()):
                     interactions[interaction_type][res_id] = []
 
-            with open('{}/{}.ring'.format(self.ring_database, domain_id[0:4]), 'r') as ring_file:
+            with open('{}{}.ring'.format(self.ring_database, domain_id[0:4]), 'r') as ring_file:
                 ring_output = ring_file.readlines()
 
             ring_output = ring_output[1:]

@@ -14,7 +14,8 @@ class run_stages():
     def __init__(self, run_parameters):
         self.run_parameters = run_parameters
         self.code = self.run_parameters['id']
-        self.pdb_database = self.run_parameters['pdbdatabase']
+        self.pdb_au_database = self.run_parameters['pdbaudatabase']
+        self.pdb_ba_database = self.run_parameters['pdbbadatabase']
         self.dssp_database = self.run_parameters['dsspdatabase']
         self.ring_database = self.run_parameters['ringdatabase']
         self.resn = float(self.run_parameters['resolution'])

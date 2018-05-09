@@ -30,7 +30,8 @@ def gen_run_parameters(args):
                 for line in input_file:
                     key = line.split(':')[0].replace(' ', '').lower()
                     value = line.split(':')[1].replace('\n', '').strip()
-                    if key in ['workingdirectory', 'pdbdatabase', 'dsspdatabase', 'ringdatabase']:
+                    if key in ['workingdirectory', 'pdbaudatabase', 'pdbbadatabase',
+                               'dsspdatabase', 'ringdatabase']:
                         value = value.replace('\\', '/')  # For windows file paths
                         value = '/{}/'.format(value.strip('/'))
                     else:
@@ -149,20 +150,39 @@ def gen_run_parameters(args):
                 break
 
     # Requires user input if the absolute file path of the (locally saved) PDB
-    # database is not specified in the input file / is not recognised
-    if 'pdbdatabase' in run_parameters:
-        if not os.path.isdir(run_parameters['pdbdatabase']):
-            print('Specified directory for PDB database not recognised')
-            run_parameters.pop('pdbdatabase')
-    if not 'pdbdatabase' in run_parameters:
-        print('Specify absolute file path of PDB database:')
-        pdb_database = ''
-        while not os.path.isdir(pdb_database):
-            pdb_database = '/{}/'.format(input(prompt).strip('/'))
-            if not os.path.isdir(pdb_database):
-                print('Specified directory for PDB database not recognised')
+    # database (asymmetric units) is not specified in the input file / is not
+    # recognised
+    if 'pdbaudatabase' in run_parameters:
+        if not os.path.isdir(run_parameters['pdbaudatabase']):
+            print('Specified directory for PDB asymmetric unit database not recognised')
+            run_parameters.pop('pdbaudatabase')
+    if not 'pdbaudatabase' in run_parameters:
+        print('Specify absolute file path of PDB asymmetric unit database:')
+        pdb_au_database = ''
+        while not os.path.isdir(pdb_au_database):
+            pdb_au_database = '/{}/'.format(input(prompt).strip('/'))
+            if not os.path.isdir(pdb_au_database):
+                print('Specified directory for asymmetric unit PDB database not recognised')
             else:
-                run_parameters['pdbdatabase'] = pdb_database
+                run_parameters['pdbaudatabase'] = pdb_au_database
+                break
+
+    # Requires user input if the absolute file path of the (locally saved) PDB
+    # database (biological assemblies) is not specified in the input file / is
+    # not recognised
+    if 'pdbbadatabase' in run_parameters:
+        if not os.path.isdir(run_parameters['pdbbadatabase']):
+            print('Specified directory for PDB biological assembly database not recognised')
+            run_parameters.pop('pdbbadatabase')
+    if not 'pdbbadatabase' in run_parameters:
+        print('Specify absolute file path of PDB biological assembly database:')
+        pdb_ba_database = ''
+        while not os.path.isdir(pdb_ba_database):
+            pdb_ba_database = '/{}/'.format(input(prompt).strip('/'))
+            if not os.path.isdir(pdb_ba_database):
+                print('Specified directory for biological assembly PDB database not recognised')
+            else:
+                run_parameters['pdbbadatabase'] = pdb_ba_database
                 break
 
     # Requires user input if the absolute file path of the (locally saved) DSSP
@@ -278,7 +298,8 @@ def gen_run_parameters(args):
         parameters_file.write('Structure database: {}\n'.format(run_parameters['structuredatabase']) +
                               'ID: {}\n'.format(run_parameters['id']) +
                               'Working directory: {}\n'.format(run_parameters['workingdirectory']) +
-                              'PDB database: {}\n'.format(run_parameters['pdbdatabase']) +
+                              'PDB AU database: {}\n'.format(run_parameters['pdbaudatabase']) +
+                              'PDB BA database: {}\n'.format(run_parameters['pdbbadatabase']) +
                               'DSSP database: {}\n'.format(run_parameters['dsspdatabase']) +
                               'RING database: {}\n'.format(run_parameters['ringdatabase']) +
                               'Resolution: {}\n'.format(run_parameters['resolution']) +
