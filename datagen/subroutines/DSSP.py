@@ -191,7 +191,7 @@ class beta_structure_dssp_classification(run_stages):
                                     'STRAND_NUM': strand_number_list_extnd_df,
                                     'SHEET_NUM': sheet_number_list_extnd_df,
                                     'ORIENTATION': orientation_list_extnd_df,
-                                    'H-BONDS': bridge_pair_list_extnd_df})
+                                    'BRIDGE_PAIRS': bridge_pair_list_extnd_df})
             cols = dssp_df.columns.tolist()
             cols = ([cols[0]] + [cols[1]] + [cols[4]] + [cols[6]] + [cols[5]]
                     + [cols[3]] + [cols[2]])

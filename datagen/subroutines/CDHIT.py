@@ -34,7 +34,7 @@ class filter_beta_structure(run_stages):
 
             header_pdb_lines = []
             try:
-                with open('{}.pdb'.format(domain_df['PDB_CODE'][row]), 'r') as pdb_file:
+                with open('{}.pdb1'.format(domain_df['PDB_CODE'][row]), 'r') as pdb_file:
                     remark_end = False
                     for line in pdb_file:
                         if (line.replace(' ', ''))[0:7] == 'REMARK4':

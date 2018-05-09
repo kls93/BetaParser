@@ -16,6 +16,7 @@ class run_stages():
         self.code = self.run_parameters['id']
         self.pdb_database = self.run_parameters['pdbdatabase']
         self.dssp_database = self.run_parameters['dsspdatabase']
+        self.ring_database = self.run_parameters['ringdatabase']
         self.resn = float(self.run_parameters['resolution'])
         self.rfac = float(self.run_parameters['rfactor'])
 
@@ -121,8 +122,7 @@ class run_stages():
         # Pickles variables required for running stage 3 (which currently has
         # to run within ISAMBARD, hence the division of stages 2-4)
         with open('Input_ISAMBARD_variables.pkl', 'wb') as pickle_file:
-            pickle.dump((sec_struct_dfs_dict, all_atoms_dfs_dict,
-                         domain_sheets_dict), pickle_file)
+            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
 
     def run_stage_3(self, radius):
         # To be run within ISAMBARD. **NOTE** solvent accessibility
@@ -140,8 +140,7 @@ class run_stages():
 
         # Loads pickled variables generated from running stage 2.
         with open('Input_ISAMBARD_variables.pkl', 'rb') as pickle_file:
-            (sec_struct_dfs_dict, all_atoms_dfs_dict, domain_sheets_dict
-             ) = pickle.load(pickle_file)
+            (sec_struct_dfs_dict, domain_sheets_dict) = pickle.load(pickle_file)
 
         # Runs NACCESS to calculate the solvent accessible surface area of
         # each individual residue
@@ -179,25 +178,31 @@ class run_stages():
 
         # Pickles variables required for running stage 4
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
-            pickle.dump((sec_struct_dfs_dict, all_atoms_dfs_dict,
-                         domain_sheets_dict, radius),
+            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict, radius),
                         pickle_file)
 
     def run_stage_4(self, orig_dir, opm_database):
         if __name__ == 'subroutines.run_stages':
+            from subroutines.RING import calculate_residue_interaction_network
             from subroutines.OPM import (
                 extract_barrel_info_from_OPM, calculate_barrel_geometry
             )
             from subroutines.output_dataframe import gen_output
         else:
+            from datagen.subroutines.RING import calculate_residue_interaction_network
             from datagen.subroutines.OPM import (
                 extract_barrel_info_from_OPM, calculate_barrel_geometry
             )
             from datagen.subroutines.output_dataframe import gen_output
 
         with open('Output_ISAMBARD_variables.pkl', 'rb') as pickle_file:
-            (sec_struct_dfs_dict, all_atoms_dfs_dict, domain_sheets_dict,
-             radius) = pickle.load(pickle_file)
+            (sec_struct_dfs_dict, domain_sheets_dict, radius) = pickle.load(pickle_file)
+
+        # Calculates residue interaction network of the amino acids in the
+        # selected beta-strands of the CATH domain in the context of its parent
+        # biological assembly
+        res_int_network = RING(self.run_parameters)
+        sec_struct_dfs_dict = res_int_network.parse_RING_output(sec_struct_dfs_dict)
 
         output = gen_output(self.run_parameters, radius)
 
@@ -233,12 +238,12 @@ class run_stages():
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual beta-strand.
         output.write_beta_strand_dataframe(
-            'strand', sec_struct_dfs_dict, all_atoms_dfs_dict, opm_database,
-            tilt_angles, strand_numbers, shear_numbers
+            'strand', sec_struct_dfs_dict, opm_database, tilt_angles,
+            strand_numbers, shear_numbers
         )
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual residue.
         output.write_beta_strand_dataframe(
-            'res', sec_struct_dfs_dict, all_atoms_dfs_dict, opm_database,
-            tilt_angles, strand_numbers, shear_numbers
+            'res', sec_struct_dfs_dict, opm_database, tilt_angles,
+            strand_numbers, shear_numbers
         )

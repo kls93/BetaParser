@@ -180,7 +180,7 @@ class calculate_barrel_geometry(run_stages):
                 next_strand_df = dssp_df[dssp_df['STRAND_NUM'] == next_strand]
                 dssp_num = next_strand_df['DSSP_NUM'].tolist()
                 dssp_num = [int(num) for num in dssp_num]
-                h_bonds = next_strand_df['H-BONDS'].tolist()
+                h_bonds = next_strand_df['BRIDGE_PAIRS'].tolist()
                 pair_index = ''
                 for h_bonds_index, pair in enumerate(h_bonds):
                     if float(pair[0]) != 0.0 and float(pair[0]) in res_list:

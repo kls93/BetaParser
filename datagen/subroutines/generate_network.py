@@ -33,7 +33,7 @@ class network_calcs():
         # orientation (antiparallel or parallel) from the strand numbers of the
         # bridge-paired residues listed in the DSSP file info
         strand_pairs = {}
-        for index, pair in enumerate(sheet_df['H-BONDS'].tolist()):
+        for index, pair in enumerate(sheet_df['BRIDGE_PAIRS'].tolist()):
             res_num_1 = int(sheet_df['DSSP_NUM'].tolist()[index])
             res_num_2 = int(pair[0])
             orientation_2 = sheet_df['ORIENTATION'].tolist()[index][0]
@@ -56,8 +56,8 @@ class network_calcs():
                     print('Warning: {} unable to be located in any of '
                           'the beta-strands listed in the DSSP '
                           'classification.'
-                          '\nCheck the H-BONDS (bridge pairs) '
-                          'formed by residue {} (DSSP ID)'.format(
+                          '\nCheck the bridge pairs formed by residue {} '
+                          '(DSSP ID)'.format(
                           res_num, res_num))
             """
 

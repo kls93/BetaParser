@@ -86,7 +86,7 @@ class extract_beta_structure_coords(run_stages):
             cwd = os.getcwd()
             os.chdir('{}{}'.format(self.pdb_database, middle_characters))
 
-            with open('{}.pdb'.format(pdb_code), 'r') as pdb_file:
+            with open('{}.pdb1'.format(pdb_code), 'r') as pdb_file:
                 pdb_file_lines = [line.strip('\n') for line in pdb_file if
                                   line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))

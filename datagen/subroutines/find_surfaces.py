@@ -248,8 +248,8 @@ class sandwich_interior_exterior_calcs():
         for row in range(sheets_df.shape[0]):
             if sheets_df['SHEET?'][row] == 'E':
                 res_1 = sheets_df['DSSP_NUM'][row]
-                res_2 = sheets_df['H-BONDS'][row][0]
-                res_3 = sheets_df['H-BONDS'][row][1]
+                res_2 = sheets_df['BRIDGE_PAIRS'][row][0]
+                res_3 = sheets_df['BRIDGE_PAIRS'][row][1]
 
                 if res_2 != '0':
                     pair_1 = [str(min([int(res_1), int(res_2)])),

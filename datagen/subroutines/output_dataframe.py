@@ -41,8 +41,8 @@ class output_calcs():
                         if line[0:6].strip() in ['ATOM', 'HETATM']:
                             chain_res_num = line[21:27].replace(' ', '')
                             if (line[12:16].strip() == 'CA'
-                                and chain_res_num in res_ids_list
-                                ):
+                                    and chain_res_num in res_ids_list
+                                    ):
                                 strand_coordinates[chain_res_num] = float(line[46:54])
                     else:
                         if float(line[46:54]) > upper_bound:
@@ -156,8 +156,8 @@ class gen_output(run_stages):
             edge_or_central_list = ['']*dssp_df.shape[0]
             for row in range(dssp_df.shape[0]):
                 if (dssp_df['STRAND_NUM'][row] in list(edge_or_central_dict.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                        and dssp_df['ATMNAME'][row] == 'CA'
+                        ):
                     edge_or_central_list[row] = edge_or_central_dict[dssp_df['STRAND_NUM'][row]]
             df_edge_or_central = pd.DataFrame({'EDGE_OR_CNTRL': edge_or_central_list})
             dssp_df = pd.concat([dssp_df, df_edge_or_central], axis=1)
@@ -166,8 +166,8 @@ class gen_output(run_stages):
         return sec_struct_dfs_dict
 
     def write_beta_strand_dataframe(self, strand_or_res, sec_struct_dfs_dict,
-                                    all_atoms_dfs_dict, opm_database,
-                                    tilt_angles, strand_numbers, shear_numbers):
+                                    opm_database, tilt_angles, strand_numbers,
+                                    shear_numbers):
         # Generates dataframes of residues and strands in the retained domains.
         if __name__ == 'subroutines.output_dataframe':
             from subroutines.output_dataframe import output_calcs
@@ -201,7 +201,13 @@ class gen_output(run_stages):
         chi = []
         solv_acsblty = []
         neighbours = []
-        h_bonds_list = []
+        brige_pairs = []
+        van_der_waals = []
+        h_bonds = []
+        ionic = []
+        ss_bonds = []
+        pi_pi_stacking = []
+        cation_pi = []
         minus_1_list = []
         plus_1_list = []
         minus_2_list = []
@@ -443,24 +449,88 @@ class gen_output(run_stages):
 
                 # Generates list of residues forming backbone hydrogen-bonds
                 # with the residue in question
-                backbone_h_bonds = []
+                bridge_pairs_list = []
                 dssp_to_pdb = dict(zip(dssp_df['DSSP_NUM'].tolist(),
                                        dssp_df['RES_ID'].tolist()))
                 for row in range(strand_df.shape[0]):
-                    h_bonds = strand_df['H-BONDS'][row]
-                    h_bonds_renum = []
-                    for dssp_num in h_bonds:
+                    bridges = strand_df['BRIDGE_PAIRS'][row]
+                    bridges_renum = []
+                    for dssp_num in bridges:
                         if dssp_num in list(dssp_to_pdb.keys()):
-                            h_bonds_renum.append(dssp_to_pdb[dssp_num])
-                    backbone_h_bonds.append(h_bonds_renum)
+                            bridges_renum.append(dssp_to_pdb[dssp_num])
+                    bridge_pairs_list.append(bridges_renum)
 
                 if reverse is True:
-                    backbone_h_bonds.reverse()
+                    bridge_pairs_list.reverse()
 
                 if strand_or_res == 'strand':
-                    h_bonds_list.append(backbone_h_bonds)
+                    bridge_pairs.append(bridge_pairs_list)
                 elif strand_or_res == 'res':
-                    h_bonds_list += backbone_h_bonds
+                    bridge_pairs += bridge_pairs_list
+
+                # Generates list of residues in van der Waals contact
+                van_der_waals_list = strand_df['VDW'].tolist()
+                if reverse is True:
+                    van_der_waals_list.reverse()
+
+                if strand_or_res == 'strand':
+                    van_der_waals.append(van_der_waals_list)
+                elif strand_or_res == 'res':
+                    van_der_waals += van_der_waals_list
+
+                # Generates list of residues that form hydrogen bonds with the
+                # residue in question
+                h_bonds_list = strand_df['HBOND'].tolist()
+                if reverse is True:
+                    h_bonds_list.reverse()
+
+                if strand_or_res == 'strand':
+                    h_bonds.append(h_bonds_list)
+                elif strand_or_res == 'res':
+                    h_bonds += h_bonds_list
+
+                # Generates list of residues that form ionic bonds with the
+                # residue in question
+                ionic_bonds_list = strand_df['IONIC'].tolist()
+                if reverse is True:
+                    ionic_bonds_list.reverse()
+
+                if strand_or_res == 'strand':
+                    ionic.append(ionic_bonds_list)
+                elif strand_or_res == 'res':
+                    ionic += ionic_bonds_list
+
+                # Generates list of disulfide bonds
+                ss_bonds_list = strand_df['SSBOND'].tolist()
+                if reverse is True:
+                    ss_bonds_list.reverse()
+
+                if strand_or_res == 'strand':
+                    ss_bonds.append(ss_bonds_list)
+                elif strand_or_res == 'res':
+                    ss_bonds += ss_bonds_list
+
+                # Generates list of residues that form pi-pi stacking
+                # interactions with the residue in question
+                pi_pi_stacking_list = strand_df['PIPISTACK'].tolist()
+                if reverse is True:
+                    pi_pi_stacking_list.reverse()
+
+                if strand_or_res == 'strand':
+                    pi_pi_stacking.append(pi_pi_stacking_list)
+                elif strand_or_res == 'res':
+                    pi_pi_stacking += pi_pi_stacking_list
+
+                # Generates list of residues that form cation_pi interactions
+                # with the residue in question
+                cation_pi_list = strand_df['PICATION'].tolist()
+                if reverse is True:
+                    cation_pi_list.reverse()
+
+                if strand_or_res == 'strand':
+                    cation_pi.append(cation_pi_list)
+                elif strand_or_res == 'res':
+                    cation_pi += cation_pi_list
 
                 # Generates list of residues in +/-1 and +/2 positions to the
                 # residue in question
@@ -468,17 +538,27 @@ class gen_output(run_stages):
                 plus_1 = []
                 minus_2 = []
                 plus_2 = []
-                all_atom_df = all_atoms_dfs_dict[domain_id]
+
+                with (open('{}/{}/{}.pdb1'.format(self.ring_database, domain_id[1:3], domain_id), 'r')
+                      as pdb_file
+                      ):
+                    pdb_file_lines = pdb_file.readlines()
+                pdb_file_lines = [line for line in pdb_file_lines
+                                  if line[0:6].strip() in ['ATOM', 'HETATM']
+                                  and line[12:16].strip() == 'CA']
+                consec_res_id_list = [line[21:27].replace(' ', '') for line in
+                                      pdb_file_lines]
+                fasta_list = [amino_acids_dict[line[17:20]] for line in
+                              pdb_file_lines]
 
                 for row in range(strand_df.shape[0]):
-                    # BUT BEWARE COUNTING NON-SEQUENTIAL RESIDUES USING THIS METHOD
                     res_id = strand_df['RES_ID'][row]
-                    all_atom_df_index = all_atom_df['RES_ID'].tolist().index(res_id)
+                    res_id_index = consec_res_id_list.index(res_id)
                     try:
-                        m_1 = all_atom_df['FASTA'].tolist()[all_atom_df_index-1]
-                        p_1 = all_atom_df['FASTA'].tolist()[all_atom_df_index+1]
-                        m_2 = all_atom_df['FASTA'].tolist()[all_atom_df_index-2]
-                        p_2 = all_atom_df['FASTA'].tolist()[all_atom_df_index+2]
+                        m_1 = fasta_list[res_id_index-1]
+                        p_1 = fasta_list[res_id_index+1]
+                        m_2 = fasta_list['FASTA'].tolist()[res_id_index-2]
+                        p_2 = fasta_list['FASTA'].tolist()[res_id_index+2]
                         print(m_1)
                         print(p_1)
                         print(m_2)
@@ -524,7 +604,7 @@ class gen_output(run_stages):
                                             'NEIGHBOURING_RESIDUES(<{}A)'.format(
                                                 self.radius
                                             ): neighbours,
-                                            'BACKBONE_H_BONDS': h_bonds_list,
+                                            'BRIDGE_PAIRS': bridge_pairs_list,
                                             'MINUS_1_POS': minus_1_list,
                                             'PLUS_1_POS': plus_1_list,
                                             'MINUS_2_POS': minus_2_list,
@@ -559,7 +639,7 @@ class gen_output(run_stages):
                                             'NEIGHBOURING_RESIDUES(<{}A)'.format(
                                                 self.radius
                                             ): neighbours,
-                                            'BACKBONE_H_BONDS': h_bonds_list,
+                                            'BRIDGE_PAIRS': bridge_pairs_list,
                                             'MINUS_1_POS': minus_1_list,
                                             'PLUS_1_POS': plus_1_list,
                                             'MINUS_2_POS': minus_2_list,

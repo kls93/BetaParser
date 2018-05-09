@@ -30,7 +30,7 @@ def gen_run_parameters(args):
                 for line in input_file:
                     key = line.split(':')[0].replace(' ', '').lower()
                     value = line.split(':')[1].replace('\n', '').strip()
-                    if key in ['workingdirectory', 'pdbdatabase', 'dsspdatabase']:
+                    if key in ['workingdirectory', 'pdbdatabase', 'dsspdatabase', 'ringdatabase']:
                         value = value.replace('\\', '/')  # For windows file paths
                         value = '/{}/'.format(value.strip('/'))
                     else:
@@ -182,6 +182,23 @@ def gen_run_parameters(args):
                 run_parameters['dsspdatabase'] = dssp_database
                 break
 
+    # Requires user input if the absolute file path of the (locally saved) RING
+    # database is not specified in the input file / is not recognised
+    if 'ringdatabase' in run_parameters:
+        if not os.path.isdir(run_parameters['ringdatabase']):
+            print('Specified directory for RING database not recognised')
+            run_parameters.pop('ringdatabase')
+    if not 'ringdatabase' in run_parameters:
+        print('Specify absolute file path of RING database:')
+        ring_database = ''
+        while not os.path.isdir(ring_database):
+            ring_database = '/{}/'.format(input(prompt).strip('/'))
+            if not os.path.isdir(ring_database):
+                print('Specified directory for RING database not recognised')
+            else:
+                run_parameters['ringdatabase'] = ring_database
+                break
+
     # Requires user input if the resolution threshold for the dataset to be
     # generated is not specified in the input file / is not recognised
     if 'resolution' in run_parameters:
@@ -263,6 +280,7 @@ def gen_run_parameters(args):
                               'Working directory: {}\n'.format(run_parameters['workingdirectory']) +
                               'PDB database: {}\n'.format(run_parameters['pdbdatabase']) +
                               'DSSP database: {}\n'.format(run_parameters['dsspdatabase']) +
+                              'RING database: {}\n'.format(run_parameters['ringdatabase']) +
                               'Resolution: {}\n'.format(run_parameters['resolution']) +
                               'Rfactor: {}\n'.format(run_parameters['rfactor']))
 
