@@ -58,13 +58,15 @@ def main():
     elif stage in ['2']:
         cdhit_entries, cdhit_output = find_cdhit_input(args)
         analysis.run_stage_2(cdhit_entries, cdhit_output)
+
     # Runs naccess upon each structure to calculate the solvent accessible
     # surface area of its beta-sheets and thus identify those which interact
     elif stage in ['3']:
         radius = find_radius(args)
         analysis.run_stage_3(radius)
-    # Analyses the summary of structural characteristics of the dataset via
-    # random forest machine learning
+
+    # Summarises the structural characteristics of the dataset in an output
+    # dataframe / csv file
     elif stage in ['4']:
         opm_database = find_opm_database(args, run_parameters)
         analysis.run_stage_4(orig_dir, opm_database)

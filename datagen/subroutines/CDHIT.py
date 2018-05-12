@@ -2,6 +2,7 @@
 import os
 import copy
 import pandas as pd
+from collections import OrderedDict
 if __name__ == 'subroutines.CDHIT':
     from subroutines.run_stages import run_stages
 else:
@@ -34,7 +35,7 @@ class filter_beta_structure(run_stages):
 
             header_pdb_lines = []
             try:
-                with open('{}.pdb1'.format(domain_df['PDB_CODE'][row]), 'r') as pdb_file:
+                with open('{}.pdb'.format(domain_df['PDB_CODE'][row]), 'r') as pdb_file:
                     remark_end = False
                     for line in pdb_file:
                         if (line.replace(' ', ''))[0:7] == 'REMARK4':
@@ -83,8 +84,8 @@ class filter_beta_structure(run_stages):
 
         filtered_domain_df_part_1 = domain_df[domain_df['PDB_CODE'].isin(processed_list)]
         filtered_domain_df_part_1 = filtered_domain_df_part_1.reset_index(drop=True)
-        filtered_domain_df_part_2 = pd.DataFrame({'RESOLUTION': resolution_list,
-                                                  'RFACTOR': rfactor_list})
+        filtered_domain_df_part_2 = pd.DataFrame(OrderedDict{'RESOLUTION': resolution_list,
+                                                             'RFACTOR': rfactor_list})
         filtered_domain_df = pd.concat(
             [filtered_domain_df_part_1, filtered_domain_df_part_2], axis=1
         )

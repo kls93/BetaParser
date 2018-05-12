@@ -43,10 +43,10 @@ class run_stages():
         domains_desc = gen_domain_desc_list(orig_dir)
         domain_df = domain_desc_filter(self.code, domains_desc)
 
-        # Filters the domain_df for X-ray structures with resolution < 1.6
-        # Angstroms (to allow distinction of hydrogen bonds) and R_factor
-        # (working value) < 0.20. Writes a file listing all PDB ids that meet
-        # these criteria suitable for uploading to the CD-HIT web server.
+        # Filters the domain_df for X-ray structures below user-specified
+        # resolution and R_factor (working value) cutoffs. Writes a file
+        # listing all PDB ids that meet these criteria suitable for uploading
+        # to the CD-HIT web server.
         beta_structure = filter_beta_structure(self.run_parameters)
         filtered_domain_df = beta_structure.resn_rfac_filter(domain_df)
         beta_structure.gen_cdhit_list(filtered_domain_df)

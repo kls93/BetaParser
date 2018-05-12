@@ -59,75 +59,45 @@ def gen_run_parameters(args):
             else:
                 run_parameters['structuredatabase'] = database
                 break
-    # Ensures database name is uppercase (required for consistent directory naming)
-    run_parameters['structuredatabase'] = run_parameters['structuredatabase'].upper()
 
     # Requires user input if the (all-beta) structural domain the user wishes
     # to analyse is not specified in the input file / is not recognised
     if 'id' in run_parameters:
-        if run_parameters['structuredatabase'] == 'CATH':
-            if (
-                type(run_parameters['id']) == list
-                    and not all(run_parameters['id'][index].startswith('2') for
-                                index, code in enumerate(run_parameters['id']))
-                ) or (
-                type(run_parameters['id']) != list
-                    and run_parameters['id'][0] != '2'
-            ):
-                print('DataGen is currently only suitable for generation and '
-                      'analysis of\nall-beta structures')
-                run_parameters.pop('id')
-        elif run_parameters['structuredatabase'] == 'SCOP':
-            if (
-                type(run_parameters['id']) == list
-                    and not all(run_parameters['id'][index].startswith('2') for
-                                index, code in enumerate(run_parameters['id']))
-                ) or (
-                type(run_parameters['id']) != list
-                    and run_parameters['id'][0] != '2'
-            ):
-                print('DataGen is currently only suitable for generation and '
-                      'analysis of\nall-beta structures')
-                run_parameters.pop('id')
+        ids_dict = {'CATH': '2',
+                    'SCOP': 'b'}
+        if (
+            type(run_parameters['id']) == list
+                and not
+                all(run_parameters['id'][index].startswith(ids_dict[run_parameters['structuredatabase']])
+                    for index, code in enumerate(run_parameters['id']))
+            ) or (
+            type(run_parameters['id']) != list
+                and run_parameters['id'][0] != ids_dict[run_parameters['structuredatabase']]
+        ):
+            print('DataGen is currently only suitable for generation and '
+                  'analysis of\nall-beta structures')
+            run_parameters.pop('id')
     if not 'id' in run_parameters:
-        if run_parameters['structuredatabase'] == 'CATH':
-            print('Specify list of CATHCODEs:')
-            run = ''
-            while (len(run) == 0
-                    or all(run[index][0] not in ['2'] for index, code in enumerate(run))
-                   ):
-                run = input(prompt).lower()
-                run = run.replace(' ', '')
-                run = run.replace('[', '')
-                run = run.replace(']', '')
-                run = [cathcode for cathcode in run.split(',')]
-                if (len(run) != 0
-                        and all(run[index].startswith('2') for index, code in enumerate(run))
-                        ):
-                    run_parameters['id'] = run
-                    break
-                else:
-                    print('DataGen is currently only suitable for '
-                          'generation and analysis of\nall-beta structures')
-        elif run_parameters['structuredatabase'] == 'SCOP':
-            print('Specify list of SCOP codes:')
-            run = ''
-            while (len(run) == 0
-                    or all(run[index][0] not in ['b'] for index, code in enumerate(run))
-                   ):
-                run = input(prompt).lower()
-                run = run.replace(' ', '')
-                run = run.replace('[', '')
-                run = run.replace(']', '')
-                run = [scopcode for scopcode in run.split(',')]
-                if (len(run) != 0
-                        and all(run[index].startswith('b') for index, code in enumerate(run))
-                        ):
-                    run_parameters['id'] = run
-                    break
-                else:
-                    print('DataGen is currently only suitable for '
-                          'generation and analysis of\nall-beta structures')
+        print('Specify list of CATHCODEs:')
+        run = ''
+        while (len(run) == 0
+                or all(run[index][0] != ids_dict[run_parameters['structuredatabase']
+                       for index, code in enumerate(run))
+               ):
+            run = input(prompt).lower()
+            run = run.replace(' ', '')
+            run = run.replace('[', '')
+            run = run.replace(']', '')
+            run = [cathcode for cathcode in run.split(',')]
+            if (len(run) != 0
+                    and all(run[index].startswith(ids_dict[run_parameters['structuredatabase'])
+                            for index, code in enumerate(run))
+                    ):
+                run_parameters['id'] = run
+                break
+            else:
+                print('DataGen is currently only suitable for '
+                      'generation and analysis of\nall-beta structures')
     # Joins list of CATH / SCOP database codes together
     if type(run_parameters['id']) == list:
         run_parameters['id'] = '_'.join(run_parameters['id'])
@@ -266,7 +236,7 @@ def gen_run_parameters(args):
             rfac = input(prompt)
             try:
                 rfac = float(rfac)
-                if rfac < 0 or rfac > 1:
+                if rfac <= 0 or rfac > 1:
                     rfac = 0
                     print('Specified Rfactor (working value) cutoff must be '
                           'between 0 and 1')
@@ -298,8 +268,8 @@ def gen_run_parameters(args):
         parameters_file.write('Structure database: {}\n'.format(run_parameters['structuredatabase']) +
                               'ID: {}\n'.format(run_parameters['id']) +
                               'Working directory: {}\n'.format(run_parameters['workingdirectory']) +
-                              'PDB AU database: {}\n'.format(run_parameters['pdbaudatabase']) +
-                              'PDB BA database: {}\n'.format(run_parameters['pdbbadatabase']) +
+                              'PDB asymmetric unit database: {}\n'.format(run_parameters['pdbaudatabase']) +
+                              'PDB biological assembly database: {}\n'.format(run_parameters['pdbbadatabase']) +
                               'DSSP database: {}\n'.format(run_parameters['dsspdatabase']) +
                               'RING database: {}\n'.format(run_parameters['ringdatabase']) +
                               'Resolution: {}\n'.format(run_parameters['resolution']) +
@@ -337,6 +307,8 @@ def find_cdhit_input(args):
         cdhit_entries = '/{}'.format(input(prompt).strip('/'))
         if not os.path.isfile(cdhit_entries):
             print('Specified file path not recognised')
+        elif cdhit_entries[-4:] != '.pkl':
+            print('Specified file is not a pkl file')
         else:
             break
 
@@ -346,6 +318,8 @@ def find_cdhit_input(args):
         cdhit_output = '/{}'.format(input(prompt).strip('/'))
         if not os.path.isfile(cdhit_output):
             print('Specified file path not recognised')
+        elif cdhit_output[-4:] != '.txt':
+            print('Specified file is not a txt file')
         else:
             break
 
@@ -356,23 +330,28 @@ def find_radius(args):
     # Determines radius of sphere for location of nearest neighbours
     if vars(args)['radius']:
         radius = vars(args)['radius']
-    else:
-        radius = 0
-        print('Select radius of sphere for identification of neighbouring '
-              'residues:')
-        while radius == 0:
-            radius = input(prompt)
-            try:
-                radius = float(radius)
-                if radius <= 0:
-                    print('Specified radius must be greater than 0')
-                    radius = 0
-                else:
-                    break
-            except ValueError:
-                print('Specified radius must be a number')
-                radius = 0
+        try:
+            radius = float(radius)
+            if radius <= 0:
+                print('Specified radius must be greater than 0')
+            else:
+                return radius
 
+    radius = 0
+    print('Select radius of sphere for identification of neighbouring '
+          'residues:')
+    while radius == 0:
+        radius = input(prompt)
+        try:
+            radius = float(radius)
+            if radius <= 0:
+                print('Specified radius must be greater than 0')
+                radius = 0
+            else:
+                break
+        except ValueError:
+            print('Specified radius must be a number')
+            radius = 0
     return radius
 
 

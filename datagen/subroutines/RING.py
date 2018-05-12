@@ -35,7 +35,9 @@ class calculate_residue_interaction_network(run_stages):
             with open('{}{}.ring'.format(self.ring_database, domain_id[0:4]), 'r') as ring_file:
                 ring_output = ring_file.readlines()
 
-            ring_output = ring_output[1:]
+            ring_output = ''.join(ring_output)
+            ring_output = ring_output.split('NodeID')[1]
+            ring_output = ring_output.split('\n')[1:]
             for line in ring_output:
                 aa_1 = line.split()[0].split(':')
                 aa_1 = (aa_1[0].replace('_', '') + aa_1[1].replace('_', '')

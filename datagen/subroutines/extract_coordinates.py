@@ -86,7 +86,7 @@ class extract_beta_structure_coords(run_stages):
             cwd = os.getcwd()
             os.chdir('{}{}'.format(self.pdb_au_database, middle_characters))
 
-            with open('{}.pdb1'.format(pdb_code), 'r') as pdb_file:
+            with open('{}.pdb'.format(pdb_code), 'r') as pdb_file:
                 pdb_file_lines = [line.strip('\n') for line in pdb_file if
                                   line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))
@@ -150,10 +150,11 @@ class extract_beta_structure_coords(run_stages):
                     sseqs_list = []
                     similarity = SequenceMatcher(a=segment, b=sequence).ratio()
                     if similarity >= 0.95:
+                        # Ensures that all selected SSEQS are in the same chain
                         if count == 1:
-                            first_chain = pdb_file_lines[indices[0]][21:22].strip()
+                            first_chain = pdb_file_lines[indices[index_3][0]][21:22].strip()
                         elif count > 1:
-                            new_chain = pdb_file_lines[indices[0]][21:22].strip()
+                            new_chain = pdb_file_lines[indices[index_3][0]][21:22].strip()
                             if new_chain != first_chain:
                                 break
 
@@ -183,7 +184,6 @@ class extract_beta_structure_coords(run_stages):
                             element.append(pdb_file_lines[index_4][76:78].strip())
                             charge.append(pdb_file_lines[index_4][78:80].strip())
                             chain_num_ins.append(pdb_file_lines[index_4][21:27].replace(' ', ''))
-
                             line_start = pdb_file_lines[index_4][:16]
                             line_end = pdb_file_lines[index_4][17:].strip('\n')
                             lines.append(line_start + ' ' + line_end)
@@ -201,30 +201,23 @@ class extract_beta_structure_coords(run_stages):
             # Makes a dataframe of the PDB information for the domain sequence
             # if each of its SSEQS were identified in the input PDB file
             if not cdhit_domain_df['DOMAIN_ID'][row] in unprocessed_list:
-                pdb_df = pd.DataFrame({'PDB_FILE_LINES': lines,
-                                       'REC': rec,
-                                       'ATMNUM': atmnum,
-                                       'ATMNAME': atmname,
-                                       'CONFORMER': conformer,
-                                       'RESNAME': resname,
-                                       'CHAIN': chain,
-                                       'RESNUM': resnum,
-                                       'INSCODE': insertion,
-                                       'XPOS': xpos,
-                                       'YPOS': ypos,
-                                       'ZPOS': zpos,
-                                       'OCC': occ,
-                                       'BFAC': bfac,
-                                       'ELEMENT': element,
-                                       'CHARGE': charge,
-                                       'RES_ID': chain_num_ins})
-                cols = pdb_df.columns.tolist()
-                cols = ([cols[7]] + [cols[10]] + [cols[1]] + [cols[0]]
-                        + [cols[5]] + [cols[12]] + [cols[3]] + [cols[13]]
-                        + [cols[8]] + [cols[14]] + [cols[15]] + [cols[16]]
-                        + [cols[9]] + [cols[2]] + [cols[6]] + [cols[4]]
-                        + [cols[11]])
-                pdb_df = pdb_df[cols]
+                pdb_df = pd.DataFrame(OrderedDict{'PDB_FILE_LINES': lines,
+                                                  'REC': rec,
+                                                  'ATMNUM': atmnum,
+                                                  'ATMNAME': atmname,
+                                                  'CONFORMER': conformer,
+                                                  'RESNAME': resname,
+                                                  'CHAIN': chain,
+                                                  'RESNUM': resnum,
+                                                  'INSCODE': insertion,
+                                                  'XPOS': xpos,
+                                                  'YPOS': ypos,
+                                                  'ZPOS': zpos,
+                                                  'OCC': occ,
+                                                  'BFAC': bfac,
+                                                  'ELEMENT': element,
+                                                  'CHARGE': charge,
+                                                  'RES_ID': chain_num_ins})
                 all_atoms_dfs_dict[cdhit_domain_df['DOMAIN_ID'][row]] = pdb_df
 
             # Makes a list of residue numbers of the domain sequence if

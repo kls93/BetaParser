@@ -92,9 +92,6 @@ class beta_structure_dssp_classification(run_stages):
         dssp_domain_df = dssp_domain_df[~dssp_domain_df['DOMAIN_ID'].isin(unprocessed_list)]
         dssp_domain_df = dssp_domain_df.reset_index(drop=True)
 
-        dssp_domain_df.to_csv('Final_filtered_dataset.csv')
-        dssp_domain_df.to_pickle('Final_filtered_dataset.pkl')
-
         return dssp_residues_dict
 
     def get_dssp_sec_struct_df(self, dssp_residues_dict, all_atoms_dfs_dict):
@@ -185,17 +182,13 @@ class beta_structure_dssp_classification(run_stages):
                             break
 
             # Appends DSSP info to dataframe of PDB info
-            dssp_df = pd.DataFrame({'DSSP_FILE_LINES': lines_extnd_df,
-                                    'DSSP_NUM': dssp_num_extnd_df,
-                                    'SHEET?': sec_struct_assignment_extnd_df,
-                                    'STRAND_NUM': strand_number_list_extnd_df,
-                                    'SHEET_NUM': sheet_number_list_extnd_df,
-                                    'ORIENTATION': orientation_list_extnd_df,
-                                    'BRIDGE_PAIRS': bridge_pair_list_extnd_df})
-            cols = dssp_df.columns.tolist()
-            cols = ([cols[0]] + [cols[1]] + [cols[4]] + [cols[6]] + [cols[5]]
-                    + [cols[3]] + [cols[2]])
-            dssp_df = dssp_df[cols]
+            dssp_df = pd.DataFrame(OrderedDict{'DSSP_FILE_LINES': lines_extnd_df,
+                                               'DSSP_NUM': dssp_num_extnd_df,
+                                               'SHEET?': sec_struct_assignment_extnd_df,
+                                               'STRAND_NUM': strand_number_list_extnd_df,
+                                               'SHEET_NUM': sheet_number_list_extnd_df,
+                                               'ORIENTATION': orientation_list_extnd_df,
+                                               'BRIDGE_PAIRS': bridge_pair_list_extnd_df})
 
             extnd_df = pd.concat([pdb_df, dssp_df], axis=1)
             extnd_df.to_pickle('Entire_domains/{}.pkl'.format(domain_id))
