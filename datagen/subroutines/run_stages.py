@@ -57,29 +57,26 @@ class run_stages():
     def run_stage_2(self, cdhit_entries, cdhit_output):
         if __name__ == 'subroutines.run_stages':
             from subroutines.extract_coordinates import extract_beta_structure_coords
-            from subroutines.DSSP import (
-                filter_dssp_database, beta_structure_dssp_classification
-            )
+            from subroutines.DSSP import beta_structure_dssp_classification
             from subroutines.generate_network import calculate_beta_network
         else:
             from datagen.subroutines.extract_coordinates import extract_beta_structure_coords
-            from datagen.subroutines.DSSP import (
-                filter_dssp_database, beta_structure_dssp_classification
-            )
+            from datagen.subroutines.DSSP import beta_structure_dssp_classification
             from datagen.subroutines.generate_network import calculate_beta_network
 
         # Loads the dataframe generated in previous steps
         filtered_domain_df = pd.read_pickle(cdhit_entries)
 
         # Obtains xyz coordinates for the sequences output from CD-HIT
-        if os.path.isdir('Entire_domains'):
-            shutil.rmtree('Entire_domains')
-        os.mkdir('Entire_domains')
+        if os.path.isdir('Biological_assemblies'):
+            shutil.rmtree('Biological_assemblies')
+        os.mkdir('Biological_assemblies')
 
         beta_structure = extract_beta_structure_coords(self.run_parameters)
         cdhit_domain_df = beta_structure.gen_cdhit_dict(
             cdhit_output, filtered_domain_df
         )
+        beta_structure.copy_biological_assembly_pdb(cdhit_domain_df)
         cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
             cdhit_domain_df
         )
@@ -87,21 +84,12 @@ class run_stages():
             all_atoms_dfs_dict
         )
 
-        # Copies required DSSP files from database (on hard drive) to local
-        # machine
-        if os.path.isdir('DSSP_files'):
-            shutil.rmtree('DSSP_files')
-        os.mkdir('DSSP_files')
-
-        filtered_files = filter_dssp_database(self.run_parameters)
-        dssp_domain_df = filtered_files.copy_files_from_dssp_database(cdhit_domain_df)
-
         # Extracts beta-strands (as classified by DSSP) from the beta-structure
         # domains
         beta_structure = beta_structure_dssp_classification(self.run_parameters)
-        dssp_residues_dict = beta_structure.extract_dssp_file_lines(dssp_domain_df)
-
-        shutil.rmtree('DSSP_files')
+        dssp_residues_dict, dssp_domain_df = beta_structure.extract_dssp_file_lines(
+            cdhit_domain_df
+        )
 
         if os.path.isdir('Beta_strands'):
             shutil.rmtree('Beta_strands')
@@ -248,3 +236,5 @@ class run_stages():
             'res', sec_struct_dfs_dict, opm_database, tilt_angles,
             strand_numbers, shear_numbers
         )
+
+        shutil.rmtree('Biological_assemblies')

@@ -43,7 +43,8 @@ def gen_run_parameters(args):
     # Requires user input if the structural database (CATH or SCOPe) is not
     # specified in the input file / is not recognised
     if 'structuredatabase' in run_parameters:
-        if run_parameters['structuredatabase'].upper() not in ['CATH', 'SCOP']:
+        run_parameters['structuredatabase'] = run_parameters['structuredatabase'].upper()
+        if run_parameters['structuredatabase'] not in ['CATH', 'SCOP']:
             print('DataGen can currently only parse the CATH and SCOP databases\n'
                   '- please select one of these databases to continue')
             run_parameters.pop('structuredatabase')
@@ -62,9 +63,9 @@ def gen_run_parameters(args):
 
     # Requires user input if the (all-beta) structural domain the user wishes
     # to analyse is not specified in the input file / is not recognised
+    ids_dict = {'CATH': '2',
+                'SCOP': 'b'}
     if 'id' in run_parameters:
-        ids_dict = {'CATH': '2',
-                    'SCOP': 'b'}
         if (
             type(run_parameters['id']) == list
                 and not
@@ -81,8 +82,7 @@ def gen_run_parameters(args):
         print('Specify list of CATHCODEs:')
         run = ''
         while (len(run) == 0
-                or all(run[index][0] != ids_dict[run_parameters['structuredatabase']
-                       for index, code in enumerate(run))
+                or all(run[index][0] != ids_dict[run_parameters['structuredatabase']] for index, code in enumerate(run))
                ):
             run = input(prompt).lower()
             run = run.replace(' ', '')
@@ -90,7 +90,7 @@ def gen_run_parameters(args):
             run = run.replace(']', '')
             run = [cathcode for cathcode in run.split(',')]
             if (len(run) != 0
-                    and all(run[index].startswith(ids_dict[run_parameters['structuredatabase'])
+                    and all(run[index].startswith(ids_dict[run_parameters['structuredatabase']])
                             for index, code in enumerate(run))
                     ):
                 run_parameters['id'] = run
@@ -265,11 +265,13 @@ def gen_run_parameters(args):
 
     # Writes run parameters to a txt file
     with open('Run_parameters_stage_{}.txt'.format(stage), 'w') as parameters_file:
+        # Don't change the parameter names listed in Run_paramters.txt without
+        # also changing these parameter names in the main body of code
         parameters_file.write('Structure database: {}\n'.format(run_parameters['structuredatabase']) +
                               'ID: {}\n'.format(run_parameters['id']) +
                               'Working directory: {}\n'.format(run_parameters['workingdirectory']) +
-                              'PDB asymmetric unit database: {}\n'.format(run_parameters['pdbaudatabase']) +
-                              'PDB biological assembly database: {}\n'.format(run_parameters['pdbbadatabase']) +
+                              'PDB AU database: {}\n'.format(run_parameters['pdbaudatabase']) +
+                              'PDB BA database: {}\n'.format(run_parameters['pdbbadatabase']) +
                               'DSSP database: {}\n'.format(run_parameters['dsspdatabase']) +
                               'RING database: {}\n'.format(run_parameters['ringdatabase']) +
                               'Resolution: {}\n'.format(run_parameters['resolution']) +
@@ -336,6 +338,8 @@ def find_radius(args):
                 print('Specified radius must be greater than 0')
             else:
                 return radius
+        except ValueError:
+            pass
 
     radius = 0
     print('Select radius of sphere for identification of neighbouring '

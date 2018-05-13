@@ -158,8 +158,8 @@ class barrel_interior_exterior_calcs():
 
         for res_id in list(xy_dict.keys()):
             if (res_id.split('_')[0] in sheets_df['RES_ID'].tolist()
-                and res_id.split('_')[1] == 'CA'
-                ):
+                    and res_id.split('_')[1] == 'CA'
+                    ):
                 x_sum += xy_dict[res_id][0][0]
                 y_sum += xy_dict[res_id][1][0]
                 count += 1
@@ -181,11 +181,13 @@ class barrel_interior_exterior_calcs():
             res_dict[res_id] = sheets_df['RESNAME'].tolist()[index]
 
         for res_id in list(res_dict.keys()):
-            if (all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
-                    for x in ['N', 'CA', 'C', 'O', 'CB']))
+            if (
+                (all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
+                     for x in ['N', 'CA', 'C', 'O', 'CB']))
                 or (res_id == 'GLY'
                     and all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
-                            for x in ['N', 'CA', 'C', 'O', 'HA3'])):
+                            for x in ['N', 'CA', 'C', 'O', 'HA3']))
+            ):
                     # Calculates angle between C_alpha, C_beta and the centre of
                     # mass
                 c_alpha_x = xy_dict['{}_CA'.format(res_id)][0][0]
@@ -401,7 +403,7 @@ class sandwich_interior_exterior_calcs():
 
                 if ((distance_com < 0 and distance_cb < 0)
                         or (distance_com > 0 and distance_cb > 0)
-                        ):
+                    ):
                     int_ext_dict[res] = 'interior'
                 else:
                     int_ext_dict[res] = 'exterior'
@@ -480,7 +482,7 @@ class int_ext_pipeline():
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(int_ext_dict.keys())
                     and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                ):
                 int_ext_list[row] = int_ext_dict[res_id]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
@@ -534,7 +536,7 @@ class int_ext_pipeline():
         for row in range(dssp_df.shape[0]):
             if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
                     and dssp_df['ATMNAME'][row] == 'CA'
-                    ):
+                ):
                 int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)

@@ -92,12 +92,12 @@ def domain_desc_filter(cathcode, domains_desc):
                 domain_sseqs.append(sseqs_list)
                 domain_sseqs_start_stop.append(sseqs_start_stop_list)
 
-    domain_df = pd.DataFrame(OrderedDict{'PDB_CODE': domain_pdb_ids,
-                                         'DOMAIN_ID': domain_ids,
-                                         'CHAIN': domain_chains,
-                                         'CATHCODE': domain_cathcodes,
-                                         'DSEQS': domain_dseqs,
-                                         'SSEQS': domain_sseqs,
-                                         'SSEQS_START_STOP': domain_sseqs_start_stop})
+    domain_df = pd.DataFrame(OrderedDict({'PDB_CODE': domain_pdb_ids,
+                                          'DOMAIN_ID': domain_ids,
+                                          'CHAIN': domain_chains,
+                                          'CATHCODE': domain_cathcodes,
+                                          'DSEQS': domain_dseqs,
+                                          'SSEQS': domain_sseqs,
+                                          'SSEQS_START_STOP': domain_sseqs_start_stop}))
 
     return domain_df

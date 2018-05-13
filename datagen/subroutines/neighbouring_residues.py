@@ -26,22 +26,41 @@ class nearest_neighbours(run_stages):
 
             # Creates AMPAL object
             domain = isambard.ampal.convert_pdb_to_ampal(
-                '{}{}/{}.pdb1'.format(self.pdb_ba_database, domain_id[1:3], domain_id)
+                'Biological_assemblies/{}.pdb1'.format(domain_id[0:4])
             )
+            try:
+                domain_args = vars(domain)['_ampal_objects']
+            except KeyError:
+                domain = isambard.ampal.AmpalContainer(domain)
+                domain_args = vars(domain)['_ampal_objects']
+            if len(domain_args) == 1:
+                domain_args = [str(domain_args)]
+            elif len(domain_args) > 1:
+                domain_args = [str(assembly) for assembly in domain_args]
 
             # Creates list of res_ids ('neighbouring residues') within a
             # user-specified radius of the C_alpha atom of every residue in the
             # input domain
-            atom_ca_list = dssp_df['ATOM_NUM'].tolist()
+            atom_ca_list = dssp_df[dssp_df['ATMNAME'] == 'CA']['ATMNUM'].tolist()
             for atom_num in atom_ca_list:
                 neighbouring_res = []
-                atom_ca = [atom for atom in domain.get_atoms() if atom.id == atom_num]
-                for atom in domain.is_within(self.radius, atom_ca, ligands=False):
-                    # Finds res_id of neighbouring residue
-                    parent_res = (atom.ampal_parent.ampal_parent.id
-                                  + atom.ampal_parent.id
-                                  + atom.ampal_parent.insertion_code)
-                    neighbouring_res.append(parent_res)
+                atom_ca = [atom for atom in domain[0].get_atoms() if atom.id == atom_num][0]
+                for sub_domain in domain:
+                    for atom in sub_domain.is_within(self.radius, atom_ca, ligands=False):
+                        # Finds res_id of neighbouring residue
+                        parent_assembly = domain_args.index(
+                            atom.ampal_parent.ampal_parent.ampal_parent
+                        )
+                        if parent_assembly == 0:
+                            parent_res = (atom.ampal_parent.ampal_parent.id
+                                          + atom.ampal_parent.id
+                                          + atom.ampal_parent.insertion_code)
+                        if parent_assembly > 1:
+                            parent_res = (atom.ampal_parent.ampal_parent.id
+                                          + atom.ampal_parent.id
+                                          + atom.ampal_parent.insertion_code
+                                          + '_model' + str(parent_assembly))
+                        neighbouring_res.append(parent_res)
 
                 # Creates ordered set of neighbouring residues
                 neighbours_set = []

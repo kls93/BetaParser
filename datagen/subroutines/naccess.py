@@ -135,17 +135,18 @@ class naccess_solv_acsblty_calcs():
 
         return solv_acsblty_dict
 
-    def calculate_residue_solv_acsblty(domain_id):
+    def calculate_residue_solv_acsblty(domain_id, dssp_df, sheets,
+                                       sec_struct_dfs_dict, domain_sheets_dict):
         # Calculates solvent accessibility of individual residues (in the
         # context of the parent biological assembly)
         res_solv_acsblty = OrderedDict()
         sheet_sub_strings = []
+        unprocessed_list = []
 
         print('Calculating solvent accessible surface areas of individual '
               'residues in {}'.format(domain_id))
 
-        with open('{}{}/{}.pdb1'.format(self.pdb_ba_database, domain_id[1:3],
-                                        domain_id), 'r') as pdb_file:
+        with open('Biological_assemblies/{}.pdb1'.format(domain_id[0:4]), 'r') as pdb_file:
             for line in pdb_file.readlines():
                 line_start = line[0:16]
                 line_end = line[17:]
@@ -171,9 +172,19 @@ class naccess_solv_acsblty_calcs():
                 res_num = line[9:13].strip()
                 ins_code = line[13:14].strip()
                 chain_res_num = chain + res_num + ins_code
-                res_solv_acsblty[chain_res_num] = float(line[29:35])
+                if (
+                    chain_res_num in dssp_df['RES_ID'].tolist()
+                    and not chain_res_num in res_solv_acsblty
+                ):
+                    res_solv_acsblty[chain_res_num] = float(line[29:35])
+        if sorted(list(res_solv_acsblty.keys())) != sorted(dssp_df['RES_ID'].tolist()):
+            unprocessed_list.append(domain_id)
+            sec_struct_dfs_dict[domain_id] = None
+            for sheet in sheets:
+                domain_sheets_dict[sheet] = None
 
-        return res_solv_acsblty
+        return (res_solv_acsblty, unprocessed_list, sec_struct_dfs_dict,
+                domain_sheets_dict)
 
     def add_naccess_info_to_df(domain_id, dssp_df, sheets, code,
                                solv_acsblty_dict, res_solv_acsblty,
@@ -191,7 +202,7 @@ class naccess_solv_acsblty_calcs():
         # accessibility calculations show that none of the retained beta-sheets
         # are in contact with one another
         if (code[0:4] in ['2.60']
-            and float(max(list(solv_acsblty_dict.keys()))) == 0.0
+                and float(max(list(solv_acsblty_dict.keys()))) == 0.0
             ):
             unprocessed_list.append(domain_id)
             sec_struct_dfs_dict[domain_id] = None
@@ -221,7 +232,7 @@ class naccess_solv_acsblty_calcs():
                     dssp_df.loc[row, 'REC'] = None
 
                 if (res_id in list(res_solv_acsblty.keys())
-                        and dssp_df['ATMNAME'][row] == 'CA'
+                    and dssp_df['ATMNAME'][row] == 'CA'
                     ):
                     solv_acsblty_list[row] = res_solv_acsblty[res_id]
 
@@ -371,11 +382,11 @@ class naccess_solv_acsblty_calcs():
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
             if (res_id in list(core_surf_combined.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
+                and dssp_df['ATMNAME'][row] == 'CA'
                 ):
                 core_surf_list[row] = core_surf_combined[res_id]
             if (res_id in list(buried_surface_area_dict.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
+                and dssp_df['ATMNAME'][row] == 'CA'
                 ):
                 buried_surface_area_list[row] = buried_surface_area_dict[res_id]
         core_surf_df = pd.DataFrame({'CORE_OR_SURFACE': core_surf_list,
@@ -396,7 +407,6 @@ class calculate_solvent_accessible_surface_area(run_stages):
         # surface area
 
         unprocessed_list_1 = []
-        unprocessed_list_2 = []
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
             dssp_df = sec_struct_dfs_dict[domain_id]
@@ -409,21 +419,26 @@ class calculate_solvent_accessible_surface_area(run_stages):
             ):
                 print('ERROR: No / only 1 beta-sheet/s retained for {}'.format(domain_id))
                 unprocessed_list_1.append(domain_id)
+                sec_struct_dfs_dict[domain_id] = None
+                for sheet in sheets:
+                    domain_sheets_dict[sheet] = None
                 continue
 
             if self.code[0:4] in ['2.40']:
                 solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_barrel_solv_acsblty(
                     sheets
                 )
-                res_solv_acsblty = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
-                    domain_id
+                (res_solv_acsblty, unprocessed_list_2, sec_struct_dfs_dict, domain_sheets_dict
+                 ) = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
+                    domain_id, dssp_df, sheets, sec_struct_dfs_dict, domain_sheets_dict
                 )
             elif self.code[0:4] in ['2.60']:
                 solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_sandwich_solv_acsblty(
                     sheets
                 )
-                res_solv_acsblty = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
-                    domain_id
+                (res_solv_acsblty, unprocessed_list_2, sec_struct_dfs_dict, domain_sheets_dict
+                 ) = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
+                    domain_id, dssp_df, sheets, sec_struct_dfs_dict, domain_sheets_dict
                 )
             else:
                 solv_acsblty_dict = {}

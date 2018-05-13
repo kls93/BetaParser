@@ -1,6 +1,7 @@
 
 import os
 import random
+import shutil
 import pandas as pd
 from collections import OrderedDict
 from difflib import SequenceMatcher
@@ -44,6 +45,33 @@ class extract_beta_structure_coords(run_stages):
         cdhit_domain_df = filtered_domain_df.iloc[df_index_list]
         cdhit_domain_df = cdhit_domain_df.reset_index(drop=True)
         return cdhit_domain_df
+
+    def copy_biological_assembly_pdb(self, cdhit_domain_df):
+        # Copies the parent biological assembly PDB file of every retained
+        # structure to the output files directory. NOTE I assume that the
+        # asymmetric unit containing the CATH domain is listed first in model 1
+        # in the biological assembly PDB file
+        for row in range(cdhit_domain_df.shape[0]):
+            pdb_code = cdhit_domain_df['PDB_CODE'][row]
+            with open('{}{}/{}.pdb1'.format(self.pdb_ba_database, pdb_code[1:3], pdb_code), 'r') as ba_file:
+                ba_file_lines = ba_file.readlines()
+
+            with open('Biological_assemblies/{}.pdb1'.format(pdb_code), 'w') as processed_ba_file:
+                model = 0
+                atm_num = 0
+                for line in ba_file_lines:
+                    if line[0:10].strip() == 'MODEL':
+                        model = int(line[10:14].strip())
+                    elif line[0:6].strip() in ['ATOM', 'HETATM']:
+                        if model == 1:
+                            atm_num = int(line[6:11])
+                            processed_ba_file.write(line)
+                        elif model > 1:
+                            atm_num += 1
+                            processed_line = (line[0:6] + str(atm_num).rjust(5) + line[11:])
+                            processed_ba_file.write(processed_line)
+                    elif line[0:6].strip() in ['TER']:
+                        processed_ba_file.write(line)
 
     def get_xyz_coords(self, cdhit_domain_df):
         # Extends the filtered (for resolution, R_factor (working value) and
@@ -160,13 +188,8 @@ class extract_beta_structure_coords(run_stages):
 
                         sequence_identified = True
 
-                        pdb_file = open('Entire_domains/{}.pdb'.format(
-                            cdhit_domain_df['DOMAIN_ID'][row]), 'a')
-
                         for index_4 in indices[index_3]:
                             sseqs_list.append(pdb_file_lines[index_4][21:27].replace(' ', ''))
-
-                            pdb_file.write('{}\n'.format(pdb_file_lines[index_4]))
 
                             rec.append(pdb_file_lines[index_4][0:6].strip())
                             atmnum.append(int(pdb_file_lines[index_4][6:11].strip()))
@@ -188,9 +211,6 @@ class extract_beta_structure_coords(run_stages):
                             line_end = pdb_file_lines[index_4][17:].strip('\n')
                             lines.append(line_start + ' ' + line_end)
 
-                        pdb_file.write('TER'.ljust(80)+'\n')
-                        pdb_file.close()
-
                         residue_list.extend(sseqs_list)
                         break
 
@@ -201,23 +221,23 @@ class extract_beta_structure_coords(run_stages):
             # Makes a dataframe of the PDB information for the domain sequence
             # if each of its SSEQS were identified in the input PDB file
             if not cdhit_domain_df['DOMAIN_ID'][row] in unprocessed_list:
-                pdb_df = pd.DataFrame(OrderedDict{'PDB_FILE_LINES': lines,
-                                                  'REC': rec,
-                                                  'ATMNUM': atmnum,
-                                                  'ATMNAME': atmname,
-                                                  'CONFORMER': conformer,
-                                                  'RESNAME': resname,
-                                                  'CHAIN': chain,
-                                                  'RESNUM': resnum,
-                                                  'INSCODE': insertion,
-                                                  'XPOS': xpos,
-                                                  'YPOS': ypos,
-                                                  'ZPOS': zpos,
-                                                  'OCC': occ,
-                                                  'BFAC': bfac,
-                                                  'ELEMENT': element,
-                                                  'CHARGE': charge,
-                                                  'RES_ID': chain_num_ins})
+                pdb_df = pd.DataFrame(OrderedDict({'PDB_FILE_LINES': lines,
+                                                   'REC': rec,
+                                                   'ATMNUM': atmnum,
+                                                   'ATMNAME': atmname,
+                                                   'CONFORMER': conformer,
+                                                   'RESNAME': resname,
+                                                   'CHAIN': chain,
+                                                   'RESNUM': resnum,
+                                                   'INSCODE': insertion,
+                                                   'XPOS': xpos,
+                                                   'YPOS': ypos,
+                                                   'ZPOS': zpos,
+                                                   'OCC': occ,
+                                                   'BFAC': bfac,
+                                                   'ELEMENT': element,
+                                                   'CHARGE': charge,
+                                                   'RES_ID': chain_num_ins}))
                 all_atoms_dfs_dict[cdhit_domain_df['DOMAIN_ID'][row]] = pdb_df
 
             # Makes a list of residue numbers of the domain sequence if

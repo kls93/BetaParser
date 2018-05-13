@@ -84,8 +84,8 @@ class filter_beta_structure(run_stages):
 
         filtered_domain_df_part_1 = domain_df[domain_df['PDB_CODE'].isin(processed_list)]
         filtered_domain_df_part_1 = filtered_domain_df_part_1.reset_index(drop=True)
-        filtered_domain_df_part_2 = pd.DataFrame(OrderedDict{'RESOLUTION': resolution_list,
-                                                             'RFACTOR': rfactor_list})
+        filtered_domain_df_part_2 = pd.DataFrame(OrderedDict({'RESOLUTION': resolution_list,
+                                                              'RFACTOR': rfactor_list}))
         filtered_domain_df = pd.concat(
             [filtered_domain_df_part_1, filtered_domain_df_part_2], axis=1
         )
