@@ -68,18 +68,19 @@ class run_stages():
         filtered_domain_df = pd.read_pickle(cdhit_entries)
 
         # Obtains xyz coordinates for the sequences output from CD-HIT
-        if os.path.isdir('Biological_assemblies'):
-            shutil.rmtree('Biological_assemblies')
-        os.mkdir('Biological_assemblies')
-
         beta_structure = extract_beta_structure_coords(self.run_parameters)
         cdhit_domain_df = beta_structure.gen_cdhit_dict(
             cdhit_output, filtered_domain_df
         )
+
+        if os.path.isdir('Biological_assemblies'):
+            shutil.rmtree('Biological_assemblies')
+        os.mkdir('Biological_assemblies')
         beta_structure.copy_biological_assembly_pdb(cdhit_domain_df)
         cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
             cdhit_domain_df
         )
+
         all_atoms_dfs_dict = beta_structure.remove_alternate_conformers(
             all_atoms_dfs_dict
         )
@@ -94,7 +95,6 @@ class run_stages():
         if os.path.isdir('Beta_strands'):
             shutil.rmtree('Beta_strands')
         os.mkdir('Beta_strands')
-
         all_atoms_dfs_dict, sec_struct_dfs_dict = beta_structure.get_dssp_sec_struct_df(
             dssp_residues_dict, all_atoms_dfs_dict
         )

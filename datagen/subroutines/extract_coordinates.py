@@ -1,6 +1,7 @@
 
 import os
 import random
+import string
 import shutil
 import pandas as pd
 from collections import OrderedDict
@@ -51,25 +52,46 @@ class extract_beta_structure_coords(run_stages):
         # structure to the output files directory. NOTE I assume that the
         # asymmetric unit containing the CATH domain is listed first in model 1
         # in the biological assembly PDB file
+        chain_ids = list(string.ascii_uppercase + string.ascii_lowercase)
+
         for row in range(cdhit_domain_df.shape[0]):
             pdb_code = cdhit_domain_df['PDB_CODE'][row]
             with open('{}{}/{}.pdb1'.format(self.pdb_ba_database, pdb_code[1:3], pdb_code), 'r') as ba_file:
                 ba_file_lines = ba_file.readlines()
 
             with open('Biological_assemblies/{}.pdb1'.format(pdb_code), 'w') as processed_ba_file:
-                model = 0
                 atm_num = 0
+                used_chains = []
+                model_1_chains = []
+
                 for line in ba_file_lines:
+                    new_model = False
                     if line[0:10].strip() == 'MODEL':
+                        new_model = True
                         model = int(line[10:14].strip())
+                        for chain in used_chains:
+                            if chain in chain_ids:
+                                chain_ids.remove(chain)
+
                     elif line[0:6].strip() in ['ATOM', 'HETATM']:
+                        chain_id = line[21:22]
+                        if not chain_id in used_chains:
+                            used_chains.append(chain_id)
+
                         if model == 1:
                             atm_num = int(line[6:11])
+                            if not chain_id in model_1_chains:
+                                model_1_chains.append(chain_id)
                             processed_ba_file.write(line)
                         elif model > 1:
                             atm_num += 1
-                            processed_line = (line[0:6] + str(atm_num).rjust(5) + line[11:])
+                            new_chain_id = chain_ids[model_1_chains.index(chain_id)]
+                            used_chains.append(new_chain_id)
+                            processed_line = (line[0:6] + str(atm_num).rjust(5)
+                                              + line[11:21] + new_chain_id
+                                              + line[22:])
                             processed_ba_file.write(processed_line)
+
                     elif line[0:6].strip() in ['TER']:
                         processed_ba_file.write(line)
 
@@ -104,25 +126,20 @@ class extract_beta_structure_coords(run_stages):
             chain_num_ins = []
             lines = []
 
-            # Copies PDB file of input structure from hard drive
+            # Extracts ATOM / HETATM records from biological assembly PDB file
+            # copied to the output files directory in the previous step
             pdb_code = cdhit_domain_df['PDB_CODE'][row]
 
             print('Obtaining ATOM / HETATM records for {}'.format(pdb_code))
             print('{:0.2f}%'.format(((row+1)/cdhit_domain_df.shape[0])*100))
 
-            middle_characters = pdb_code[1:3]
-            cwd = os.getcwd()
-            os.chdir('{}{}'.format(self.pdb_au_database, middle_characters))
-
-            with open('{}.pdb'.format(pdb_code), 'r') as pdb_file:
+            with open('Biological_assemblies/{}.pdb1'.format(pdb_code), 'r') as pdb_file:
                 pdb_file_lines = [line.strip('\n') for line in pdb_file if
                                   line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))
             pdb_file_lines.append('TER'.ljust(80))  # Second TER line ensures
             # that entire sequence segment is extracted if TER cards have not
             # been placed correctly in the input PDB file
-
-            os.chdir('{}'.format(cwd))
 
             # For each segment sequence in the domain, makes a list of all
             # sequences in the input PDB file that lie between the recorded
