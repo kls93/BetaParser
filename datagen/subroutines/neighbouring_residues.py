@@ -26,7 +26,7 @@ class nearest_neighbours(run_stages):
 
             # Creates AMPAL object
             domain = isambard.ampal.convert_pdb_to_ampal(
-                'Biological_assemblies/{}.pdb1'.format(domain_id[0:4])
+                'Biological_assemblies/{}.pdb'.format(domain_id[0:4])
             )
             try:
                 domain_args = vars(domain)['_ampal_objects']

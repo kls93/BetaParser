@@ -52,48 +52,13 @@ class extract_beta_structure_coords(run_stages):
         # structure to the output files directory. NOTE I assume that the
         # asymmetric unit containing the CATH domain is listed first in model 1
         # in the biological assembly PDB file
-        chain_ids = list(string.ascii_uppercase + string.ascii_lowercase)
-
         for row in range(cdhit_domain_df.shape[0]):
             pdb_code = cdhit_domain_df['PDB_CODE'][row]
-            with open('{}{}/{}.pdb1'.format(self.pdb_ba_database, pdb_code[1:3], pdb_code), 'r') as ba_file:
-                ba_file_lines = ba_file.readlines()
-
-            with open('Biological_assemblies/{}.pdb1'.format(pdb_code), 'w') as processed_ba_file:
-                atm_num = 0
-                used_chains = []
-                model_1_chains = []
-
-                for line in ba_file_lines:
-                    new_model = False
-                    if line[0:10].strip() == 'MODEL':
-                        new_model = True
-                        model = int(line[10:14].strip())
-                        for chain in used_chains:
-                            if chain in chain_ids:
-                                chain_ids.remove(chain)
-
-                    elif line[0:6].strip() in ['ATOM', 'HETATM']:
-                        chain_id = line[21:22]
-                        if not chain_id in used_chains:
-                            used_chains.append(chain_id)
-
-                        if model == 1:
-                            atm_num = int(line[6:11])
-                            if not chain_id in model_1_chains:
-                                model_1_chains.append(chain_id)
-                            processed_ba_file.write(line)
-                        elif model > 1:
-                            atm_num += 1
-                            new_chain_id = chain_ids[model_1_chains.index(chain_id)]
-                            used_chains.append(new_chain_id)
-                            processed_line = (line[0:6] + str(atm_num).rjust(5)
-                                              + line[11:21] + new_chain_id
-                                              + line[22:])
-                            processed_ba_file.write(processed_line)
-
-                    elif line[0:6].strip() in ['TER']:
-                        processed_ba_file.write(line)
+            if not os.path.isfile('Biological_assemblies/{}.pdb'.format(pdb_code)):
+                shutil.copy2(
+                    '{}{}/{}.pdb'.format(self.pdb_ba_database, pdb_code[1:3], pdb_code),
+                    'Biological_assemblies/{}.pdb'.format(pdb_code)
+                )
 
     def get_xyz_coords(self, cdhit_domain_df):
         # Extends the filtered (for resolution, R_factor (working value) and
@@ -133,7 +98,7 @@ class extract_beta_structure_coords(run_stages):
             print('Obtaining ATOM / HETATM records for {}'.format(pdb_code))
             print('{:0.2f}%'.format(((row+1)/cdhit_domain_df.shape[0])*100))
 
-            with open('Biological_assemblies/{}.pdb1'.format(pdb_code), 'r') as pdb_file:
+            with open('Biological_assemblies/{}.pdb'.format(pdb_code), 'r') as pdb_file:
                 pdb_file_lines = [line.strip('\n') for line in pdb_file if
                                   line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))
@@ -157,7 +122,7 @@ class extract_beta_structure_coords(run_stages):
 
                 for index_2, line in enumerate(pdb_file_lines):
                     if index_2 != (len(pdb_file_lines)-1):
-                        if (line[22:27].strip() == start
+                        if (line[22: 27].strip() == start
                                 and line[21:22] == cdhit_domain_df['CHAIN'][row]
                                 ):
                             start_seq = True
@@ -224,6 +189,7 @@ class extract_beta_structure_coords(run_stages):
                             element.append(pdb_file_lines[index_4][76:78].strip())
                             charge.append(pdb_file_lines[index_4][78:80].strip())
                             chain_num_ins.append(pdb_file_lines[index_4][21:27].replace(' ', ''))
+                            # Removes alternate conformer labels
                             line_start = pdb_file_lines[index_4][:16]
                             line_end = pdb_file_lines[index_4][17:].strip('\n')
                             lines.append(line_start + ' ' + line_end)

@@ -30,12 +30,11 @@ class filter_beta_structure(run_stages):
             print('{:0.2f}%'.format(((row+1)/domain_df.shape[0])*100))
 
             middle_characters = domain_df['PDB_CODE'][row][1:3]
-            cwd = os.getcwd()
-            os.chdir('{}{}'.format(self.pdb_au_database, middle_characters))
 
             header_pdb_lines = []
             try:
-                with open('{}.pdb'.format(domain_df['PDB_CODE'][row]), 'r') as pdb_file:
+                with open('{}{}/{}.pdb'.format(self.pdb_au_database, middle_characters,
+                                               domain_df['PDB_CODE'][row]), 'r') as pdb_file:
                     remark_end = False
                     for line in pdb_file:
                         if (line.replace(' ', ''))[0:7] == 'REMARK4':
@@ -47,8 +46,6 @@ class filter_beta_structure(run_stages):
                             header_pdb_lines.append(line)
             except FileNotFoundError:
                 unprocessed_list_1.append(domain_df['PDB_CODE'][row])
-
-            os.chdir('{}'.format(cwd))
 
             resolution = 0
             rfactor = 0

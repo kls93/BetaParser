@@ -65,9 +65,9 @@ class calc_torsion_angles():
                 phi[row] = phi_val
                 psi[row] = psi_val
 
-        angle_df = pd.DataFrame({'PHI': phi,
-                                 'PSI': psi,
-                                 'OMEGA': omega})
+        angle_df = pd.DataFrame(OrderedDict{'PHI': phi,
+                                            'PSI': psi,
+                                            'OMEGA': omega})
 
         dssp_df = pd.concat([dssp_df, angle_df], axis=1)
 
@@ -81,16 +81,8 @@ class calc_torsion_angles():
         # Initialises list of side chain torsion angle values
         chi = ['']*dssp_df.shape[0]
 
-        # Generates ordered set of res_ids
-        res_ids = dssp_df['RES_ID'].tolist()
-        res_ids_filtered = []
-        for res_id in res_ids:
-            if res_id not in res_ids_filtered:
-                res_ids_filtered.append(res_id)
-        res_ids = res_ids_filtered
-
         # Uses ISAMBARD to calculate the chi angles of every residue
-        chi_angles = []
+        chi_angles = OrderedDict()
         residues = list(self.pdb.get_monomers())
         for res in residues:
             angles = isambard.ampal.analyse_protein.measure_sidechain_torsion_angles(

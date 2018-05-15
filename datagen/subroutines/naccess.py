@@ -135,10 +135,11 @@ class naccess_solv_acsblty_calcs():
 
         return solv_acsblty_dict
 
-    def calculate_residue_solv_acsblty(domain_id, dssp_df, sheets,
-                                       sec_struct_dfs_dict, domain_sheets_dict):
+    def calculate_residue_solv_acsblty(domain_id, sheets, sec_struct_dfs_dict,
+                                       domain_sheets_dict):
         # Calculates solvent accessibility of individual residues (in the
         # context of the parent biological assembly)
+        dssp_df = sec_struct_dfs_dict[domain_id]
         res_solv_acsblty = OrderedDict()
         sheet_sub_strings = []
         unprocessed_list = []
@@ -146,7 +147,7 @@ class naccess_solv_acsblty_calcs():
         print('Calculating solvent accessible surface areas of individual '
               'residues in {}'.format(domain_id))
 
-        with open('Biological_assemblies/{}.pdb1'.format(domain_id[0:4]), 'r') as pdb_file:
+        with open('Biological_assemblies/{}.pdb'.format(domain_id[0:4]), 'r') as pdb_file:
             for line in pdb_file.readlines():
                 line_start = line[0:16]
                 line_end = line[17:]
@@ -158,8 +159,8 @@ class naccess_solv_acsblty_calcs():
                 sheet_sub_strings.append(new_line)
         sheet_string = ''.join(sheet_sub_strings)
 
-        # Runs NACCESS to calculate solvent accessible surface area of every
-        # residue side chain (note that naccess classes C_alpha atoms as
+        # Runs NACCESS to calculate absolute solvent accessible surface area of
+        # every residue side chain (note that naccess classes C_alpha atoms as
         # side-chain rather than main chain so that Gly has a side chain sasa
         # value) in domain
         naccess_out = isambard.external_programs.naccess.run_naccess(
@@ -177,7 +178,8 @@ class naccess_solv_acsblty_calcs():
                     and not chain_res_num in res_solv_acsblty
                 ):
                     res_solv_acsblty[chain_res_num] = float(line[29:35])
-        if sorted(list(res_solv_acsblty.keys())) != sorted(dssp_df['RES_ID'].tolist()):
+
+        if sorted(list(res_solv_acsblty.keys())) != sorted(list(set(dssp_df['RES_ID'].tolist()))):
             unprocessed_list.append(domain_id)
             sec_struct_dfs_dict[domain_id] = None
             for sheet in sheets:
@@ -186,13 +188,13 @@ class naccess_solv_acsblty_calcs():
         return (res_solv_acsblty, unprocessed_list, sec_struct_dfs_dict,
                 domain_sheets_dict)
 
-    def add_naccess_info_to_df(domain_id, dssp_df, sheets, code,
-                               solv_acsblty_dict, res_solv_acsblty,
-                               sec_struct_dfs_dict, domain_sheets_dict,
-                               unprocessed_list):
+    def add_naccess_info_to_df(domain_id, sheets, code, solv_acsblty_dict,
+                               res_solv_acsblty, sec_struct_dfs_dict,
+                               domain_sheets_dict, unprocessed_list):
         # Uses the previously calculated solvent accessibility values to
         # determine which sheet/s form/s the beta-barrel/sandwich, and then
         # prunes the dataframe (dssp_df) to remove all other sheets
+        dssp_df = sec_struct_dfs_dict[domain_id]
 
         # Initialises list of residue solvent accessibility values for
         # incorporation into the domain dataframe (dssp_df)
@@ -244,13 +246,14 @@ class naccess_solv_acsblty_calcs():
 
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-    def write_domain_pdb(domain_id, dssp_df, sheets):
+    def write_domain_pdb(domain_id, sheets, sec_struct_dfs_dict):
         # Writes a PDB file of the residues that form the beta-barrel /
         # -sandwich as determined from sheet surface solvent accessibility
         # calculations performed in the previous steps. Individual beta-strands
         # are separated by 'TER' cards
         print('Writing PDB file of beta-strands in {}'.format(domain_id))
 
+        dssp_df = sec_struct_dfs_dict[domain_id]
         strand_number_set = [strand for strand in set(dssp_df['STRAND_NUM'].tolist())
                              if strand != '']
 
@@ -264,13 +267,13 @@ class naccess_solv_acsblty_calcs():
                         new_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
                 new_pdb_file.write('TER'.ljust(80)+'\n')
 
-    def calc_core_residues_sandwich(domain_id, dssp_df, sheets,
-                                    sec_struct_dfs_dict, domain_sheets_dict,
-                                    unprocessed_list):
+    def calc_core_residues_sandwich(domain_id, sheets, sec_struct_dfs_dict,
+                                    domain_sheets_dict, unprocessed_list):
         # Calculates whether each residue faces towards the interior or the
         # exterior of the sandwich from the ratio of its solvent accessibility
         # within the sandwich to its solvent accessibility within its
         # individual parent beta-sheet
+        dssp_df = sec_struct_dfs_dict[domain_id]
 
         # Checks that correct number of sheets has been retained for analysis
         if len(sheets) != 2:
@@ -309,13 +312,13 @@ class naccess_solv_acsblty_calcs():
                     sheet_sub_strings.append(new_line)
         sheet_string = ''.join(sheet_sub_strings)
 
-        # Runs NACCESS to calculate solvent accessible surface area of every
-        # residue in beta-sheet pair
+        # Runs NACCESS to calculate absolute solvent accessible surface area of
+        # every residue in beta-sheet pair
         naccess_out = isambard.external_programs.naccess.run_naccess(
             sheet_string, 'rsa', path=False, include_hetatms=True
         )
         naccess_out = naccess_out.split('\n')
-        naccess_out = [line for line in naccess_out if line != '' and line[5:8]]
+        naccess_out = [line for line in naccess_out if line != '']
         for line in naccess_out:
             if line[0:3] in ['RES', 'HEM']:
                 chain = line[8:9].strip()
@@ -341,14 +344,13 @@ class naccess_solv_acsblty_calcs():
                     sheet_sub_strings.append(new_line)
             sheet_string = ''.join(sheet_sub_strings)
 
-            # Runs NACCESS to calculate solvent accessible surface area of every
-            # residue in domain
+            # Runs NACCESS to calculate absolute solvent accessible surface
+            # area of every residue in domain
             naccess_out = isambard.external_programs.naccess.run_naccess(
                 sheet_string, 'rsa', path=False, include_hetatms=True
             )
             naccess_out = naccess_out.split('\n')
-            naccess_out = [line for line in naccess_out if line != '' and
-                           line[5:8] != 'GLY']
+            naccess_out = [line for line in naccess_out if line != '']
             for line in naccess_out:
                 if line[0:3] in ['RES', 'HEM']:
                     chain = line[8:9].strip()
@@ -376,6 +378,7 @@ class naccess_solv_acsblty_calcs():
                 elif buried_surface_area < 20:
                     core_surf_combined[res] = 'surface'
             else:
+                buried_surface_area_dict[res] = ''
                 core_surf_combined[res] = ''
 
         # Updates dataframe with solvent accessibility information
@@ -389,8 +392,8 @@ class naccess_solv_acsblty_calcs():
                 and dssp_df['ATMNAME'][row] == 'CA'
                 ):
                 buried_surface_area_list[row] = buried_surface_area_dict[res_id]
-        core_surf_df = pd.DataFrame({'CORE_OR_SURFACE': core_surf_list,
-                                     'BURIED_SURFACE_AREA(%)': buried_surface_area_list})
+        core_surf_df = pd.DataFrame(OrderedDict({'CORE_OR_SURFACE': core_surf_list,
+                                                 'BURIED_SURFACE_AREA(%)': buried_surface_area_list}))
         dssp_df = pd.concat([dssp_df, core_surf_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
 
@@ -409,7 +412,6 @@ class calculate_solvent_accessible_surface_area(run_stages):
         unprocessed_list_1 = []
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
-            dssp_df = sec_struct_dfs_dict[domain_id]
             sheets = {key: value for key, value in domain_sheets_dict.items()
                       if domain_id in key}
 
@@ -430,7 +432,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
                 )
                 (res_solv_acsblty, unprocessed_list_2, sec_struct_dfs_dict, domain_sheets_dict
                  ) = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
-                    domain_id, dssp_df, sheets, sec_struct_dfs_dict, domain_sheets_dict
+                    domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict
                 )
             elif self.code[0:4] in ['2.60']:
                 solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_sandwich_solv_acsblty(
@@ -438,7 +440,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
                 )
                 (res_solv_acsblty, unprocessed_list_2, sec_struct_dfs_dict, domain_sheets_dict
                  ) = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
-                    domain_id, dssp_df, sheets, sec_struct_dfs_dict, domain_sheets_dict
+                    domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict
                 )
             else:
                 solv_acsblty_dict = {}
@@ -446,11 +448,13 @@ class calculate_solvent_accessible_surface_area(run_stages):
 
             (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list_2
              ) = naccess_solv_acsblty_calcs.add_naccess_info_to_df(
-                domain_id, dssp_df, sheets, self.code, solv_acsblty_dict,
+                domain_id, sheets, self.code, solv_acsblty_dict,
                 res_solv_acsblty, sec_struct_dfs_dict, domain_sheets_dict,
                 unprocessed_list_2
             )
-            naccess_solv_acsblty_calcs.write_domain_pdb(domain_id, dssp_df, sheets)
+            naccess_solv_acsblty_calcs.write_domain_pdb(
+                domain_id, sheets, sec_struct_dfs_dict,
+            )
 
         sec_struct_dfs_dict = OrderedDict(
             {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
@@ -460,12 +464,12 @@ class calculate_solvent_accessible_surface_area(run_stages):
         )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nError in network generation - no / '
+            unprocessed_file.write('\n\nERROR in network generation - no / '
                                    'only 1 sheet/s retained for solvent '
                                    'accessibility calculations:\n')
             for domain_id in set(unprocessed_list_1):
                 unprocessed_file.write('{}\n'.format(domain_id))
-            unprocessed_file.write('\n\nError in solvent accessibility calculation:\n')
+            unprocessed_file.write('\n\nERROR in solvent accessibility calculation:\n')
             for domain_id in set(unprocessed_list_2):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
@@ -478,14 +482,13 @@ class calculate_solvent_accessible_surface_area(run_stages):
         unprocessed_list = []
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
-            dssp_df = sec_struct_dfs_dict[domain_id]
             sheets = [key for key in list(domain_sheets_dict.keys()) if
                       domain_id in key]
 
             (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
              ) = naccess_solv_acsblty_calcs.calc_core_residues_sandwich(
-                domain_id, dssp_df, sheets, sec_struct_dfs_dict,
-                domain_sheets_dict, unprocessed_list
+                domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict,
+                unprocessed_list
             )
 
         sec_struct_dfs_dict = OrderedDict(
@@ -496,7 +499,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
         )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nError in finding core and external '
+            unprocessed_file.write('\n\nERROR in finding core and external '
                                    'residues:\n')
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))

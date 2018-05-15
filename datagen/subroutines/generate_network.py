@@ -263,7 +263,7 @@ class calculate_beta_network(run_stages):
         )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nError in network generation - no / '
+            unprocessed_file.write('\n\nERROR in network generation - no / '
                                    'only 1 sheet/s have more than 2 '
                                    'beta-strands:\n')
             for domain_id in set(unprocessed_list):
