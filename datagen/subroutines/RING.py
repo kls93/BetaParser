@@ -2,6 +2,7 @@
 
 import os
 import pandas as pd
+from collections import OrderedDict
 if __name__ == 'subroutines.RING':
     from subroutines.run_stages import run_stages
 else:
@@ -28,11 +29,13 @@ class calculate_residue_interaction_network(run_stages):
                             'PIPISTACK': {},
                             'PICATION': {}}
 
-            for res_id in dssp_df['RES_ID'].tolist():
+            for res_id in set(dssp_df['RES_ID'].tolist()):
                 for interaction_type in list(interactions.keys()):
                     interactions[interaction_type][res_id] = []
 
-            with open('{}{}.ring'.format(self.ring_database, domain_id[0:4]), 'r') as ring_file:
+            with open('{}{}/{}.ring'.format(
+                self.ring_database, domain_id[1:3], domain_id[0:4]
+            ), 'r') as ring_file:
                 ring_output = ring_file.readlines()
 
             ring_output = ''.join(ring_output)
@@ -52,12 +55,12 @@ class calculate_residue_interaction_network(run_stages):
                 if aa_1 not in interactions[interaction_type][aa_2]:
                     interactions[interaction_type][aa_2].append(aa_1)
 
-            ring_df_dict = {'VDW': ['']*len(dssp_df.shape[0]),
-                            'HBOND': ['']*len(dssp_df.shape[0]),
-                            'IONIC': ['']*len(dssp_df.shape[0]),
-                            'SSBOND': ['']*len(dssp_df.shape[0]),
-                            'PIPISTACK': ['']*len(dssp_df.shape[0]),
-                            'PICATION': ['']*len(dssp_df.shape[0])}
+            ring_df_dict = OrderedDict{'VDW': ['']*len(dssp_df.shape[0]),
+                                       'HBOND': ['']*len(dssp_df.shape[0]),
+                                       'IONIC': ['']*len(dssp_df.shape[0]),
+                                       'SSBOND': ['']*len(dssp_df.shape[0]),
+                                       'PIPISTACK': ['']*len(dssp_df.shape[0]),
+                                       'PICATION': ['']*len(dssp_df.shape[0])}
             for row in range(dssp_df.shape[0]):
                 res_id = dssp_df['RES_ID'][row]
                 for interaction_type in list(ring_df_dict.keys()):
@@ -67,3 +70,114 @@ class calculate_residue_interaction_network(run_stages):
             sec_struct_dfs_dict[domain_id] = dssp_df
 
         return sec_struct_dfs_dict
+
+    def identify_int_ext_sandwich(self, sec_struct_dfs_dict, domain_sheets_dict):
+        # Identifies residues facing towards the interior of the sandwich as
+        # the group of residues in (direct or indirect) van der Waals contact
+        # with one another that has the highest average buried surface area
+        unprocessed_list = []
+
+        for domain_id in list(sec_struct_dfs_dict.keys()):
+            dssp_df = sec_struct_dfs_dict[domain_id]
+
+            # Groups residues in van der Waals contact together
+            groups = OrderedDict()
+            count = 0
+            for row in range(dssp_df.shape[0]):
+                res_id = dssp_df['RES_ID'][row]
+
+                in_current_group = False
+                for group in list(groups.keys()):
+                    if res_id in groups[group]:
+                        in_current_group = True
+                        groups[group] += dssp_df['VDW'][row]
+                if in_current_group is False:
+                    count += 1
+                    groups[str(count)] = [res_id]  # Must be list!
+
+            # Merges overlapping groups
+            merged_group_lists = []
+            for group_list in list(groups.values()):
+                merged_group_lists += group_list
+
+            while sorted(set(merged_group_lists)) != sorted(merged_group_lists):
+                group_1 = groups[list(groups.keys())[0]]
+                overlap = False
+                for group in list(groups.keys()):
+                    if group != list(groups.keys())[0]:
+                        if bool(set(group_1) & set(groups[group])):
+                            merged_group = group_1 + groups[group]
+                            groups[group] = list(set(merged_group))
+                            del groups[list(groups.keys())[0]]
+                            overlap = True
+                            break
+
+                if overlap is False:
+                    groups.move_to_end(group_1)
+
+                merged_group_lists = []
+                for group_list in list(groups.values()):
+                    merged_group_lists += group_list
+
+            if len(list(groups.keys())) != 3:
+                print('ERROR in determining interacting surfaces')
+                unprocessed_list.append(domain_id)
+                sec_struct_dfs_dict[domain_id] = None
+                sheet_ids = [sheet_id for sheet_id in list(domain_sheets_dict.keys())
+                             if sheet_id.startswith(domain_id)]
+                for sheet_id in sheet_ids:
+                    domain_sheets_dict[sheet_id] = None
+            else:
+                # Finds the group with the largest average buried surface area,
+                # which is assumed to be the interior surface
+                buried_surface_areas = {}
+                dssp_ca_df = dssp_df[dssp_df['ATMNAME'] == 'CA']
+                dssp_ca_df = dssp_ca_df.reset_index(drop=True)
+                for group in list(groups.keys()):
+                    buried_surface_area_sum = 0
+                    for res_id in groups[group]:
+                        buried_surface_area = dssp_ca_df['BURIED_SURFACE_AREA(%)'].tolist()[
+                            dssp_ca_df['RES_ID'].tolist().index(res_id)
+                        ]
+                        buried_surface_area_sum += buried_surface_area
+                    average_buried_surface_area = buried_surface_area_sum / len(groups[group])
+                    buried_surface_areas[average_buried_surface_area] = group
+
+                interior_group = buried_surface_areas[max(list(buried_surface_areas.keys()))]
+                int_ext_dict = {}
+                for group in groups:
+                    for res_id in group:
+                        if group == interior_group:
+                            int_ext_dict[res_id] = 'interior'
+                        else:
+                            int_ext_dict[res_id] = 'exterior'
+
+                # Updates dataframe with interior / exterior-facing calculation
+                # results
+                int_ext_list = ['']*dssp_df.shape[0]
+                for row in range(dssp_df.shape[0]):
+                    res_id = dssp_df['RES_ID'][row]
+                    if (
+                        res_id in list(int_ext_dict.keys())
+                        and dssp_df['ATMNAME'][row] == 'CA'
+                    ):
+                        int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
+                int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
+                dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
+                sec_struct_dfs_dict[domain_id] = dssp_df
+
+        # Writes PDB accession codes that could not be processed to output file
+        with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
+            unprocessed_file.write('\n\nERROR - failed to identify interior '
+                                   'and exterior surfaces of sandwich:\n')
+            for domain_id in set(unprocessed_list):
+                unprocessed_file.write('{}\n'.format(domain_id))
+
+        sec_struct_dfs_dict = OrderedDict(
+            {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
+        )
+        domain_sheets_dict = OrderedDict(
+            {key: value for key, value in domain_sheets_dict.items() if value is not None}
+        )
+
+        return sec_struct_dfs_dict, domain_sheets_dict

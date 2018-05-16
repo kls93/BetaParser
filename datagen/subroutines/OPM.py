@@ -65,11 +65,11 @@ class extract_barrel_info_from_OPM(run_stages):
                     # code available in OPM_TM_subunits.txt
                 tm_lists.append(tm_residues)
 
-        opm_df = pd.DataFrame({'PDB_CODE': pdb_codes,
-                               'CHAIN': chains,
-                               'TILT_ANGLE': tilt_angles,
-                               'TM_RANGE': tm_lists,
-                               'SEGMENTS': tm_segment_lists})
+        opm_df = pd.DataFrame(OrderedDict{'PDB_CODE': pdb_codes,
+                                          'CHAIN': chains,
+                                          'TILT_ANGLE': tilt_angles,
+                                          'TM_RANGE': tm_lists,
+                                          'SEGMENTS': tm_segment_lists})
 
         return opm_df
 

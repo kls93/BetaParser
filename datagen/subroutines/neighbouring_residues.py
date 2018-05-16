@@ -16,7 +16,8 @@ class nearest_neighbours(run_stages):
 
     def calculate_nearest_neighbours(self, sec_struct_dfs_dict):
         # For each C_alpha atom in the domain, makes a list of all residues
-        # within a user-specified radius (TODO: optimise this value)
+        # within a user-specified radius in the context of the biological
+        # assembly (TODO: optimise this value)
         for domain_id in list(sec_struct_dfs_dict.keys()):
             print('Calculating neighbouring residues for each atom in '
                   '{}'.format(domain_id))
@@ -28,54 +29,45 @@ class nearest_neighbours(run_stages):
             domain = isambard.ampal.convert_pdb_to_ampal(
                 'Biological_assemblies/{}.pdb'.format(domain_id[0:4])
             )
-            try:
-                domain_args = vars(domain)['_ampal_objects']
-            except KeyError:
-                domain = isambard.ampal.AmpalContainer(domain)
-                domain_args = vars(domain)['_ampal_objects']
-            if len(domain_args) == 1:
-                domain_args = [str(domain_args)]
-            elif len(domain_args) > 1:
-                domain_args = [str(assembly) for assembly in domain_args]
 
             # Creates list of res_ids ('neighbouring residues') within a
-            # user-specified radius of the C_alpha atom of every residue in the
-            # input domain
-            atom_ca_list = dssp_df[dssp_df['ATMNAME'] == 'CA']['ATMNUM'].tolist()
-            for atom_num in atom_ca_list:
-                neighbouring_res = []
-                atom_ca = [atom for atom in domain[0].get_atoms() if atom.id == atom_num][0]
-                for sub_domain in domain:
-                    for atom in sub_domain.is_within(self.radius, atom_ca, ligands=False):
-                        # Finds res_id of neighbouring residue
-                        parent_assembly = domain_args.index(
-                            atom.ampal_parent.ampal_parent.ampal_parent
-                        )
-                        if parent_assembly == 0:
-                            parent_res = (atom.ampal_parent.ampal_parent.id
-                                          + atom.ampal_parent.id
-                                          + atom.ampal_parent.insertion_code)
-                        if parent_assembly > 1:
-                            parent_res = (atom.ampal_parent.ampal_parent.id
-                                          + atom.ampal_parent.id
-                                          + atom.ampal_parent.insertion_code
-                                          + '_model' + str(parent_assembly))
+            # user-specified radius of the centre of mass of every residue in
+            # the input domain
+            res_ids = dssp_df[dssp_df['ATMNAME'] == 'CA']['RES_ID'].tolist()
+            for res_id in res_ids:
+                res_df = dssp_df[dssp_df['RES_ID'] == res_id]
+                res_df = res_df.reset_index(drop=True)
+
+                atom_df = res_df[res_df['ATMNAME'] == 'CA']
+                atom_df = atom_df.reset_index(drop=True)
+                if atom_df.shape[0] == 1:
+                    coordinates = np.zeros((res_df.shape[0], 3))
+                    for row in range(res_df.shape[0]):
+                        coordinates[row][0] = res_df['XPOS']
+                        coordinates[row][1] = res_df['YPOS']
+                        coordinates[row][2] = res_df['ZPOS']
+                    com = isambard.tools.geometry.centre_of_mass(coordinates)
+                    dummy_atom = isambard.ampal.Atom([com[0][0], com[0][1], com[0][2], 'C')
+
+                    neighbouring_res = []
+                    for neighbour in domain.is_within(self.radius, dummy_atom, ligands=False):
+                        parent_res = (neighbour.ampal_parent.ampal_parent.id
+                                      + neighbour.ampal_parent.id
+                                      + neighbour.ampal_parent.insertion_code)
                         neighbouring_res.append(parent_res)
 
-                # Creates ordered set of neighbouring residues
-                neighbours_set = []
-                for res in neighbouring_res:
-                    if not res in neighbours_set:
-                        neighbours_set.append(res)
+                    # Creates ordered set of neighbouring residues
+                    neighbours_set = []
+                    for res in neighbouring_res:
+                        if not res in neighbours_set:
+                            neighbours_set.append(res)
 
-                # Finds res_id of central atom
-                central_res = (atom_ca.ampal_parent.ampal_parent.id
-                               + atom_ca.ampal_parent.id
-                               + atom_ca.ampal_parent.insertion_code)
-                neighbours_set.remove(central_res)
-                neighbours_dict[central_res] = neighbours_set
+                    # Removes central residue from the list of its neighbours,
+                    # then stores neighbours list in dictionary
+                    neighbours_set.remove(res_id)
+                    neighbours_dict[domain_id] = neighbours_set
 
-            # Updates domain dataframe (dssp_df)
+            # Updates dataframe with neighbouring residue information
             neighbours_list = ['']*dssp_df.shape[0]
             for row in range(dssp_df.shape[0]):
                 if (

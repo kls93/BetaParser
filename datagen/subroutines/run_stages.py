@@ -192,9 +192,12 @@ class run_stages():
         # biological assembly
         res_int_network = RING(self.run_parameters)
         sec_struct_dfs_dict = res_int_network.parse_RING_output(sec_struct_dfs_dict)
+        if self.code[0:4] in ['2.60']:
+            sec_struct_dfs_dict, domain_sheets_dict = res_int_network.identify_int_ext_sandwich(
+                sec_struct_dfs_dict, domain_sheets_dict
+            )
 
         output = gen_output(self.run_parameters, radius)
-
         # For beta-barrel domains, calculates the strand number, plus, if the
         # barrel is in the OPM database, extracts its average strand tilt
         # number from the database
