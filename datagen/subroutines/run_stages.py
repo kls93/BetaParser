@@ -76,7 +76,7 @@ class run_stages():
         if os.path.isdir('Biological_assemblies'):
             shutil.rmtree('Biological_assemblies')
         os.mkdir('Biological_assemblies')
-        beta_structure.copy_biological_assembly_pdb(cdhit_domain_df)
+        cdhit_domain_df = beta_structure.copy_biological_assembly_pdb(cdhit_domain_df)
         cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
             cdhit_domain_df
         )
@@ -95,7 +95,8 @@ class run_stages():
         if os.path.isdir('Beta_strands'):
             shutil.rmtree('Beta_strands')
         os.mkdir('Beta_strands')
-        all_atoms_dfs_dict, sec_struct_dfs_dict = beta_structure.get_dssp_sec_struct_df(
+        (all_atoms_dfs_dict, sec_struct_dfs_dict, dssp_to_pdb_dict
+         ) = beta_structure.get_dssp_sec_struct_df(
             dssp_residues_dict, all_atoms_dfs_dict
         )
         del dssp_residues_dict  # To save memory and reduce the number of
@@ -111,7 +112,8 @@ class run_stages():
         # Pickles variables required for running stage 3 (which currently has
         # to run within ISAMBARD, hence the division of stages 2-4)
         with open('Input_ISAMBARD_variables.pkl', 'wb') as pickle_file:
-            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict), pickle_file)
+            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict, dssp_to_pdb_dict
+                         ), pickle_file)
 
     def run_stage_3(self, radius):
         # To be run within ISAMBARD. **NOTE** solvent accessibility
@@ -129,7 +131,8 @@ class run_stages():
 
         # Loads pickled variables generated from running stage 2.
         with open('Input_ISAMBARD_variables.pkl', 'rb') as pickle_file:
-            (sec_struct_dfs_dict, domain_sheets_dict) = pickle.load(pickle_file)
+            (sec_struct_dfs_dict, domain_sheets_dict, dssp_to_pdb_dict
+             ) = pickle.load(pickle_file)
 
         # Runs NACCESS to calculate the solvent accessible surface area of
         # each individual residue
@@ -147,10 +150,11 @@ class run_stages():
 
         # For each individual residue, calculates whether it faces in towards
         # or outwards from the centre of the beta_barrel/sheet
-        beta_structure = find_interior_exterior_surfaces(self.run_parameters)
-        sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
-            sec_struct_dfs_dict, domain_sheets_dict
-        )
+        if self.code[0:4] in ['2.40']:
+            beta_structure = find_interior_exterior_surfaces(self.run_parameters)
+            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
+                sec_struct_dfs_dict, domain_sheets_dict
+            )
 
         # Calculates the backbone and side chain dihedral angles of each
         # individual residue
@@ -167,8 +171,8 @@ class run_stages():
 
         # Pickles variables required for running stage 4
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
-            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict, radius),
-                        pickle_file)
+            pickle.dump((sec_struct_dfs_dict, domain_sheets_dict,
+                         dssp_to_pdb_dict, radius), pickle_file)
 
     def run_stage_4(self, orig_dir, opm_database):
         if __name__ == 'subroutines.run_stages':
@@ -185,19 +189,19 @@ class run_stages():
             from datagen.subroutines.output_dataframe import gen_output
 
         with open('Output_ISAMBARD_variables.pkl', 'rb') as pickle_file:
-            (sec_struct_dfs_dict, domain_sheets_dict, radius) = pickle.load(pickle_file)
+            (sec_struct_dfs_dict, domain_sheets_dict, dssp_to_pdb_dict, radius
+             ) = pickle.load(pickle_file)
 
         # Calculates residue interaction network of the amino acids in the
         # selected beta-strands of the CATH domain in the context of its parent
         # biological assembly
-        res_int_network = RING(self.run_parameters)
+        res_int_network = calculate_residue_interaction_network(self.run_parameters)
         sec_struct_dfs_dict = res_int_network.parse_RING_output(sec_struct_dfs_dict)
         if self.code[0:4] in ['2.60']:
             sec_struct_dfs_dict, domain_sheets_dict = res_int_network.identify_int_ext_sandwich(
                 sec_struct_dfs_dict, domain_sheets_dict
             )
 
-        output = gen_output(self.run_parameters, radius)
         # For beta-barrel domains, calculates the strand number, plus, if the
         # barrel is in the OPM database, extracts its average strand tilt
         # number from the database
@@ -222,7 +226,8 @@ class run_stages():
         # Classifies each beta-strand as either 'edge' or 'central' based upon
         # the number of strands with which it forms backbone hydrogen-bonding
         # interactions
-        elif self.code[0:4] in ['2.60']:
+        output = gen_output(self.run_parameters, radius)
+        if self.code[0:4] in ['2.60']:
             sec_struct_dfs_dict = output.identify_edge_central(
                 domain_sheets_dict, sec_struct_dfs_dict
             )
@@ -230,14 +235,12 @@ class run_stages():
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual beta-strand.
         output.write_beta_strand_dataframe(
-            'strand', sec_struct_dfs_dict, opm_database, tilt_angles,
-            strand_numbers, shear_numbers
+            'strand', sec_struct_dfs_dict, opm_database, dssp_to_pdb_dict,
+            tilt_angles, strand_numbers, shear_numbers
         )
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual residue.
         output.write_beta_strand_dataframe(
-            'res', sec_struct_dfs_dict, opm_database, tilt_angles,
-            strand_numbers, shear_numbers
+            'res', sec_struct_dfs_dict, opm_database, dssp_to_pdb_dict,
+            tilt_angles, strand_numbers, shear_numbers
         )
-
-        shutil.rmtree('Biological_assemblies')

@@ -52,13 +52,28 @@ class extract_beta_structure_coords(run_stages):
         # structure to the output files directory. NOTE I assume that the
         # asymmetric unit containing the CATH domain is listed first in model 1
         # in the biological assembly PDB file
+        unprocessed_list = []
+
         for row in range(cdhit_domain_df.shape[0]):
             pdb_code = cdhit_domain_df['PDB_CODE'][row]
             if not os.path.isfile('Biological_assemblies/{}.pdb'.format(pdb_code)):
-                shutil.copy2(
-                    '{}{}/{}.pdb'.format(self.pdb_ba_database, pdb_code[1:3], pdb_code),
-                    'Biological_assemblies/{}.pdb'.format(pdb_code)
-                )
+                try:
+                    shutil.copy(
+                        '{}{}/{}.pdb'.format(self.pdb_ba_database, pdb_code[1:3], pdb_code),
+                        'Biological_assemblies/{}.pdb'.format(pdb_code)
+                    )
+                except FileNotFoundError:
+                    unprocessed_list.append(cdhit_domain_df['DOMAIN_ID'][row])
+
+        cdhit_domain_df = cdhit_domain_df[~cdhit_domain_df['DOMAIN_ID'].isin(unprocessed_list)]
+        cdhit_domain_df = cdhit_domain_df.reset_index(drop=True)
+
+        with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
+            unprocessed_file.write('\n\nBiological assembly file not present:\n')
+            for domain_id in set(unprocessed_list):
+                unprocessed_file.write('{}\n'.format(domain_id))
+
+        return cdhit_domain_df
 
     def get_xyz_coords(self, cdhit_domain_df):
         # Extends the filtered (for resolution, R_factor (working value) and

@@ -66,6 +66,7 @@ class beta_structure_dssp_classification(run_stages):
         # Generates dataframe of relevant information in DSSP file for each
         # domain
         sec_struct_dfs_dict = OrderedDict()
+        dssp_to_pdb_dict = OrderedDict()
 
         for index_1, domain_id in enumerate(list(dssp_residues_dict.keys())):
             dssp_indv_file_lines = dssp_residues_dict[domain_id]
@@ -87,7 +88,10 @@ class beta_structure_dssp_classification(run_stages):
             # Extracts secondary structure information from the DSSP file lines
             for index_2, line in enumerate(dssp_indv_file_lines):
                 if not line.startswith('TER'):
-                    chain_res_num.append(line[11:12].strip() + line[5:11].replace(' ', ''))
+                    res_id = line[11:12].strip() + line[5:11].replace(' ', '')
+                    dssp_to_pdb_dict[line[0:5].strip()] = res_id
+
+                    chain_res_num.append(res_id)
                     dssp_num.append(line[0:5].strip())
                     secondary_structure = line[16:17]
                     lines.append(line.strip('\n'))
@@ -170,4 +174,4 @@ class beta_structure_dssp_classification(run_stages):
             filtered_extnd_df.to_pickle('Beta_strands/{}.pkl'.format(domain_id))
             sec_struct_dfs_dict[domain_id] = filtered_extnd_df
 
-        return all_atoms_dfs_dict, sec_struct_dfs_dict
+        return all_atoms_dfs_dict, sec_struct_dfs_dict, dssp_to_pdb_dict

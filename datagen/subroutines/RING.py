@@ -55,16 +55,20 @@ class calculate_residue_interaction_network(run_stages):
                 if aa_1 not in interactions[interaction_type][aa_2]:
                     interactions[interaction_type][aa_2].append(aa_1)
 
-            ring_df_dict = OrderedDict{'VDW': ['']*len(dssp_df.shape[0]),
-                                       'HBOND': ['']*len(dssp_df.shape[0]),
-                                       'IONIC': ['']*len(dssp_df.shape[0]),
-                                       'SSBOND': ['']*len(dssp_df.shape[0]),
-                                       'PIPISTACK': ['']*len(dssp_df.shape[0]),
-                                       'PICATION': ['']*len(dssp_df.shape[0])}
+            ring_df_dict = OrderedDict({'VDW': ['']*len(dssp_df.shape[0]),
+                                        'HBOND': ['']*len(dssp_df.shape[0]),
+                                        'IONIC': ['']*len(dssp_df.shape[0]),
+                                        'SSBOND': ['']*len(dssp_df.shape[0]),
+                                        'PIPISTACK': ['']*len(dssp_df.shape[0]),
+                                        'PICATION': ['']*len(dssp_df.shape[0])})
             for row in range(dssp_df.shape[0]):
                 res_id = dssp_df['RES_ID'][row]
                 for interaction_type in list(ring_df_dict.keys()):
-                    ring_df_dict[interaction_type][row] = interactions[interaction_type][res_id]
+                    if (
+                        res_id in interactions[interaction_type]
+                        and dssp_df['ATMNAME'] == 'CA'
+                    ):
+                        ring_df_dict[interaction_type][row] = interactions[interaction_type][res_id]
             ring_df = pd.DataFrame(ring_df_dict)
             dssp_df = pd.concat([dssp_df, ring_df], axis=1)
             sec_struct_dfs_dict[domain_id] = dssp_df
@@ -93,7 +97,7 @@ class calculate_residue_interaction_network(run_stages):
                         groups[group] += dssp_df['VDW'][row]
                 if in_current_group is False:
                     count += 1
-                    groups[str(count)] = [res_id]  # Must be list!
+                    groups[str(count)] = [res_id] + dssp_df['VDW'][row]  # Must be list!
 
             # Merges overlapping groups
             merged_group_lists = []
@@ -104,13 +108,15 @@ class calculate_residue_interaction_network(run_stages):
                 group_1 = groups[list(groups.keys())[0]]
                 overlap = False
                 for group in list(groups.keys()):
-                    if group != list(groups.keys())[0]:
-                        if bool(set(group_1) & set(groups[group])):
-                            merged_group = group_1 + groups[group]
-                            groups[group] = list(set(merged_group))
-                            del groups[list(groups.keys())[0]]
-                            overlap = True
-                            break
+                    if (
+                        group != list(groups.keys())[0]
+                        and bool(set(group_1) & set(groups[group]))
+                    ):
+                        merged_group = group_1 + groups[group]
+                        groups[group] = list(set(merged_group))
+                        del groups[list(groups.keys())[0]]
+                        overlap = True
+                        break
 
                 if overlap is False:
                     groups.move_to_end(group_1)
@@ -119,8 +125,12 @@ class calculate_residue_interaction_network(run_stages):
                 for group_list in list(groups.values()):
                     merged_group_lists += group_list
 
+            # Checks that correct number of surfaces have been identified (2x
+            # exterior, 1x interior). BE CAREFUL WITH THIS CHECK IF EXPAND CODE
+            # TO LOOK AT A WIDER RANGE OF STRUCTURES!
             if len(list(groups.keys())) != 3:
-                print('ERROR in determining interacting surfaces')
+                print('ERROR in determining interior- and exterior-facing '
+                      'surfaces')
                 unprocessed_list.append(domain_id)
                 sec_struct_dfs_dict[domain_id] = None
                 sheet_ids = [sheet_id for sheet_id in list(domain_sheets_dict.keys())
@@ -161,7 +171,7 @@ class calculate_residue_interaction_network(run_stages):
                         res_id in list(int_ext_dict.keys())
                         and dssp_df['ATMNAME'][row] == 'CA'
                     ):
-                        int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
+                        int_ext_list[row] = int_ext_dict[res_id]
                 int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
                 dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
                 sec_struct_dfs_dict[domain_id] = dssp_df

@@ -1,6 +1,7 @@
 
 import isambard
 import pandas as pd
+import numpy as np
 from collections import OrderedDict
 if __name__ == 'subroutines.neighbouring_residues':
     from subroutines.run_stages import run_stages
@@ -43,11 +44,11 @@ class nearest_neighbours(run_stages):
                 if atom_df.shape[0] == 1:
                     coordinates = np.zeros((res_df.shape[0], 3))
                     for row in range(res_df.shape[0]):
-                        coordinates[row][0] = res_df['XPOS']
-                        coordinates[row][1] = res_df['YPOS']
-                        coordinates[row][2] = res_df['ZPOS']
+                        coordinates[row][0] = res_df['XPOS'][row]
+                        coordinates[row][1] = res_df['YPOS'][row]
+                        coordinates[row][2] = res_df['ZPOS'][row]
                     com = isambard.tools.geometry.centre_of_mass(coordinates)
-                    dummy_atom = isambard.ampal.Atom([com[0][0], com[0][1], com[0][2], 'C')
+                    dummy_atom = isambard.ampal.Atom([com[0], com[1], com[2]], 'C')
 
                     neighbouring_res = []
                     for neighbour in domain.is_within(self.radius, dummy_atom, ligands=False):

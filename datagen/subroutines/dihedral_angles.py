@@ -65,9 +65,9 @@ class calc_torsion_angles():
                 phi[row] = phi_val
                 psi[row] = psi_val
 
-        angle_df = pd.DataFrame(OrderedDict{'PHI': phi,
-                                            'PSI': psi,
-                                            'OMEGA': omega})
+        angle_df = pd.DataFrame(OrderedDict({'PHI': phi,
+                                             'PSI': psi,
+                                             'OMEGA': omega}))
 
         dssp_df = pd.concat([dssp_df, angle_df], axis=1)
 
@@ -94,8 +94,7 @@ class calc_torsion_angles():
                     angles_rounded.append(round(angle, 1))
                 else:
                     angles_rounded.append('')
-            chi_angles.append(angles_rounded)
-        chi_angles = OrderedDict(zip(res_ids, chi_angles))
+            chi_angles[res] = angles_rounded
 
         # Updates domain dataframe (dssp_df)
         for row in range(dssp_df.shape[0]):

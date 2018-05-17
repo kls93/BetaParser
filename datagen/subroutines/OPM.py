@@ -65,11 +65,11 @@ class extract_barrel_info_from_OPM(run_stages):
                     # code available in OPM_TM_subunits.txt
                 tm_lists.append(tm_residues)
 
-        opm_df = pd.DataFrame(OrderedDict{'PDB_CODE': pdb_codes,
-                                          'CHAIN': chains,
-                                          'TILT_ANGLE': tilt_angles,
-                                          'TM_RANGE': tm_lists,
-                                          'SEGMENTS': tm_segment_lists})
+        opm_df = pd.DataFrame(OrderedDict({'PDB_CODE': pdb_codes,
+                                           'CHAIN': chains,
+                                           'TILT_ANGLE': tilt_angles,
+                                           'TM_RANGE': tm_lists,
+                                           'SEGMENTS': tm_segment_lists}))
 
         return opm_df
 
@@ -200,9 +200,9 @@ class calculate_barrel_geometry(run_stages):
                 listed_res = []
                 for h_bonds_index, res in enumerate(h_bonds):
                     if (res != 0
-                            and float(res) in res_list
-                            and res in list(dssp_num_dict.keys())
-                        ):
+                                and float(res) in res_list
+                                and res in list(dssp_num_dict.keys())
+                            ):
                         listed_res.append(int(dssp_num_dict[res]))
                         res_list_index = res_list.index(float(res))
                         res_array[count, res_list_index] = float(dssp_num_dict[res])
@@ -321,8 +321,8 @@ class calculate_barrel_geometry(run_stages):
                 shear = low_index_row_1 - low_index_row_n
                 for diff in diff_dict:
                     if (low_index_row_n < diff_dict[diff][0]
-                            and diff_dict[diff][1] < low_index_row_1
-                        ):
+                                and diff_dict[diff][1] < low_index_row_1
+                            ):
                         shear += diff
                         break
             elif low_index_row_1 < low_index_row_n:
@@ -331,8 +331,8 @@ class calculate_barrel_geometry(run_stages):
                 shear = high_index_row_n - high_index_row_1
                 for diff in diff_dict:
                     if (high_index_row_1 < diff_dict[diff][0]
-                            and diff_dict[diff][1] < high_index_row_n
-                        ):
+                                and diff_dict[diff][1] < high_index_row_n
+                            ):
                         shear += diff
                         break
 
