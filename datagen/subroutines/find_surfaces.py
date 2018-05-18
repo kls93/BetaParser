@@ -190,7 +190,7 @@ class barrel_interior_exterior_calcs():
             if (
                 (all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
                      for x in ['N', 'CA', 'C', 'O', 'CB']))
-                or (res_id == 'GLY'
+                or (res_dict[res_id] == 'GLY'
                     and all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
                             for x in ['N', 'CA', 'C', 'O', 'HA3']))
             ):
@@ -412,9 +412,9 @@ class sandwich_interior_exterior_calcs():
                     c_x_coord = xy_sub_dict[atom][0][0]
                     c_y_coord = xy_sub_dict[atom][1][0]
                 elif (
-                    (atom.split('_')[0] != 'GLY' and atom.endswith('_CB'))
+                    (atom.endswith('_CB'))
                     or
-                    (atom.split()[0] == 'GLY' and atom.endswith('HA3'))
+                    (res_ids_dict[atom.split('_')[0]] == 'GLY' and atom.endswith('HA3'))
                 ):
                     cb = True
                     cb_x_coord = xy_sub_dict[atom][0][0]

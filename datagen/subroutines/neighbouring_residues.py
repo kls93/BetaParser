@@ -47,7 +47,7 @@ class nearest_neighbours(run_stages):
                         coordinates[row][0] = res_df['XPOS'][row]
                         coordinates[row][1] = res_df['YPOS'][row]
                         coordinates[row][2] = res_df['ZPOS'][row]
-                    com = isambard.tools.geometry.centre_of_mass(coordinates)
+                    com = np.average(coordinates, axis=0)
                     dummy_atom = isambard.ampal.Atom([com[0], com[1], com[2]], 'C')
 
                     neighbouring_res = []
@@ -66,7 +66,7 @@ class nearest_neighbours(run_stages):
                     # Removes central residue from the list of its neighbours,
                     # then stores neighbours list in dictionary
                     neighbours_set.remove(res_id)
-                    neighbours_dict[domain_id] = neighbours_set
+                    neighbours_dict[res_id] = neighbours_set
 
             # Updates dataframe with neighbouring residue information
             neighbours_list = ['']*dssp_df.shape[0]

@@ -150,11 +150,10 @@ class run_stages():
 
         # For each individual residue, calculates whether it faces in towards
         # or outwards from the centre of the beta_barrel/sheet
-        if self.code[0:4] in ['2.40']:
-            beta_structure = find_interior_exterior_surfaces(self.run_parameters)
-            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
-                sec_struct_dfs_dict, domain_sheets_dict
-            )
+        beta_structure = find_interior_exterior_surfaces(self.run_parameters)
+        sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
+            sec_struct_dfs_dict, domain_sheets_dict
+        )
 
         # Calculates the backbone and side chain dihedral angles of each
         # individual residue
@@ -196,11 +195,15 @@ class run_stages():
         # selected beta-strands of the CATH domain in the context of its parent
         # biological assembly
         res_int_network = calculate_residue_interaction_network(self.run_parameters)
-        sec_struct_dfs_dict = res_int_network.parse_RING_output(sec_struct_dfs_dict)
+        sec_struct_dfs_dict, domain_sheets_dict = res_int_network.parse_RING_output(
+            sec_struct_dfs_dict, domain_sheets_dict
+        )
+        """
         if self.code[0:4] in ['2.60']:
             sec_struct_dfs_dict, domain_sheets_dict = res_int_network.identify_int_ext_sandwich(
                 sec_struct_dfs_dict, domain_sheets_dict
             )
+        """
 
         # For beta-barrel domains, calculates the strand number, plus, if the
         # barrel is in the OPM database, extracts its average strand tilt

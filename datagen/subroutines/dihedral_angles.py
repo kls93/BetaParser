@@ -84,7 +84,9 @@ class calc_torsion_angles():
         # Uses ISAMBARD to calculate the chi angles of every residue
         chi_angles = OrderedDict()
         residues = list(self.pdb.get_monomers())
-        for res in residues:
+        chain_res_num = [str(res.ampal_parent.id) + str(res.id) +
+                         str(res.insertion_code) for res in residues]
+        for index, res in enumerate(residues):
             angles = isambard.ampal.analyse_protein.measure_sidechain_torsion_angles(
                 res
             )
@@ -94,7 +96,7 @@ class calc_torsion_angles():
                     angles_rounded.append(round(angle, 1))
                 else:
                     angles_rounded.append('')
-            chi_angles[res] = angles_rounded
+            chi_angles[chain_res_num[index]] = angles_rounded
 
         # Updates domain dataframe (dssp_df)
         for row in range(dssp_df.shape[0]):
@@ -104,7 +106,7 @@ class calc_torsion_angles():
             ):
                 chi[row] = chi_angles[dssp_df['RES_ID'][row]]
 
-        angle_df = pd.DataFrame({'CHI_ANGLES': chi})
+        angle_df = pd.DataFrame({'CHI': chi})
         dssp_df = pd.concat([dssp_df, angle_df], axis=1)
 
         return dssp_df
