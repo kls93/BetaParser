@@ -17,11 +17,12 @@ class run_stages():
         self.pdb_au_database = self.run_parameters['pdbaudatabase']
         self.pdb_ba_database = self.run_parameters['pdbbadatabase']
         self.dssp_database = self.run_parameters['dsspdatabase']
+        self.opm_database = self.run_parameters['opmdatabase']
         self.ring_database = self.run_parameters['ringdatabase']
         self.resn = float(self.run_parameters['resolution'])
         self.rfac = float(self.run_parameters['rfactor'])
 
-    def run_stage_1_cath(self, orig_dir):
+    def run_stage_1_cath(self, orig_dir, discard_tm):
         # Runs stage 1 of the DataGen pipeline, extracting sequences of the
         # structural domain of interest from the CATH database
         if __name__ == 'subroutines.run_stages':
@@ -41,7 +42,8 @@ class run_stages():
         # earlier user input), picking out PDB accession codes and sequences
         # (whose values are stored in the 'domain_df' dataframe).
         domains_desc = gen_domain_desc_list(orig_dir)
-        domain_df = domain_desc_filter(self.code, domains_desc)
+        domain_df = domain_desc_filter(self.code, domains_desc, discard_tm,
+                                       self.opm_database)
 
         # Filters the domain_df for X-ray structures below user-specified
         # resolution and R_factor (working value) cutoffs. Writes a file
@@ -51,7 +53,7 @@ class run_stages():
         filtered_domain_df = beta_structure.resn_rfac_filter(domain_df)
         beta_structure.gen_cdhit_list(filtered_domain_df)
 
-    def run_stage_1_scope(self, orig_dir):
+    def run_stage_1_scope(self, orig_dir, discard_tm):
         return
 
     def run_stage_2(self, cdhit_entries, cdhit_output):
@@ -173,7 +175,7 @@ class run_stages():
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict,
                          dssp_to_pdb_dict, radius), pickle_file)
 
-    def run_stage_4(self, orig_dir, opm_database):
+    def run_stage_4(self, orig_dir):
         if __name__ == 'subroutines.run_stages':
             from subroutines.RING import calculate_residue_interaction_network
             from subroutines.OPM import (
@@ -238,12 +240,12 @@ class run_stages():
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual beta-strand.
         output.write_beta_strand_dataframe(
-            'strand', sec_struct_dfs_dict, opm_database, dssp_to_pdb_dict,
-            tilt_angles, strand_numbers, shear_numbers
+            'strand', sec_struct_dfs_dict, dssp_to_pdb_dict, tilt_angles,
+            strand_numbers, shear_numbers
         )
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual residue.
         output.write_beta_strand_dataframe(
-            'res', sec_struct_dfs_dict, opm_database, dssp_to_pdb_dict,
-            tilt_angles, strand_numbers, shear_numbers
+            'res', sec_struct_dfs_dict, dssp_to_pdb_dict, tilt_angles,
+            strand_numbers, shear_numbers
         )

@@ -196,10 +196,13 @@ class output_calcs():
 
         return minus_list, plus_list
 
-    def convert_res_id_to_fasta(sub_list, res_id_to_fasta_dict, nested):
+    def convert_res_id_to_fasta(sub_list, res_id_to_fasta_dict, nested, chain_id):
         # Converts input list of residue ids (= chain + residue number +
-        # insertion code) into a list of 1 letter amino acid codes
-        fasta_list = []
+        # insertion code) into a list of 1 letter amino acid codes. Separates
+        # interactions by chainID.
+        intra_chain_fasta_list = []
+        inter_chain_fasta_list = []
+
         for item in sub_list:
             if nested is False:
                 try:
@@ -207,18 +210,30 @@ class output_calcs():
                 except KeyError:
                     fasta = ''
 
+                if item[0:1] == chain_id:
+                    intra_chain_fasta_list.append(fasta)
+                else:
+                    inter_chain_fasta_list.append(fasta)
+
             elif nested is True:
-                fasta = []
+                intra_fasta = []
+                inter_fasta = []
+
                 for res in item:
                     try:
                         fasta_indv = res_id_to_fasta_dict[res]
                     except KeyError:
                         fasta_indv = ''
-                    fasta.append(fasta_indv)
 
-            fasta_list.append(fasta)
+                    if res[0:1] == chain_id:
+                        intra_fasta.append(fasta_indv)
+                    else:
+                        inter_fasta.append(fasta_indv)
 
-        return fasta_list
+                intra_chain_fasta_list.append(intra_fasta)
+                inter_chain_fasta_list.append(inter_fasta)
+
+        return intra_chain_fasta_list, inter_chain_fasta_list
 
 
 def reverse_strand_lists(sub_list, reverse):
@@ -296,7 +311,7 @@ class gen_output(run_stages):
         return sec_struct_dfs_dict
 
     def write_beta_strand_dataframe(self, strand_or_res, sec_struct_dfs_dict,
-                                    opm_database, dssp_to_pdb_dict, tilt_angles,
+                                    dssp_to_pdb_dict, tilt_angles,
                                     strand_numbers, shear_numbers):
         # Generates dataframes of residues and strands in the retained domains.
         if __name__ == 'subroutines.output_dataframe':
@@ -343,14 +358,22 @@ class gen_output(run_stages):
         plus_1 = []
         minus_2 = []
         plus_2 = []
-        neighbours_fasta = []
-        bridge_pairs_fasta = []
-        van_der_waals_fasta = []
-        h_bonds_fasta = []
-        ionic_fasta = []
-        ss_bonds_fasta = []
-        pi_pi_stacking_fasta = []
-        cation_pi_fasta = []
+        neighbours_fasta_intra = []
+        bridge_pairs_fasta_intra = []
+        van_der_waals_fasta_intra = []
+        h_bonds_fasta_intra = []
+        ionic_fasta_intra = []
+        ss_bonds_fasta_intra = []
+        pi_pi_stacking_fasta_intra = []
+        cation_pi_fasta_intra = []
+        neighbours_fasta_inter = []
+        bridge_pairs_fasta_inter = []
+        van_der_waals_fasta_inter = []
+        h_bonds_fasta_inter = []
+        ionic_fasta_inter = []
+        ss_bonds_fasta_inter = []
+        pi_pi_stacking_fasta_inter = []
+        cation_pi_fasta_inter = []
 
         unprocessed_list = []
 
@@ -370,13 +393,15 @@ class gen_output(run_stages):
             for strand_num in strands_list:
                 strand_df = dssp_df[dssp_df['STRAND_NUM'] == strand_num]
                 strand_df = strand_df.reset_index(drop=True)
+                chain_id = strand_df['CHAIN'][0]
 
                 # If the strand's parent structure is in the OPM database,
                 # determines the orientation of the strand in the OM
                 (in_database, reverse, res_ids_list, strand_coordinates,
                  lower_bound, upper_bound, unprocessed_list
                  ) = output_calcs.determine_strand_orientation(
-                    domain_id, strand_num, strand_df, opm_database, unprocessed_list
+                    domain_id, strand_num, strand_df, self.opm_database,
+                    unprocessed_list
                 )
 
                 # Gives strand a unique ID
@@ -566,12 +591,17 @@ class gen_output(run_stages):
                     strand_or_res
                 )
 
-                neighbours_fasta_sub_list = output_calcs.convert_res_id_to_fasta(
-                    neighbours_sub_list, res_id_to_fasta_dict, True
+                (neighbours_fasta_sub_list_intra, neighbours_fasta_sub_list_inter
+                 ) = output_calcs.convert_res_id_to_fasta(
+                    neighbours_sub_list, res_id_to_fasta_dict, True, chain_id
                 )
-                neighbours_fasta = append_to_output_lists(
-                    neighbours_fasta_sub_list, neighbours_fasta, res_ids_list,
-                    strand_or_res
+                neighbours_fasta_intra = append_to_output_lists(
+                    neighbours_fasta_sub_list_intra, neighbours_fasta_intra,
+                    res_ids_list, strand_or_res
+                )
+                neighbours_fasta_inter = append_to_output_lists(
+                    neighbours_fasta_sub_list_inter, neighbours_fasta_inter,
+                    res_ids_list, strand_or_res
                 )
 
                 # Generates list of residues forming backbone hydrogen-bonds
@@ -584,11 +614,16 @@ class gen_output(run_stages):
                     bridge_pairs_list, bridge_pairs, res_ids_list, strand_or_res
                 )
 
-                bridge_pairs_fasta_sub_list = output_calcs.convert_res_id_to_fasta(
-                    bridge_pairs_list, res_id_to_fasta_dict, True
+                (bridge_pairs_fasta_sub_list_intra, bridge_pairs_fasta_sub_list_inter
+                 ) = output_calcs.convert_res_id_to_fasta(
+                    bridge_pairs_list, res_id_to_fasta_dict, True, chain_id
                 )
-                bridge_pairs_fasta = append_to_output_lists(
-                    bridge_pairs_fasta_sub_list, bridge_pairs_fasta,
+                bridge_pairs_fasta_intra = append_to_output_lists(
+                    bridge_pairs_fasta_sub_list_intra, bridge_pairs_fasta_intra,
+                    res_ids_list, strand_or_res
+                )
+                bridge_pairs_fasta_inter = append_to_output_lists(
+                    bridge_pairs_fasta_sub_list_inter, bridge_pairs_fasta_inter,
                     res_ids_list, strand_or_res
                 )
 
@@ -598,11 +633,16 @@ class gen_output(run_stages):
                     strand_or_res
                 )
 
-                van_der_waals_fasta_sub_list = output_calcs.convert_res_id_to_fasta(
-                    van_der_waals_sub_list, res_id_to_fasta_dict, True
+                (van_der_waals_fasta_sub_list_intra, van_der_waals_fasta_sub_list_inter
+                 ) = output_calcs.convert_res_id_to_fasta(
+                    van_der_waals_sub_list, res_id_to_fasta_dict, True, chain_id
                 )
-                van_der_waals_fasta = append_to_output_lists(
-                    van_der_waals_fasta_sub_list, van_der_waals_fasta,
+                van_der_waals_fasta_intra = append_to_output_lists(
+                    van_der_waals_fasta_sub_list_intra, van_der_waals_fasta_intra,
+                    res_ids_list, strand_or_res
+                )
+                van_der_waals_fasta_inter = append_to_output_lists(
+                    van_der_waals_fasta_sub_list_inter, van_der_waals_fasta_inter,
                     res_ids_list, strand_or_res
                 )
 
@@ -613,12 +653,17 @@ class gen_output(run_stages):
                     strand_or_res
                 )
 
-                h_bonds_fasta_sub_list = output_calcs.convert_res_id_to_fasta(
-                    h_bonds_sub_list, res_id_to_fasta_dict, True
+                (h_bonds_fasta_sub_list_intra, h_bonds_fasta_sub_list_inter
+                 ) = output_calcs.convert_res_id_to_fasta(
+                    h_bonds_sub_list, res_id_to_fasta_dict, True, chain_id
                 )
-                h_bonds_fasta = append_to_output_lists(
-                    h_bonds_fasta_sub_list, h_bonds_fasta, res_ids_list,
-                    strand_or_res
+                h_bonds_fasta_intra = append_to_output_lists(
+                    h_bonds_fasta_sub_list_intra, h_bonds_fasta_intra,
+                    res_ids_list, strand_or_res
+                )
+                h_bonds_fasta_inter = append_to_output_lists(
+                    h_bonds_fasta_sub_list_inter, h_bonds_fasta_inter,
+                    res_ids_list, strand_or_res
                 )
 
                 # Generates list of residues that form ionic bonds with the
@@ -627,11 +672,16 @@ class gen_output(run_stages):
                     'IONIC', strand_df, ionic, reverse, res_ids_list, strand_or_res
                 )
 
-                ionic_fasta_sub_list = output_calcs.convert_res_id_to_fasta(
-                    ionic_sub_list, res_id_to_fasta_dict, True
+                (ionic_fasta_sub_list_intra, ionic_fasta_sub_list_inter
+                 ) = output_calcs.convert_res_id_to_fasta(
+                    ionic_sub_list, res_id_to_fasta_dict, True, chain_id
                 )
-                ionic_fasta = append_to_output_lists(
-                    ionic_fasta_sub_list, ionic_fasta, res_ids_list,
+                ionic_fasta_intra = append_to_output_lists(
+                    ionic_fasta_sub_list_intra, ionic_fasta_intra, res_ids_list,
+                    strand_or_res
+                )
+                ionic_fasta_inter = append_to_output_lists(
+                    ionic_fasta_sub_list_inter, ionic_fasta_inter, res_ids_list,
                     strand_or_res
                 )
 
@@ -641,12 +691,17 @@ class gen_output(run_stages):
                     strand_or_res
                 )
 
-                ss_bonds_fasta_sub_list = output_calcs.convert_res_id_to_fasta(
-                    ss_bonds_sub_list, res_id_to_fasta_dict, True
+                (ss_bonds_fasta_sub_list_intra, ss_bonds_fasta_sub_list_inter
+                 ) = output_calcs.convert_res_id_to_fasta(
+                    ss_bonds_sub_list, res_id_to_fasta_dict, True, chain_id
                 )
-                ss_bonds_fasta = append_to_output_lists(
-                    ss_bonds_fasta_sub_list, ss_bonds_fasta, res_ids_list,
-                    strand_or_res
+                ss_bonds_fasta_intra = append_to_output_lists(
+                    ss_bonds_fasta_sub_list_intra, ss_bonds_fasta_intra,
+                    res_ids_list, strand_or_res
+                )
+                ss_bonds_fasta_inter = append_to_output_lists(
+                    ss_bonds_fasta_sub_list_inter, ss_bonds_fasta_inter,
+                    res_ids_list, strand_or_res
                 )
 
                 # Generates list of residues that form pi-pi stacking
@@ -656,11 +711,16 @@ class gen_output(run_stages):
                     res_ids_list, strand_or_res
                 )
 
-                pi_pi_stacking_fasta_sub_list = output_calcs.convert_res_id_to_fasta(
-                    pi_pi_stacking_sub_list, res_id_to_fasta_dict, True
+                (pi_pi_stacking_fasta_sub_list_intra, pi_pi_stacking_fasta_sub_list_inter
+                 ) = output_calcs.convert_res_id_to_fasta(
+                    pi_pi_stacking_sub_list, res_id_to_fasta_dict, True, chain_id
                 )
-                pi_pi_stacking_fasta = append_to_output_lists(
-                    pi_pi_stacking_fasta_sub_list, pi_pi_stacking_fasta,
+                pi_pi_stacking_fasta_intra = append_to_output_lists(
+                    pi_pi_stacking_fasta_sub_list_intra, pi_pi_stacking_fasta_intra,
+                    res_ids_list, strand_or_res
+                )
+                pi_pi_stacking_fasta_inter = append_to_output_lists(
+                    pi_pi_stacking_fasta_sub_list_inter, pi_pi_stacking_fasta_inter,
                     res_ids_list, strand_or_res
                 )
 
@@ -671,12 +731,17 @@ class gen_output(run_stages):
                     strand_or_res
                 )
 
-                cation_pi_fasta_sub_list = output_calcs.convert_res_id_to_fasta(
-                    cation_pi_sub_list, res_id_to_fasta_dict, True
+                (cation_pi_fasta_sub_list_intra, cation_pi_fasta_sub_list_inter
+                 ) = output_calcs.convert_res_id_to_fasta(
+                    cation_pi_sub_list, res_id_to_fasta_dict, True, chain_id
                 )
-                cation_pi_fasta = append_to_output_lists(
-                    cation_pi_fasta_sub_list, cation_pi_fasta, res_ids_list,
-                    strand_or_res
+                cation_pi_fasta_intra = append_to_output_lists(
+                    cation_pi_fasta_sub_list_intra, cation_pi_fasta_intra,
+                    res_ids_list, strand_or_res
+                )
+                cation_pi_fasta_inter = append_to_output_lists(
+                    cation_pi_fasta_sub_list_inter, cation_pi_fasta_inter,
+                    res_ids_list, strand_or_res
                 )
 
                 # Generates list of residues in +/-1 and +/2 positions to the
@@ -741,16 +806,24 @@ class gen_output(run_stages):
                 plus_1[index] = np.nan
                 minus_2[index] = np.nan
                 plus_2[index] = np.nan
-                neighbours_fasta[index] = np.nan
-                bridge_pairs_fasta[index] = np.nan
-                van_der_waals_fasta[index] = np.nan
-                h_bonds_fasta[index] = np.nan
-                ionic_fasta[index] = np.nan
-                ss_bonds_fasta[index] = np.nan
-                pi_pi_stacking_fasta[index] = np.nan
-                cation_pi_fasta[index] = np.nan
+                neighbours_fasta_intra[index] = np.nan
+                bridge_pairs_fasta_intra[index] = np.nan
+                van_der_waals_fasta_intra[index] = np.nan
+                h_bonds_fasta_intra[index] = np.nan
+                ionic_fasta_intra[index] = np.nan
+                ss_bonds_fasta_intra[index] = np.nan
+                pi_pi_stacking_fasta_intra[index] = np.nan
+                cation_pi_fasta_intra[index] = np.nan
+                neighbours_fasta_inter[index] = np.nan
+                bridge_pairs_fasta_inter[index] = np.nan
+                van_der_waals_fasta_inter[index] = np.nan
+                h_bonds_fasta_inter[index] = np.nan
+                ionic_fasta_inter[index] = np.nan
+                ss_bonds_fasta_inter[index] = np.nan
+                pi_pi_stacking_fasta_inter[index] = np.nan
+                cation_pi_fasta_inter[index] = np.nan
 
-                # Generates csv file of beta-barrel dataset
+        # Generates csv file of beta-barrel dataset
         if self.code[0:4] in ['2.40']:
             beta_strands_df_dict = OrderedDict({'STRAND_ID': domain_strand_ids,
                                                 'TILT_ANGLE(DEGREES)': tilt_angle,
@@ -782,16 +855,26 @@ class gen_output(run_stages):
                                                 'PLUS_1_POS': plus_1,
                                                 'MINUS_2_POS': minus_2,
                                                 'PLUS_2_POS': plus_2,
-                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA'.format(
+                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA_INTRA_CHAIN'.format(
                                                     self.radius
-                                                ): neighbours_fasta,
-                                                'BRIDGE_PAIRS_FASTA': bridge_pairs_fasta,
-                                                'VDW_FASTA': van_der_waals_fasta,
-                                                'HBOND_FASTA': h_bonds_fasta,
-                                                'IONIC_FASTA': ionic_fasta,
-                                                'SSBOND_FASTA': ss_bonds_fasta,
-                                                'PIPISTACK_FASTA': pi_pi_stacking_fasta,
-                                                'PICATION_FASTA': cation_pi_fasta})
+                                                ): neighbours_fasta_intra,
+                                                'BRIDGE_PAIRS_FASTA_INTRA_CHAIN': bridge_pairs_fasta_intra,
+                                                'VDW_FASTA_INTRA_CHAIN': van_der_waals_fasta_intra,
+                                                'HBOND_FASTA_INTRA_CHAIN': h_bonds_fasta_intra,
+                                                'IONIC_FASTA_INTRA_CHAIN': ionic_fasta_intra,
+                                                'SSBOND_FASTA_INTRA_CHAIN': ss_bonds_fasta_intra,
+                                                'PIPISTACK_FASTA_INTRA_CHAIN': pi_pi_stacking_fasta_intra,
+                                                'PICATION_FASTA_INTRA_CHAIN': cation_pi_fasta_intra,
+                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA_INTER_CHAIN'.format(
+                                                    self.radius
+                                                ): neighbours_fasta_inter,
+                                                'BRIDGE_PAIRS_FASTA_INTER_CHAIN': bridge_pairs_fasta_inter,
+                                                'VDW_FASTA_INTER_CHAIN': van_der_waals_fasta_inter,
+                                                'HBOND_FASTA_INTER_CHAIN': h_bonds_fasta_inter,
+                                                'IONIC_FASTA_INTER_CHAIN': ionic_fasta_inter,
+                                                'SSBOND_FASTA_INTER_CHAIN': ss_bonds_fasta_inter,
+                                                'PIPISTACK_FASTA_INTER_CHAIN': pi_pi_stacking_fasta_inter,
+                                                'PICATION_FASTA_INTER_CHAIN': cation_pi_fasta_inter})
             beta_strands_df = pd.DataFrame(beta_strands_df_dict)
             beta_strands_df = beta_strands_df.dropna()
             beta_strands_df = beta_strands_df.reset_index(drop=True)
@@ -829,16 +912,26 @@ class gen_output(run_stages):
                                                 'PLUS_1_POS': plus_1,
                                                 'MINUS_2_POS': minus_2,
                                                 'PLUS_2_POS': plus_2,
-                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA'.format(
+                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA_INTRA_CHAIN'.format(
                                                     self.radius
-                                                ): neighbours_fasta,
-                                                'BRIDGE_PAIRS_FASTA': bridge_pairs_fasta,
-                                                'VDW_FASTA': van_der_waals_fasta,
-                                                'HBOND_FASTA': h_bonds_fasta,
-                                                'IONIC_FASTA': ionic_fasta,
-                                                'SSBOND_FASTA': ss_bonds_fasta,
-                                                'PIPISTACK_FASTA': pi_pi_stacking_fasta,
-                                                'PICATION_FASTA': cation_pi_fasta})
+                                                ): neighbours_fasta_intra,
+                                                'BRIDGE_PAIRS_FASTA_INTRA_CHAIN': bridge_pairs_fasta_intra,
+                                                'VDW_FASTA_INTRA_CHAIN': van_der_waals_fasta_intra,
+                                                'HBOND_FASTA_INTRA_CHAIN': h_bonds_fasta_intra,
+                                                'IONIC_FASTA_INTRA_CHAIN': ionic_fasta_intra,
+                                                'SSBOND_FASTA_INTRA_CHAIN': ss_bonds_fasta_intra,
+                                                'PIPISTACK_FASTA_INTRA_CHAIN': pi_pi_stacking_fasta_intra,
+                                                'PICATION_FASTA_INTRA_CHAIN': cation_pi_fasta_intra,
+                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA_INTER_CHAIN'.format(
+                                                    self.radius
+                                                ): neighbours_fasta_inter,
+                                                'BRIDGE_PAIRS_FASTA_INTER_CHAIN': bridge_pairs_fasta_inter,
+                                                'VDW_FASTA_INTER_CHAIN': van_der_waals_fasta_inter,
+                                                'HBOND_FASTA_INTER_CHAIN': h_bonds_fasta_inter,
+                                                'IONIC_FASTA_INTER_CHAIN': ionic_fasta_inter,
+                                                'SSBOND_FASTA_INTER_CHAIN': ss_bonds_fasta_inter,
+                                                'PIPISTACK_FASTA_INTER_CHAIN': pi_pi_stacking_fasta_inter,
+                                                'PICATION_FASTA_INTER_CHAIN': cation_pi_fasta_inter})
             beta_strands_df = pd.DataFrame(beta_strands_df_dict)
             beta_strands_df = beta_strands_df.dropna()
             beta_strands_df = beta_strands_df.reset_index(drop=True)

@@ -17,8 +17,8 @@ def main():
         from subroutines.run_stages import run_stages
     else:
         from datagen.subroutines.run_parameters import (
-            gen_run_parameters, find_cdhit_input, find_radius,
-            find_opm_database
+            gen_run_parameters, determine_discard_tm, find_cdhit_input,
+            find_radius
         )
         from datagen.subroutines.run_stages import run_stages
     orig_dir = os.getcwd()
@@ -28,12 +28,12 @@ def main():
     parser.add_argument('-i', '--input_file', help='OPTIONAL: Specifies the '
                         'absolute file path of an input file listing run '
                         'parameters')
+    parser.add_argument('--tm', help='OPTIONAL: Specifies whether or not to '
+                        'retain only TM structures')
     parser.add_argument('-s', '--sequences', nargs='+', help='OPTIONAL: '
                         'Specifies the absolute file path of an input file of '
                         'CDHIT filtered FASTA sequences required for stage 2 '
                         'of the analysis pipeline')
-    parser.add_argument('--opm', help='OPTIONAL: Specifies the absolute file '
-                        'path of a local copy of the OPM database')
     parser.add_argument('--radius', help='OPTIONAL: Specifies the radius of '
                         'the sphere drawn around each atom when calculating '
                         'the identities of its nearest neighbouring residues')
@@ -48,10 +48,11 @@ def main():
     if stage in ['1']:
         # Determines whether the user wants to extract structures from the CATH
         # or from the SCOPe structural database
+        discard_tm = determine_discard_tm(args, run_parameters)
         if run_parameters['structuredatabase'] == 'CATH':
-            analysis.run_stage_1_cath(orig_dir)
+            analysis.run_stage_1_cath(orig_dir, discard_tm)
         elif run_parameters['structuredatabase'] == 'SCOP':
-            analysis.run_stage_1_scope(orig_dir)
+            analysis.run_stage_1_scope(orig_dir, discard_tm)
 
     # Extracts PDB structures and structural information for each of the
     # sequences listed in a CDHIT output txt file
@@ -68,8 +69,7 @@ def main():
     # Summarises the structural characteristics of the dataset in an output
     # dataframe / csv file
     elif stage in ['4']:
-        opm_database = find_opm_database(args, run_parameters)
-        analysis.run_stage_4(orig_dir, opm_database)
+        analysis.run_stage_4(orig_dir)
 
 
 # Calls 'main' function if datagen.py is run as a script

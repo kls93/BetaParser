@@ -1,4 +1,63 @@
 
+def merge_models_biological_assembly_pdbs(pdb_file_lines):
+    # Combines multiple models in biological assembly PDB files into a single
+    # model (which requires updating the chain ids and atom numbers)
+    alphabet = string.ascii_uppercase + string.ascii_lowercase + '0123456789'
+    new_pdb_file_lines = []
+
+    pdb_file_lines = pdb_file_lines.replace('ENDMDL', 'MODEL')
+    sections = pdb_file_lines.split('MODEL')
+    sections = [section for section in sections if section.strip() != '\n']
+
+    for index, section in enumerate(sections):
+        lines = section.split('\n')
+        if index == 0:
+            new_pdb_file_lines += lines
+        elif index == len(sections) - 1 and 'END' in section:
+            new_pdb_file_lines += lines
+        else:
+            model = int(lines[0])
+            max_atom_num = int(lines[-1][6:11])
+            lines = lines[1:]
+            if model == 1:
+                chain_ids = []
+                for line in lines:
+                    if line[0:3] != 'TER':
+                        new_pdb_file_lines.append(line)
+                    else:
+                        new_pdb_file_lines.append('TER'.ljust(80))
+
+                    chain_id = line[21:22]
+                    if chain_id in alphabet:
+                        alphabet = alphabet.replace(chain_id, '')
+                    if not chain_id in chain_ids:
+                        chain_ids.append(chain_id)
+
+            else:
+                new_chain_ids = []
+                for line in lines:
+                    if line[0:3] == 'TER':
+                        new_pdb_file_lines.append('TER'.ljust(80))
+                    else:
+                        max_atom_num += 1
+                        new_atom_num = str(max_atom_num)
+                        if len(new_atom_num) > 5:
+                            new_atom_num = new_atom_num[-5:]
+                        new_atom_num = new_atom_num.rjust(5)
+
+                        new_chain_id = alphabet[chain_ids.index(line[21:22])]
+                        if not new_chain_id in new_chain_ids:
+                            new_chain_ids.append(new_chain_id)
+
+                        new_line = (line[0:6] + new_atom_num + line[11:21] +
+                                    new_chain_id + line[22:])
+                        new_pdb_file_lines.append(new_line)
+
+                for chain_id in new_chain_ids:
+                    alphabet = alphabet.replace(chain_id, '')
+
+    return new_pdb_file_lines
+
     def merge_sheets(self, dssp_residues_dict, dssp_dfs_dict):
         # Merges sheet names of sheets that share strands
         dssp_dfs_merged_sheets_dict = OrderedDict()
@@ -169,8 +228,8 @@ def find_barrel_shear_number(self, sec_struct_dfs_dict):
                 shear_pairs = [[h_bonded_res_2_b, h_bonded_res_3_a],
                                [h_bonded_res_2_a, h_bonded_res_3_b]]
                 if (not any(x in [None, 0] for x in [dssp_num for pair in
-                                                     shear_pairs for dssp_num in pair])
-                    ):
+                                                         shear_pairs for dssp_num in pair])
+                        ):
                     for pair in shear_pairs:
                         print(pair)  # DELETE ME
                         if int(res_1) in pair:

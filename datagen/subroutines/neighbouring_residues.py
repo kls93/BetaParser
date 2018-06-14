@@ -36,7 +36,8 @@ class nearest_neighbours(run_stages):
             # the input domain
             res_ids = dssp_df[dssp_df['ATMNAME'] == 'CA']['RES_ID'].tolist()
             for res_id in res_ids:
-                res_df = dssp_df[dssp_df['RES_ID'] == res_id]
+                res_df = dssp_df[(dssp_df['RES_ID'] == res_id) &
+                                 (~dssp_df['ATMNAME'].isin(['N', 'C', 'O']))]
                 res_df = res_df.reset_index(drop=True)
 
                 atom_df = res_df[res_df['ATMNAME'] == 'CA']

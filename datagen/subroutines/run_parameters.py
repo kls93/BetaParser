@@ -90,8 +90,8 @@ def gen_run_parameters(args):
             run = run.replace(']', '')
             run = [cathcode for cathcode in run.split(',')]
             if (len(run) != 0
-                    and all(run[index].startswith(ids_dict[run_parameters['structuredatabase']])
-                            for index, code in enumerate(run))
+                        and all(run[index].startswith(ids_dict[run_parameters['structuredatabase']])
+                                for index, code in enumerate(run))
                     ):
                 run_parameters['id'] = run
                 break
@@ -170,6 +170,23 @@ def gen_run_parameters(args):
                 print('Specified directory for DSSP database not recognised')
             else:
                 run_parameters['dsspdatabase'] = dssp_database
+                break
+
+    # Requires user input if the absolute file path of the (locally saved) OPM
+    # database is not specified in the input file / is not recognised
+    if 'opmdatabase' in run_parameters:
+        if not os.path.isdir(run_parameters['opmdatabase']):
+            print('Specified directory for OPM database not recognised')
+            run_parameters.pop('opmdatabase')
+    if not 'opmdatabase' in run_parameters:
+        print('Specify absolute file path of OPM database:')
+        opm_database = ''
+        while not os.path.isdir(opm_database):
+            opm_database = '/{}/'.format(input(prompt).strip('/'))
+            if not os.path.isdir(opm_database):
+                print('Specified directory for OPM database not recognised')
+            else:
+                run_parameters['opmdatabase'] = opm_database
                 break
 
     # Requires user input if the absolute file path of the (locally saved) RING
@@ -273,11 +290,42 @@ def gen_run_parameters(args):
                               'PDB AU database: {}\n'.format(run_parameters['pdbaudatabase']) +
                               'PDB BA database: {}\n'.format(run_parameters['pdbbadatabase']) +
                               'DSSP database: {}\n'.format(run_parameters['dsspdatabase']) +
+                              'OPM database: {}\n'.format(run_parameters['opmdatabase']) +
                               'RING database: {}\n'.format(run_parameters['ringdatabase']) +
                               'Resolution: {}\n'.format(run_parameters['resolution']) +
                               'Rfactor: {}\n'.format(run_parameters['rfactor']))
 
     return stage, run_parameters
+
+
+def determine_discard_tm(args, run_parameters):
+    # Determines whether or not the user wants to keep only transmembrane
+    # structures
+    discard_tm = ''
+    if (run_parameters['structuredatabase'] == 'CATH'
+            and run_parameters['id'][0:4] in ['2.40']):
+        if vars(args)['tm']:
+            try:
+                discard_tm = vars(args)['tm'].lower()
+            except:
+                discard_tm = ''
+        else:
+            discard_tm = ''
+
+        while not discard_tm in ['yes', 'no', 'y', 'n']:
+            print('Discard non-TM structures?')
+            discard_tm = input(prompt).lower()
+            if not discard_tm in ['yes', 'no', 'y', 'n']:
+                print('Input not recognised - please enter "yes" or "no"')
+            else:
+                break
+
+    if discard_tm in ['yes', 'y']:
+        discard_tm = True
+    elif discard_tm in ['no', 'n']:
+        discard_tm = False
+
+    return discard_tm
 
 
 def find_cdhit_input(args):
@@ -357,27 +405,3 @@ def find_radius(args):
             print('Specified radius must be a number')
             radius = 0
     return radius
-
-
-def find_opm_database(args, run_parameters):
-    # Locates local copy of OPM database (for determining strand orientation of
-    # beta barrels in stage 4)
-    opm_database = ''
-    if (run_parameters['structuredatabase'] == 'CATH'
-            and run_parameters['id'][0:4] in ['2.40']):
-        if vars(args)['opm']:
-            opm_database = vars(args)['opm']
-            opm_database.replace('\\', '/')
-            opm_database = '/' + opm_database.strip('/')
-        else:
-            opm_database = ''
-
-        while not os.path.isdir(opm_database):
-            print('Specify absolute file path of OPM database:')
-            opm_database = '/' + input(prompt).strip('/')
-            if not os.path.isdir(opm_database):
-                print('Specified file path not recognised')
-            else:
-                break
-
-    return opm_database
