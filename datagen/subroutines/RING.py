@@ -16,22 +16,40 @@ class calculate_residue_interaction_network(run_stages):
 
     def parse_RING_output(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Appends residue interaction network information to dssp_df.
-        # **TODO** Currently treats main chain / main chain, main chain / side
-        # chain and side chain / side chain interactions identically, might
-        # want to update this in the future.
+
         unprocessed_list = []
+        interaction_types = ['VDW', 'HBOND', 'IONIC', 'SSBOND', 'PIPISTACK',
+                             'PICATION']
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
             print('Identifying interacting residues for {}'.format(domain_id))
 
             dssp_df = sec_struct_dfs_dict[domain_id]
 
-            interactions = {'VDW': {},
-                            'HBOND': {},
-                            'IONIC': {},
-                            'SSBOND': {},
-                            'PIPISTACK': {},
-                            'PICATION': {}}
+            interactions = {'VDW_MC_MC': {},
+                            'HBOND_MC_MC': {},
+                            'IONIC_MC_MC': {},
+                            'SSBOND_MC_MC': {},
+                            'PIPISTACK_MC_MC': {},
+                            'PICATION_MC_MC': {},
+                            'VDW_SC_MC': {},
+                            'HBOND_SC_MC': {},
+                            'IONIC_SC_MC': {},
+                            'SSBOND_SC_MC': {},
+                            'PIPISTACK_SC_MC': {},
+                            'PICATION_SC_MC': {},
+                            'VDW_MC_SC': {},
+                            'HBOND_MC_SC': {},
+                            'IONIC_MC_SC': {},
+                            'SSBOND_MC_SC': {},
+                            'PIPISTACK_MC_SC': {},
+                            'PICATION_MC_SC': {},
+                            'VDW_SC_SC': {},
+                            'HBOND_SC_SC': {},
+                            'IONIC_SC_SC': {},
+                            'SSBOND_SC_SC': {},
+                            'PIPISTACK_SC_SC': {},
+                            'PICATION_SC_SC': {}}
 
             for res_id in set(dssp_df['RES_ID'].tolist()):
                 for interaction_type in list(interactions.keys()):
@@ -64,25 +82,54 @@ class calculate_residue_interaction_network(run_stages):
                     aa_2 = (aa_2[0].replace('_', '') + aa_2[1].replace('_', '')
                             + aa_2[2].replace('_', ''))
 
-                    interaction_type = line.split()[1].split(':')[0]
-                    if interaction_type in list(interactions.keys()):
-                        if (
-                            aa_1 in list(interactions[interaction_type].keys())
-                            and aa_2 not in interactions[interaction_type][aa_1]
-                        ):
-                            interactions[interaction_type][aa_1].append(aa_2)
-                        if (
-                            aa_2 in list(interactions[interaction_type].keys())
-                            and aa_1 not in interactions[interaction_type][aa_2]
-                        ):
-                            interactions[interaction_type][aa_2].append(aa_1)
+                    mc_or_sc = line.split()[1].split(':')[1]
+                    aa_1_label = mc_or_sc.split('_')[0]
+                    aa_2_label = mc_or_sc.split('_')[1]
 
-                ring_df_dict = OrderedDict({'VDW': ['']*dssp_df.shape[0],
-                                            'HBOND': ['']*dssp_df.shape[0],
-                                            'IONIC': ['']*dssp_df.shape[0],
-                                            'SSBOND': ['']*dssp_df.shape[0],
-                                            'PIPISTACK': ['']*dssp_df.shape[0],
-                                            'PICATION': ['']*dssp_df.shape[0]})
+                    interaction_type = line.split()[1].split(':')[0]
+                    aa_1_interaction_type = '{}_{}_{}'.format(
+                        interaction_type, aa_1_label, aa_2_label
+                    )
+                    aa_2_interaction_type = '{}_{}_{}'.format(
+                        interaction_type, aa_2_label, aa_1_label
+                    )
+
+                    # Records interaction for both residues involved
+                    if (
+                        aa_1 in list(interactions[aa_1_interaction_type].keys())
+                        and aa_2 not in interactions[aa_1_interaction_type][aa_1]
+                    ):
+                        interactions[aa_1_interaction_type][aa_1].append(aa_2)
+                    if (
+                        aa_2 in list(interactions[aa_2_interaction_type].keys())
+                        and aa_1 not in interactions[aa_2_interaction_type][aa_2]
+                    ):
+                        interactions[aa_2_interaction_type][aa_2].append(aa_1)
+
+                ring_df_dict = OrderedDict({'VDW_MC_MC': ['']*dssp_df.shape[0],
+                                            'HBOND_MC_MC': ['']*dssp_df.shape[0],
+                                            'IONIC_MC_MC': ['']*dssp_df.shape[0],
+                                            'SSBOND_MC_MC': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_MC': ['']*dssp_df.shape[0],
+                                            'PICATION_MC_MC': ['']*dssp_df.shape[0],
+                                            'VDW_SC_MC': ['']*dssp_df.shape[0],
+                                            'HBOND_SC_MC': ['']*dssp_df.shape[0],
+                                            'IONIC_SC_MC': ['']*dssp_df.shape[0],
+                                            'SSBOND_SC_MC': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_MC': ['']*dssp_df.shape[0],
+                                            'PICATION_SC_MC': ['']*dssp_df.shape[0],
+                                            'VDW_MC_SC': ['']*dssp_df.shape[0],
+                                            'HBOND_MC_SC': ['']*dssp_df.shape[0],
+                                            'IONIC_MC_SC': ['']*dssp_df.shape[0],
+                                            'SSBOND_MC_SC': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_SC': ['']*dssp_df.shape[0],
+                                            'PICATION_MC_SC': ['']*dssp_df.shape[0],
+                                            'VDW_SC_SC': ['']*dssp_df.shape[0],
+                                            'HBOND_SC_SC': ['']*dssp_df.shape[0],
+                                            'IONIC_SC_SC': ['']*dssp_df.shape[0],
+                                            'SSBOND_SC_SC': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_SC': ['']*dssp_df.shape[0],
+                                            'PICATION_SC_SC': ['']*dssp_df.shape[0]})
                 for row in range(dssp_df.shape[0]):
                     res_id = dssp_df['RES_ID'][row]
                     for interaction_type in list(ring_df_dict.keys()):

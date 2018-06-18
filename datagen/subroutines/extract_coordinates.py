@@ -51,9 +51,8 @@ class extract_beta_structure_coords(run_stages):
 
     def copy_biological_assembly_pdb(self, cdhit_domain_df):
         # Copies the parent biological assembly PDB file of every retained
-        # structure to the output files directory. NOTE I assume that the
-        # asymmetric unit containing the CATH domain is listed first in model 1
-        # in the biological assembly PDB file
+        # structure to the output files directory.
+
         unprocessed_list = []
 
         for row in range(cdhit_domain_df.shape[0]):
