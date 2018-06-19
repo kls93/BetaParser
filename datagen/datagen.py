@@ -11,13 +11,13 @@ import argparse
 def main():
     if __name__ == '__main__':
         from subroutines.run_parameters import (
-            gen_run_parameters, find_cdhit_input, find_radius,
-            find_opm_database
+            gen_run_parameters, determine_if_discard_tm, find_cdhit_input,
+            find_radius
         )
         from subroutines.run_stages import run_stages
     else:
         from datagen.subroutines.run_parameters import (
-            gen_run_parameters, determine_discard_tm, find_cdhit_input,
+            gen_run_parameters, determine_if_discard_tm, find_cdhit_input,
             find_radius
         )
         from datagen.subroutines.run_stages import run_stages
@@ -48,7 +48,7 @@ def main():
     if stage in ['1']:
         # Determines whether the user wants to extract structures from the CATH
         # or from the SCOPe structural database
-        discard_tm = determine_discard_tm(args, run_parameters)
+        discard_tm = determine_if_discard_tm(args, run_parameters)
         if run_parameters['structuredatabase'] == 'CATH':
             analysis.run_stage_1_cath(orig_dir, discard_tm)
         elif run_parameters['structuredatabase'] == 'SCOP':

@@ -3,6 +3,11 @@ import os
 import pandas as pd
 from collections import OrderedDict
 
+if __name__ == 'subroutines.CATH':
+    from subroutines.variables import gen_tm_pdb_codes_list
+else:
+    from datagen.subroutines.variables import gen_tm_pdb_codes_list
+
 
 def gen_domain_desc_list(orig_dir):
     # Generates a list of the domain descriptions provided in
@@ -31,12 +36,12 @@ def gen_domain_desc_list(orig_dir):
     return domains_desc
 
 
-def domain_desc_filter(cathcode, domains_desc, discard_tm, opm_database):
+def domain_desc_filter(cathcode, domains_desc, discard_tm):
     # Filters the domain descriptions list for beta-structures (either
     # sandwiches or barrels depending upon the user's choice), picking out PDB
     # accession codes and sequences, whose values are stored in a dataframe.
 
-    opm_pdb_codes = [pdb[0:4] for pdb in os.listdir(opm_database)]
+    tm_pdb_codes = gen_tm_pdb_codes_list()
 
     domain_pdb_ids = []
     domain_ids = []
@@ -61,7 +66,7 @@ def domain_desc_filter(cathcode, domains_desc, discard_tm, opm_database):
                 pdb_code = [line for line in domain_sublist if
                             line.startswith('DOMAIN')][0][10:14]
                 if (
-                        (discard_tm is True and pdb_code in opm_pdb_codes)
+                        (discard_tm is True and pdb_code in tm_pdb_codes)
                         or
                         (discard_tm is False)
                 ):

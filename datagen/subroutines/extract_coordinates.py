@@ -49,7 +49,7 @@ class extract_beta_structure_coords(run_stages):
 
         return cdhit_domain_df
 
-    def copy_biological_assembly_pdb(self, cdhit_domain_df):
+    def copy_biological_assembly_pdb(self, cdhit_domain_df, suffix):
         # Copies the parent biological assembly PDB file of every retained
         # structure to the output files directory.
 
@@ -85,8 +85,6 @@ class extract_beta_structure_coords(run_stages):
                         else:
                             assembly = assembly[0]
 
-            print('{}{}'.format(pdb_code, assembly))
-
             # Copies preferred assembly PDB file from biological assembly PDB
             # database stored on hard drive to output directory
             if count != 1:
@@ -101,8 +99,11 @@ class extract_beta_structure_coords(run_stages):
             else:
                 if not os.path.isfile('Biological_assemblies/{}.pdb'.format(pdb_code)):
                     try:
-                        shutil.copy('{}{}/{}_merged.pdb{}'.format(
-                            self.pdb_ba_database, pdb_code[1:3], pdb_code, assembly
+                        print('Copying {}{}.pdb{} to \'Biological_assemblies '
+                              'output directory\''.format(pdb_code, suffix, assembly))
+                        shutil.copy('{}{}/{}{}.pdb{}'.format(
+                            self.pdb_ba_database, pdb_code[1:3], pdb_code,
+                            suffix, assembly
                         ), 'Biological_assemblies/{}.pdb'.format(pdb_code)
                         )
                     except FileNotFoundError:
@@ -248,7 +249,8 @@ class extract_beta_structure_coords(run_stages):
                             element.append(pdb_file_lines[index_4][76:78].strip())
                             charge.append(pdb_file_lines[index_4][78:80].strip())
                             chain_num_ins.append(pdb_file_lines[index_4][21:27].replace(' ', ''))
-                            # Removes alternate conformer labels
+                            # Removes alternate conformer labels from pdb file
+                            # lines (but not from dataframe)
                             line_start = pdb_file_lines[index_4][:16]
                             line_end = pdb_file_lines[index_4][17:].strip('\n')
                             lines.append(line_start + ' ' + line_end)

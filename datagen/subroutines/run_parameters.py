@@ -31,7 +31,8 @@ def gen_run_parameters(args):
                     key = line.split(':')[0].replace(' ', '').lower()
                     value = line.split(':')[1].replace('\n', '').strip()
                     if key in ['workingdirectory', 'pdbaudatabase', 'pdbbadatabase',
-                               'dsspdatabase', 'ringdatabase']:
+                               'dsspdatabase', 'opm_database', 'ringdatabase']:  # Only
+                               # include file paths in this list!
                         value = value.replace('\\', '/')  # For windows file paths
                         value = '/{}/'.format(value.strip('/'))
                     else:
@@ -80,19 +81,21 @@ def gen_run_parameters(args):
             run_parameters.pop('id')
     if not 'id' in run_parameters:
         print('Specify list of CATHCODEs:')
-        run = ''
-        while (len(run) == 0
+        run = []
+        while (
+                len(run) == 0
                 or all(run[index][0] != ids_dict[run_parameters['structuredatabase']] for index, code in enumerate(run))
-               ):
+        ):
             run = input(prompt).lower()
             run = run.replace(' ', '')
             run = run.replace('[', '')
             run = run.replace(']', '')
             run = [cathcode for cathcode in run.split(',')]
-            if (len(run) != 0
-                        and all(run[index].startswith(ids_dict[run_parameters['structuredatabase']])
-                                for index, code in enumerate(run))
-                    ):
+            if (
+                len(run) != 0
+                and all(run[index].startswith(ids_dict[run_parameters['structuredatabase']])
+                        for index, code in enumerate(run))
+            ):
                 run_parameters['id'] = run
                 break
             else:
@@ -101,6 +104,27 @@ def gen_run_parameters(args):
     # Joins list of CATH / SCOP database codes together
     if type(run_parameters['id']) == list:
         run_parameters['id'] = '_'.join(run_parameters['id'])
+
+    # Requires user to specify whether they want to analyse each input domain
+    # in the context of the parent asymmetric unit or biological assembly
+    if 'auorba' in run_parameters:
+        if not run_parameters['auorba'].lower() in ['au', 'ba']:
+            print('DataGen can only analyse input domains in the context of '
+                  'either the asymmetric unit or the biological assembly')
+            run_parameters.pop('auorba')
+    if not 'auorba' in run_parameters:
+        print('Select whether to analyse each input domain in the context of '
+              'either the parent asymmetric unit (\'au\') or the parent '
+              'biological assembly (\'ba\')')
+        auorba = ''
+        while not auorba in ['au', 'ba']:
+            auorba = input(prompt).lower()
+            if auorba in ['au', 'ba']:
+                run_parameters['auorba'] = auorba
+                break
+            else:
+                print('DataGen can only analyse input domains in the context of '
+                      'either the asymmetric unit or the biological assembly')
 
     # Requires user input if the absolute file path of the working directory is
     # not specified in the input file / is not recognised
@@ -139,21 +163,25 @@ def gen_run_parameters(args):
 
     # Requires user input if the absolute file path of the (locally saved) PDB
     # database (biological assemblies) is not specified in the input file / is
-    # not recognised
-    if 'pdbbadatabase' in run_parameters:
-        if not os.path.isdir(run_parameters['pdbbadatabase']):
-            print('Specified directory for PDB biological assembly database not recognised')
-            run_parameters.pop('pdbbadatabase')
-    if not 'pdbbadatabase' in run_parameters:
-        print('Specify absolute file path of PDB biological assembly database:')
-        pdb_ba_database = ''
-        while not os.path.isdir(pdb_ba_database):
-            pdb_ba_database = '/{}/'.format(input(prompt).strip('/'))
-            if not os.path.isdir(pdb_ba_database):
-                print('Specified directory for biological assembly PDB database not recognised')
-            else:
-                run_parameters['pdbbadatabase'] = pdb_ba_database
-                break
+    # not recognised and the user has previously specified that they want to
+    # analyse each input domain in the context of its parent biological assembly
+    if run_parameters['auorba'] == 'ba':
+        if 'pdbbadatabase' in run_parameters:
+            if not os.path.isdir(run_parameters['pdbbadatabase']):
+                print('Specified directory for PDB biological assembly database not recognised')
+                run_parameters.pop('pdbbadatabase')
+        if not 'pdbbadatabase' in run_parameters:
+            print('Specify absolute file path of PDB biological assembly database:')
+            pdb_ba_database = ''
+            while not os.path.isdir(pdb_ba_database):
+                pdb_ba_database = '/{}/'.format(input(prompt).strip('/'))
+                if not os.path.isdir(pdb_ba_database):
+                    print('Specified directory for biological assembly PDB database not recognised')
+                else:
+                    run_parameters['pdbbadatabase'] = pdb_ba_database
+                    break
+    else:
+        run_parameters['pdbbadatabase'] = run_parameters['pdbaudatabase']
 
     # Requires user input if the absolute file path of the (locally saved) DSSP
     # database is not specified in the input file / is not recognised
@@ -265,6 +293,13 @@ def gen_run_parameters(args):
                 print('Specified Rfactor (working value) cutoff must be a '
                       'number')
 
+    # Requires user input if a suffix for the PDB files in the biological
+    # assembly database is not specified in the input file
+    if not 'suffix' in run_parameters:
+        print('Specify suffix of biological assembly PDB files:')
+        suffix = input(prompt)
+        run_parameters['suffix'] = suffix
+
     # Creates and / or sets the output directory as the current working
     # directory
     os.chdir('{}'.format(run_parameters['workingdirectory']))
@@ -287,18 +322,20 @@ def gen_run_parameters(args):
         parameters_file.write('Structure database: {}\n'.format(run_parameters['structuredatabase']) +
                               'ID: {}\n'.format(run_parameters['id']) +
                               'Working directory: {}\n'.format(run_parameters['workingdirectory']) +
+                              'Parent structure: {}\n'.format(run_parameters['auorba']) +
                               'PDB AU database: {}\n'.format(run_parameters['pdbaudatabase']) +
                               'PDB BA database: {}\n'.format(run_parameters['pdbbadatabase']) +
                               'DSSP database: {}\n'.format(run_parameters['dsspdatabase']) +
                               'OPM database: {}\n'.format(run_parameters['opmdatabase']) +
                               'RING database: {}\n'.format(run_parameters['ringdatabase']) +
                               'Resolution: {}\n'.format(run_parameters['resolution']) +
-                              'Rfactor: {}\n'.format(run_parameters['rfactor']))
+                              'Rfactor: {}\n'.format(run_parameters['rfactor']) +
+                              'Suffix: {}\n'.format(run_parameters['suffix']))
 
     return stage, run_parameters
 
 
-def determine_discard_tm(args, run_parameters):
+def determine_if_discard_tm(args, run_parameters):
     # Determines whether or not the user wants to keep only transmembrane
     # structures
     discard_tm = ''

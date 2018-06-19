@@ -21,6 +21,7 @@ class run_stages():
         self.ring_database = self.run_parameters['ringdatabase']
         self.resn = float(self.run_parameters['resolution'])
         self.rfac = float(self.run_parameters['rfactor'])
+        self.suffix = self.run_parameters['suffix']
 
     def run_stage_1_cath(self, orig_dir, discard_tm):
         # Runs stage 1 of the DataGen pipeline, extracting sequences of the
@@ -42,8 +43,7 @@ class run_stages():
         # earlier user input), picking out PDB accession codes and sequences
         # (whose values are stored in the 'domain_df' dataframe).
         domains_desc = gen_domain_desc_list(orig_dir)
-        domain_df = domain_desc_filter(self.code, domains_desc, discard_tm,
-                                       self.opm_database)
+        domain_df = domain_desc_filter(self.code, domains_desc, discard_tm)
 
         # Filters the domain_df for X-ray structures below user-specified
         # resolution and R_factor (working value) cutoffs. Writes a file
@@ -78,7 +78,9 @@ class run_stages():
         if os.path.isdir('Biological_assemblies'):
             shutil.rmtree('Biological_assemblies')
         os.mkdir('Biological_assemblies')
-        cdhit_domain_df = beta_structure.copy_biological_assembly_pdb(cdhit_domain_df)
+        cdhit_domain_df = beta_structure.copy_biological_assembly_pdb(
+            cdhit_domain_df, self.suffix
+        )
         cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
             cdhit_domain_df
         )

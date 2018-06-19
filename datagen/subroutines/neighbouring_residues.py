@@ -40,8 +40,12 @@ class nearest_neighbours(run_stages):
                                  (~dssp_df['ATMNAME'].isin(['N', 'C', 'O']))]
                 res_df = res_df.reset_index(drop=True)
 
-                atom_df = res_df[res_df['ATMNAME'] == 'CA']
-                atom_df = atom_df.reset_index(drop=True)
+                try:
+                    atom_df = res_df[res_df['ATMNAME'] == 'CA']
+                    atom_df = atom_df.reset_index(drop=True)
+                except:
+                    pass
+
                 if atom_df.shape[0] == 1:
                     coordinates = np.zeros((res_df.shape[0], 3))
                     for row in range(res_df.shape[0]):
