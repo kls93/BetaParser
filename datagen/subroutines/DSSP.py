@@ -2,6 +2,7 @@
 import os
 import shutil
 import copy
+import isambard
 import pandas as pd
 from collections import OrderedDict
 if __name__ == 'subroutines.DSSP':
@@ -25,29 +26,38 @@ class beta_structure_dssp_classification(run_stages):
 
         for row in range(dssp_domain_df.shape[0]):
             dssp_indv_file_lines = []
+            pdb_code = dssp_domain_df['PDB_CODE'][row]
             chain_num_list = copy.copy(dssp_domain_df['CHAIN_NUM'][row])
 
             try:
-                with open('{}{}.dssp'.format(self.dssp_database, dssp_domain_df['PDB_CODE'][row]), 'r') as dssp_file:
-                    print('Processing {}.dssp'.format(dssp_domain_df['PDB_CODE'][row]))
-                    for line in dssp_file:
-                        if (line[11:12].strip()+line[5:11].strip()) in chain_num_list:
-                            dssp_indv_file_lines.append(line.strip('\n'))
-                            index = chain_num_list.index(line[11:12].strip()+line[5:11].strip())
-                            chain_num_list[index] = ''
+                dssp_out = isambard.external_programs.dssp.run_dssp(
+                    pdb='Parent_assemblies/{}.pdb'.format(self.pdb_ba_database, pdb_code),
+                    path=True, outfile=None
+                )
+            except:
+                dssp_out = ''
+                unprocessed_list_1.append(dssp_domain_df['DOMAIN_ID'][row])
+
+            dssp_out = dssp_out.split('\n')
+
+            if len(dssp_out) > 1:
+                for line in dssp_out:
+                    if (line[11:12].strip()+line[5:11].strip()) in chain_num_list:
+                        dssp_indv_file_lines.append(line.strip('\n'))
+                        index = chain_num_list.index(line[11:12].strip()+line[5:11].strip())
+                        chain_num_list[index] = ''
 
                 chain_num_list = [chain_num for chain_num in chain_num_list if chain_num != '']
                 if len(chain_num_list) == 0:
-                    dssp_indv_file_lines.append('TER'.ljust(136)+'\n')
+                    dssp_indv_file_lines.append('TER'.ljust(136)+'\n')  # Extra line
+                    # enables strand numbering method in following function
                     dssp_residues_dict[dssp_domain_df['DOMAIN_ID'][row]] = dssp_indv_file_lines
                 elif len(chain_num_list) > 0:
                     unprocessed_list_2.append(dssp_domain_df['DOMAIN_ID'][row])
-            except FileNotFoundError:
-                unprocessed_list_1.append(dssp_domain_df['DOMAIN_ID'][row])
 
         # Writes PDB accession codes that could not be processed to output file
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nNot in DSSP database:\n')
+            unprocessed_file.write('\n\nUnable to run DSSP on domain:\n')
             for domain_id in set(unprocessed_list_1):
                 unprocessed_file.write('{}\n'.format(domain_id))
             unprocessed_file.write('\n\nCoordinates missing from DSSP file:\n')
@@ -56,8 +66,7 @@ class beta_structure_dssp_classification(run_stages):
 
         # Filters dssp_domain_df to remove entries whose DSSP files have
         # coordinates missing
-        dssp_domain_df = dssp_domain_df[~dssp_domain_df['DOMAIN_ID'].isin(
-            unprocessed_list_1 + unprocessed_list_2)]
+        dssp_domain_df = dssp_domain_df[~dssp_domain_df['DOMAIN_ID'].isin(unprocessed_list)]
         dssp_domain_df = dssp_domain_df.reset_index(drop=True)
 
         return dssp_residues_dict, dssp_domain_df

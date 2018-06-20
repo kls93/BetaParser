@@ -28,7 +28,7 @@ class nearest_neighbours(run_stages):
 
             # Creates AMPAL object
             domain = isambard.ampal.convert_pdb_to_ampal(
-                'Biological_assemblies/{}.pdb'.format(domain_id[0:4])
+                'Parent_assemblies/{}.pdb'.format(domain_id[0:4])
             )
 
             # Creates list of res_ids ('neighbouring residues') within a

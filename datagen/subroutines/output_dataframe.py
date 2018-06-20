@@ -19,7 +19,7 @@ class output_calcs():
         # amino acid codes from the input dataframe (dssp_df)
 
         # Extracts list of consecutive res_ids from biological assembly PDB file
-        with open('Biological_assemblies/{}.pdb'.format(domain_id[0:4]), 'r') as pdb_file:
+        with open('Parent_assemblies/{}.pdb'.format(domain_id[0:4]), 'r') as pdb_file:
             pdb_file_lines = pdb_file.readlines()
         pdb_file_lines = [line for line in pdb_file_lines if line[0:6].strip()
                           in ['ATOM', 'HETATM']]

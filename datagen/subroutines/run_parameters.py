@@ -303,9 +303,10 @@ def gen_run_parameters(args):
     # Creates and / or sets the output directory as the current working
     # directory
     os.chdir('{}'.format(run_parameters['workingdirectory']))
-    dir_name = '{}_{}_resn_{}_rfac_{}'.format(
+    dir_name = '{}_{}_resn_{}_rfac_{}_{}'.format(
         run_parameters['structuredatabase'], run_parameters['id'],
-        run_parameters['resolution'], run_parameters['rfactor']
+        run_parameters['resolution'], run_parameters['rfactor'],
+        run_paramters['auorba']
     )
     if stage == '1':
         if os.path.isdir(dir_name):

@@ -75,9 +75,9 @@ class run_stages():
             cdhit_output, filtered_domain_df
         )
 
-        if os.path.isdir('Biological_assemblies'):
-            shutil.rmtree('Biological_assemblies')
-        os.mkdir('Biological_assemblies')
+        if os.path.isdir('Parent_assemblies'):
+            shutil.rmtree('Parent_assemblies')
+        os.mkdir('Parent_assemblies')
         cdhit_domain_df = beta_structure.copy_biological_assembly_pdb(
             cdhit_domain_df, self.suffix
         )

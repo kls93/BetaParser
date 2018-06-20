@@ -63,27 +63,33 @@ class extract_beta_structure_coords(run_stages):
             assembly = 0
             error = False
 
-            page = requests.get(
-                'https://www.ebi.ac.uk/pdbe/entry/pdb/{}/analysis'.format(pdb_code.lower())).text
-            for line in page.split('\n'):
-                if '(preferred)' in line:
-                    count += 1
-                    line = [sub_line for sub_line in line.split('<') if '(preferred)' in sub_line]
-                    if len(line) > 1:
-                        error = True
-
-                    line = line[0]
-                    line = [sub_line for sub_line in line.split('>') if '(preferred)' in sub_line]
-                    if len(line) != 1:
-                        error = True
-
-                    else:
-                        line = line[0]
-                        assembly = [int(s) for s in line.split() if s.isdigit()]
-                        if len(assembly) > 1:
+            if self.pdb_au_database == self.pdb_ba_database:
+                count = 1
+                assembly == ''
+            else:
+                page = requests.get(
+                    'https://www.ebi.ac.uk/pdbe/entry/pdb/{}/analysis'.format(pdb_code.lower())).text
+                for line in page.split('\n'):
+                    if '(preferred)' in line:
+                        count += 1
+                        line = [sub_line for sub_line in line.split('<') if
+                                '(preferred)' in sub_line]
+                        if len(line) > 1:
                             error = True
+
+                        line = line[0]
+                        line = [sub_line for sub_line in line.split('>') if
+                                '(preferred)' in sub_line]
+                        if len(line) != 1:
+                            error = True
+
                         else:
-                            assembly = assembly[0]
+                            line = line[0]
+                            assembly = [int(s) for s in line.split() if s.isdigit()]
+                            if len(assembly) > 1:
+                                error = True
+                            else:
+                                assembly = assembly[0]
 
             # Copies preferred assembly PDB file from biological assembly PDB
             # database stored on hard drive to output directory
@@ -97,14 +103,14 @@ class extract_beta_structure_coords(run_stages):
             if error is True:
                 pass
             else:
-                if not os.path.isfile('Biological_assemblies/{}.pdb'.format(pdb_code)):
+                if not os.path.isfile('Parent_assemblies/{}.pdb'.format(pdb_code)):
                     try:
-                        print('Copying {}{}.pdb{} to \'Biological_assemblies '
+                        print('Copying {}{}.pdb{} to \'Parent_assemblies/ '
                               'output directory\''.format(pdb_code, suffix, assembly))
                         shutil.copy('{}{}/{}{}.pdb{}'.format(
                             self.pdb_ba_database, pdb_code[1:3], pdb_code,
                             suffix, assembly
-                        ), 'Biological_assemblies/{}.pdb'.format(pdb_code)
+                        ), 'Parent_assemblies/{}.pdb'.format(pdb_code)
                         )
                     except FileNotFoundError:
                         unprocessed_list.append(cdhit_domain_df['DOMAIN_ID'][row])
@@ -158,7 +164,7 @@ class extract_beta_structure_coords(run_stages):
             print('Obtaining ATOM / HETATM records for {}'.format(pdb_code))
             print('{:0.2f}%'.format(((row+1)/cdhit_domain_df.shape[0])*100))
 
-            with open('Biological_assemblies/{}.pdb'.format(pdb_code), 'r') as pdb_file:
+            with open('Parent_assemblies/{}.pdb'.format(pdb_code), 'r') as pdb_file:
                 pdb_file_lines = [line.strip('\n') for line in pdb_file if
                                   line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))
@@ -183,15 +189,15 @@ class extract_beta_structure_coords(run_stages):
                 for index_2, line in enumerate(pdb_file_lines):
                     if index_2 != (len(pdb_file_lines)-1):
                         if (line[22: 27].strip() == start
-                            and line[21:22] == cdhit_domain_df['CHAIN'][row]
-                            ):
+                                and line[21:22] == cdhit_domain_df['CHAIN'][row]
+                                ):
                             start_seq = True
 
                         if start_seq is True and stop_seq is False:
                             index_list.append(index_2)
                             if (line[22:27].strip() != pdb_file_lines[index_2+1][22:27].strip()
-                                or pdb_file_lines[index_2+1][0:3] == 'TER'
-                                ):
+                                    or pdb_file_lines[index_2+1][0:3] == 'TER'
+                                    ):
                                 if line[17:20].strip() in amino_acids_dict:
                                     sequence = sequence + amino_acids_dict[line[17:20].strip()]
                         elif stop_seq is True:
@@ -204,11 +210,11 @@ class extract_beta_structure_coords(run_stages):
                             continue
 
                         if (pdb_file_lines[index_2+1][0:3] == 'TER'
-                            or (line[22:27].strip() == stop
-                                        and line[21:22] == cdhit_domain_df['CHAIN'][row]
-                                        and pdb_file_lines[index_2+1][22:27].strip() != stop
-                                        )
-                            ):
+                                or (line[22:27].strip() == stop
+                                    and line[21:22] == cdhit_domain_df['CHAIN'][row]
+                                    and pdb_file_lines[index_2+1][22:27].strip() != stop
+                                    )
+                                ):
                             stop_seq = True
 
                 # Selects the first identified sequence from the input PDB that
@@ -360,9 +366,9 @@ class extract_beta_structure_coords(run_stages):
             for row in range(pdb_df.shape[0]):
                 # Removes alternate conformers
                 if (pdb_df['RES_ID'][row] in alternate_conformers
-                    and pdb_df['CONFORMER'][row] not in
-                    [alternate_conformers[pdb_df['RES_ID'][row]], '']
-                    ):
+                        and pdb_df['CONFORMER'][row] not in
+                        [alternate_conformers[pdb_df['RES_ID'][row]], '']
+                        ):
                     pdb_df.loc[row, 'REC'] = None
                 # Removes hydrogens
                 if pdb_df['ELEMENT'][row] == 'H':

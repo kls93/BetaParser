@@ -147,7 +147,7 @@ class naccess_solv_acsblty_calcs():
         print('Calculating solvent accessible surface areas of individual '
               'residues in {}'.format(domain_id))
 
-        with open('Biological_assemblies/{}.pdb'.format(domain_id[0:4]), 'r') as pdb_file:
+        with open('Parent_assemblies/{}.pdb'.format(domain_id[0:4]), 'r') as pdb_file:
             for line in pdb_file.readlines():
                 line_start = line[0:16]
                 line_end = line[17:]
