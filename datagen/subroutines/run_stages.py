@@ -78,7 +78,7 @@ class run_stages():
         if os.path.isdir('Parent_assemblies'):
             shutil.rmtree('Parent_assemblies')
         os.mkdir('Parent_assemblies')
-        cdhit_domain_df = beta_structure.copy_biological_assembly_pdb(
+        cdhit_domain_df = beta_structure.copy_parent_assembly_pdb(
             cdhit_domain_df, self.suffix
         )
         cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(

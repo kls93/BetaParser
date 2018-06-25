@@ -49,9 +49,10 @@ class extract_beta_structure_coords(run_stages):
 
         return cdhit_domain_df
 
-    def copy_biological_assembly_pdb(self, cdhit_domain_df, suffix):
-        # Copies the parent biological assembly PDB file of every retained
-        # structure to the output files directory.
+    def copy_parent_assembly_pdb(self, cdhit_domain_df, suffix):
+        # Copies the parent assembly (specified by the user to be either the
+        # asymmetric unit or the biological assembly) PDB file of every
+        # retained structure to the output files directory.
 
         unprocessed_list = []
 
@@ -65,7 +66,7 @@ class extract_beta_structure_coords(run_stages):
 
             if self.pdb_au_database == self.pdb_ba_database:
                 count = 1
-                assembly == ''
+                assembly = ''
             else:
                 page = requests.get(
                     'https://www.ebi.ac.uk/pdbe/entry/pdb/{}/analysis'.format(pdb_code.lower())).text
@@ -74,7 +75,7 @@ class extract_beta_structure_coords(run_stages):
                         count += 1
                         line = [sub_line for sub_line in line.split('<') if
                                 '(preferred)' in sub_line]
-                        if len(line) > 1:
+                        if len(line) != 1:
                             error = True
 
                         line = line[0]
@@ -86,13 +87,13 @@ class extract_beta_structure_coords(run_stages):
                         else:
                             line = line[0]
                             assembly = [int(s) for s in line.split() if s.isdigit()]
-                            if len(assembly) > 1:
+                            if len(assembly) != 1:
                                 error = True
                             else:
                                 assembly = assembly[0]
 
-            # Copies preferred assembly PDB file from biological assembly PDB
-            # database stored on hard drive to output directory
+            # Copies preferred assembly PDB file from PDB database (stored on
+            # local machine / hard drive) to output directory
             if count != 1:
                 error = True
                 unprocessed_list.append(cdhit_domain_df['DOMAIN_ID'][row])
@@ -105,8 +106,8 @@ class extract_beta_structure_coords(run_stages):
             else:
                 if not os.path.isfile('Parent_assemblies/{}.pdb'.format(pdb_code)):
                     try:
-                        print('Copying {}{}.pdb{} to \'Parent_assemblies/ '
-                              'output directory\''.format(pdb_code, suffix, assembly))
+                        print('Copying {}{}.pdb{} to \'Parent_assemblies/\' '
+                              'output directory'.format(pdb_code, suffix, assembly))
                         shutil.copy('{}{}/{}{}.pdb{}'.format(
                             self.pdb_ba_database, pdb_code[1:3], pdb_code,
                             suffix, assembly
@@ -120,7 +121,7 @@ class extract_beta_structure_coords(run_stages):
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nError in identifying / copying '
-                                   'biological assembly PDB file:\n')
+                                   'parent assembly PDB file:\n')
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
@@ -132,7 +133,7 @@ class extract_beta_structure_coords(run_stages):
         # segment sequence (SSEQS)
         amino_acids_dict = gen_amino_acids_dict()
         all_atoms_dfs_dict = OrderedDict()
-        domain_residue_list = []
+        domain_residue_dict = OrderedDict()
         unprocessed_list = []
 
         for row in range(cdhit_domain_df.shape[0]):
@@ -188,7 +189,7 @@ class extract_beta_structure_coords(run_stages):
 
                 for index_2, line in enumerate(pdb_file_lines):
                     if index_2 != (len(pdb_file_lines)-1):
-                        if (line[22: 27].strip() == start
+                        if (line[22:27].strip() == start
                                 and line[21:22] == cdhit_domain_df['CHAIN'][row]
                                 ):
                             start_seq = True
@@ -297,7 +298,7 @@ class extract_beta_structure_coords(run_stages):
                 if chain_num not in chain_num_list:
                     chain_num_list.append(chain_num)
             if not cdhit_domain_df['DOMAIN_ID'][row] in unprocessed_list:
-                domain_residue_list.append(chain_num_list)
+                domain_residue_dict[cdhit_domain_df['DOMAIN_ID'][row]] = chain_num_list
 
         # Lists all segment sequences that could not be processed owing to
         # insufficient similarity between the FASTA sequence listed in the
@@ -313,6 +314,9 @@ class extract_beta_structure_coords(run_stages):
         cdhit_domain_df = cdhit_domain_df.reset_index(drop=True)
 
         # Appends column of residue numbers to the input dataframe
+        domain_residue_list = ['']*cdhit_domain_df.shape[0]
+        for row in range(cdhit_domain_df.shape[0]):
+            domain_residue_list[row] = domain_residue_dict[cdhit_domain_df['DOMAIN_ID'][row]]
         domain_residue_df = pd.DataFrame({'CHAIN_NUM': domain_residue_list})
         cdhit_domain_df = pd.concat([cdhit_domain_df, domain_residue_df], axis=1)
 
@@ -350,8 +354,8 @@ class extract_beta_structure_coords(run_stages):
             chainresnum_set = set(chainresnum)
             for number in chainresnum_set:
                 indices = []
-                a = 'A1'
-                b = 'A'
+                a = ''
+                b = ''
                 c = 0
                 for index_1, value_1 in enumerate(chainresnum):
                     if value_1 == number:

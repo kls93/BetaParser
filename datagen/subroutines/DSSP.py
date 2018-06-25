@@ -1,8 +1,12 @@
 
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt  # Necessary to make prevent 'Invalid DISPLAY
+# variable' error, don't remove!
 import os
 import shutil
 import copy
-import isambard
+import isambard_dev as isambard
 import pandas as pd
 from collections import OrderedDict
 if __name__ == 'subroutines.DSSP':
@@ -17,11 +21,10 @@ class beta_structure_dssp_classification(run_stages):
         run_stages.__init__(self, run_parameters)
 
     def extract_dssp_file_lines(self, dssp_domain_df):
-        unprocessed_list_1 = []
-        unprocessed_list_2 = []
-
         # Creates dictionary of DSSP file lines for all input PDB accession
         # codes
+        unprocessed_list = []
+
         dssp_residues_dict = OrderedDict()
 
         for row in range(dssp_domain_df.shape[0]):
@@ -29,39 +32,32 @@ class beta_structure_dssp_classification(run_stages):
             pdb_code = dssp_domain_df['PDB_CODE'][row]
             chain_num_list = copy.copy(dssp_domain_df['CHAIN_NUM'][row])
 
-            try:
-                dssp_out = isambard.external_programs.dssp.run_dssp(
-                    pdb='Parent_assemblies/{}.pdb'.format(self.pdb_ba_database, pdb_code),
-                    path=True, outfile=None
-                )
-            except:
-                dssp_out = ''
-                unprocessed_list_1.append(dssp_domain_df['DOMAIN_ID'][row])
+            print('Running DSSP for {}'.format(pdb_code))
 
+            dssp_out = isambard.external_programs.dssp.run_dssp(
+                pdb='Parent_assemblies/{}.pdb'.format(pdb_code),
+                path=True, outfile=None
+            )
             dssp_out = dssp_out.split('\n')
 
-            if len(dssp_out) > 1:
-                for line in dssp_out:
-                    if (line[11:12].strip()+line[5:11].strip()) in chain_num_list:
-                        dssp_indv_file_lines.append(line.strip('\n'))
-                        index = chain_num_list.index(line[11:12].strip()+line[5:11].strip())
-                        chain_num_list[index] = ''
+            for line in dssp_out:
+                if (line[11:12].strip()+line[5:11].strip()) in chain_num_list:
+                    dssp_indv_file_lines.append(line.strip('\n'))
+                    index = chain_num_list.index(line[11:12].strip()+line[5:11].strip())
+                    chain_num_list[index] = ''
 
-                chain_num_list = [chain_num for chain_num in chain_num_list if chain_num != '']
-                if len(chain_num_list) == 0:
-                    dssp_indv_file_lines.append('TER'.ljust(136)+'\n')  # Extra line
-                    # enables strand numbering method in following function
-                    dssp_residues_dict[dssp_domain_df['DOMAIN_ID'][row]] = dssp_indv_file_lines
-                elif len(chain_num_list) > 0:
-                    unprocessed_list_2.append(dssp_domain_df['DOMAIN_ID'][row])
+            chain_num_list = [chain_num for chain_num in chain_num_list if chain_num != '']
+            if len(chain_num_list) == 0:
+                dssp_indv_file_lines.append('TER'.ljust(136)+'\n')  # Extra line
+                # enables strand numbering method in following function
+                dssp_residues_dict[dssp_domain_df['DOMAIN_ID'][row]] = dssp_indv_file_lines
+            elif len(chain_num_list) > 0:
+                unprocessed_list.append(dssp_domain_df['DOMAIN_ID'][row])
 
         # Writes PDB accession codes that could not be processed to output file
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nUnable to run DSSP on domain:\n')
-            for domain_id in set(unprocessed_list_1):
-                unprocessed_file.write('{}\n'.format(domain_id))
-            unprocessed_file.write('\n\nCoordinates missing from DSSP file:\n')
-            for domain_id in set(unprocessed_list_2):
+            unprocessed_file.write('\n\nError in DSSP run:\n')
+            for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
         # Filters dssp_domain_df to remove entries whose DSSP files have
@@ -180,7 +176,7 @@ class beta_structure_dssp_classification(run_stages):
                     extnd_df.loc[row, 'REC'] = None
             filtered_extnd_df = extnd_df[extnd_df['REC'].notnull()]
             filtered_extnd_df = filtered_extnd_df.reset_index(drop=True)
-            filtered_extnd_df.to_pickle('Beta_strands/{}.pkl'.format(domain_id))
+            filtered_extnd_df.to_pickle('Beta_strands/{}.pkl'.format(domain_id))  # Remove this line?
             sec_struct_dfs_dict[domain_id] = filtered_extnd_df
 
         return all_atoms_dfs_dict, sec_struct_dfs_dict, dssp_to_pdb_dict

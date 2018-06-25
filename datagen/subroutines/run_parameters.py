@@ -31,7 +31,7 @@ def gen_run_parameters(args):
                     key = line.split(':')[0].replace(' ', '').lower()
                     value = line.split(':')[1].replace('\n', '').strip()
                     if key in ['workingdirectory', 'pdbaudatabase', 'pdbbadatabase',
-                               'dsspdatabase', 'opm_database', 'ringdatabase']:  # Only
+                               'dsspdatabase', 'opmdatabase', 'ringdatabase']:  # Only
                                # include file paths in this list!
                         value = value.replace('\\', '/')  # For windows file paths
                         value = '/{}/'.format(value.strip('/'))
@@ -303,11 +303,12 @@ def gen_run_parameters(args):
     # Creates and / or sets the output directory as the current working
     # directory
     os.chdir('{}'.format(run_parameters['workingdirectory']))
-    dir_name = '{}_{}_resn_{}_rfac_{}_{}'.format(
+    dir_name = '{}_{}_resn_{}_rfac_{}_{}/'.format(
         run_parameters['structuredatabase'], run_parameters['id'],
         run_parameters['resolution'], run_parameters['rfactor'],
-        run_paramters['auorba']
+        run_parameters['auorba']
     )
+
     if stage == '1':
         if os.path.isdir(dir_name):
             shutil.rmtree(dir_name)
@@ -322,8 +323,7 @@ def gen_run_parameters(args):
         # also changing these parameter names in the main body of code
         parameters_file.write('Structure database: {}\n'.format(run_parameters['structuredatabase']) +
                               'ID: {}\n'.format(run_parameters['id']) +
-                              'Working directory: {}\n'.format(run_parameters['workingdirectory']) +
-                              'Parent structure: {}\n'.format(run_parameters['auorba']) +
+                              'AU or BA: {}\n'.format(run_parameters['auorba']) +
                               'PDB AU database: {}\n'.format(run_parameters['pdbaudatabase']) +
                               'PDB BA database: {}\n'.format(run_parameters['pdbbadatabase']) +
                               'DSSP database: {}\n'.format(run_parameters['dsspdatabase']) +
@@ -389,7 +389,7 @@ def find_cdhit_input(args):
         cdhit_entries = ''
         cdhit_output = ''
 
-    while not os.path.isfile(cdhit_entries):
+    while not os.path.isfile(cdhit_entries) or not cdhit_entries.endswith('.pkl'):
         print('Specify absolute file path of input pkl file of FASTA '
               'sequences fed into CDHIT')
         cdhit_entries = '/{}'.format(input(prompt).strip('/'))
@@ -400,7 +400,7 @@ def find_cdhit_input(args):
         else:
             break
 
-    while not os.path.isfile(cdhit_output):
+    while not os.path.isfile(cdhit_output) or not cdhit_output.endswith('.txt'):
         print('Specify absolute file path of txt file of filtered FASTA '
               'sequences output from CDHIT')
         cdhit_output = '/{}'.format(input(prompt).strip('/'))

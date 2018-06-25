@@ -17,45 +17,16 @@ class calculate_residue_interaction_network(run_stages):
     def run_RING(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Runs RING on the parent structure (biological assembly / asymmetric
         # unit as specified by the user)
-
-        unprocessed_list = []
-
         os.mkdir('ring')
-        os.system('export VICTOR_ROOT=/bin/ring/')
-
         for domain_id in list(sec_struct_dfs_dict.keys()):
-            try:
-                os.system(
-                    '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 > ring/{}.ring'.format(
-                        domain_id[0:4], domain_id[0:4]
-                    )
+            os.system(
+                '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 > ring/{}.ring'.format(
+                    domain_id[0:4], domain_id[0:4]
                 )
-
-            except OSError:
-                sec_struct_dfs_dict[domain_id] = None
-                sheet_ids = [sheet_id for sheet_id in list(domain_sheets_dict.keys())
-                             if sheet_id.startswith(domain_id)]
-                for sheet_id in sheet_ids:
-                    domain_sheets_dict[sheet_id] = None
-                unprocessed_list.append(domain_id)
-
-        # Writes PDB accession codes that could not be processed with RING to
-        # output file
-        with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nERROR - failed to run RING:\n')
-            for domain_id in set(unprocessed_list):
-                unprocessed_file.write('{}\n'.format(domain_id))
-
-        sec_struct_dfs_dict = OrderedDict(
-            {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
-        )
-        domain_sheets_dict = OrderedDict(
-            {key: value for key, value in domain_sheets_dict.items() if value is not None}
-        )
+            )
 
     def parse_RING_output(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Appends residue interaction network information to dssp_df.
-
         unprocessed_list = []
         interaction_types = ['VDW', 'HBOND', 'IONIC', 'SSBOND', 'PIPISTACK',
                              'PICATION']
@@ -111,6 +82,7 @@ class calculate_residue_interaction_network(run_stages):
                 ring_output = ring_output.split('NodeId')[2]
                 ring_output = ring_output.split('\n')[1:]
                 ring_output = [line for line in ring_output if line != '']
+
                 for line in ring_output:
                     aa_1 = line.split()[0].split(':')
                     aa_1 = (aa_1[0].replace('_', '') + aa_1[1].replace('_', '')
@@ -167,6 +139,7 @@ class calculate_residue_interaction_network(run_stages):
                                             'SSBOND_SC_SC': ['']*dssp_df.shape[0],
                                             'PIPISTACK_SC_SC': ['']*dssp_df.shape[0],
                                             'PICATION_SC_SC': ['']*dssp_df.shape[0]})
+
                 for row in range(dssp_df.shape[0]):
                     res_id = dssp_df['RES_ID'][row]
                     for interaction_type in list(ring_df_dict.keys()):
@@ -181,7 +154,7 @@ class calculate_residue_interaction_network(run_stages):
 
         # Writes PDB accession codes that could not be processed to output file
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nERROR in running RING:\n')
+            unprocessed_file.write('\n\nError in running RING:\n')
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))
 

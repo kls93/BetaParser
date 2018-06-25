@@ -91,7 +91,7 @@ class filter_beta_structure(run_stages):
 
         with open('Unprocessed_domains.txt', 'w') as unprocessed_file:
             unprocessed_file.write('PDB accession code not in PDB database '
-                                   '(downloaded 11/06/2017):\n')
+                                   '(downloaded 11/06/2018):\n')
             unprocessed_list_1 = set(unprocessed_list_1)
             for pdb in unprocessed_list_1:
                 unprocessed_file.write('{}\n'.format(pdb))

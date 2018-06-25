@@ -1,8 +1,12 @@
 
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt  # Necessary to make prevent 'Invalid DISPLAY
+# variable' error, don't remove!
 import pandas as pd
 import networkx as nx
-import matplotlib.pyplot as plt
 from collections import OrderedDict
+
 if __name__ == 'subroutines.generate_network':
     from subroutines.run_stages import run_stages
 else:
@@ -234,7 +238,7 @@ class calculate_beta_network(run_stages):
                 edge_labels, domain_sheets, domain_sheets_dict = network_calcs.create_network(
                     domain_id, sheet, strand_pairs, edge_labels, domain_sheets,
                     domain_sheets_dict
-                )
+                )  # Note that only sheets with three or more beta-strands are included in network
 
             if (
                     domain_sheets and
@@ -247,7 +251,7 @@ class calculate_beta_network(run_stages):
                 network_calcs.draw_network(domain_id, domain_sheets, edge_labels)
                 dssp_df = network_calcs.remove_small_sheets(
                     domain_id, dssp_df, domain_sheets
-                )
+                )  # Removes sheets with fewer than three beta-strands
                 sec_struct_dfs_dict[domain_id] = dssp_df
             else:
                 sec_struct_dfs_dict[domain_id] = None
