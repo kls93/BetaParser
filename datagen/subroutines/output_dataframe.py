@@ -85,6 +85,7 @@ class output_calcs():
                             lower_bound = float(line[46:54])
 
             z_coordinates = list(strand_coordinates.values())
+            # Ensures that all residues are in the OPM structure
             if len(z_coordinates) != len(res_ids_list):
                 unprocessed_list.append('{}_strand_{}'.format(domain_id, strand_id))
             else:
@@ -293,7 +294,7 @@ def gen_interaction_lists(properties_list, interaction_type_abbrev,
          ) = append_to_output_lists(
             fasta_sub_list_intra, fasta_intra, res_ids_list, strand_or_res
         )
-        (properties_list['{}_fasta_inter_{}'.format(interaction_type_long, chain_combo)
+        (properties_list['{}_fasta_inter_{}'.format(interaction_type_long, chain_combo)]
          ) = append_to_output_lists(
             fasta_sub_list_inter, fasta_inter, res_ids_list, strand_or_res
         )
@@ -1015,7 +1016,7 @@ class gen_output(run_stages):
                                                 'SSBOND_MC_MC': ss_bonds_mc_mc,
                                                 'PIPISTACK_MC_MC': pi_pi_stacking_mc_mc,
                                                 'PICATION_MC_MC': cation_pi_mc_mc,
-                                                'VDW'_MC_SC: van_der_waals_mc_sc,
+                                                'VDW_MC_SC': van_der_waals_mc_sc,
                                                 'HBOND_MC_SC': h_bonds_mc_sc,
                                                 'IONIC_MC_SC': ionic_mc_sc,
                                                 'SSBOND_MC_SC': ss_bonds_mc_sc,
@@ -1031,7 +1032,7 @@ class gen_output(run_stages):
                                                 'HBOND_SC_SC': h_bonds_sc_sc,
                                                 'IONIC_SC_SC': ionic_sc_sc,
                                                 'SSBOND_SC_SC': ss_bonds_sc_sc,
-                                                'PIPISTACK_SC_SC': pi_pi_stacking, _sc_sc
+                                                'PIPISTACK_SC_SC': pi_pi_stacking_sc_sc,
                                                 'PICATION_SC_SC': cation_pi_sc_sc,
                                                 'MINUS_1_POS': minus_1,
                                                 'PLUS_1_POS': plus_1,

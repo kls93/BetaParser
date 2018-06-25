@@ -19,6 +19,7 @@ class calculate_residue_interaction_network(run_stages):
         # unit as specified by the user)
         os.mkdir('ring')
         for domain_id in list(sec_struct_dfs_dict.keys()):
+            print('Running RING for {}'.format(domain_id[0:4]))
             os.system(
                 '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 > ring/{}.ring'.format(
                     domain_id[0:4], domain_id[0:4]
@@ -105,15 +106,19 @@ class calculate_residue_interaction_network(run_stages):
 
                     # Records interaction for both residues involved
                     if (
-                        aa_1 in list(interactions[aa_1_interaction_type].keys())
-                        and aa_2 not in interactions[aa_1_interaction_type][aa_1]
+                        aa_1_interaction_type in list(interactions.keys())
+                        and aa_2_interaction_type in list(interactions.keys())
                     ):
-                        interactions[aa_1_interaction_type][aa_1].append(aa_2)
-                    if (
-                        aa_2 in list(interactions[aa_2_interaction_type].keys())
-                        and aa_1 not in interactions[aa_2_interaction_type][aa_2]
-                    ):
-                        interactions[aa_2_interaction_type][aa_2].append(aa_1)
+                        if (
+                            aa_1 in list(interactions[aa_1_interaction_type].keys())
+                            and aa_2 not in interactions[aa_1_interaction_type][aa_1]
+                        ):
+                            interactions[aa_1_interaction_type][aa_1].append(aa_2)
+                        if (
+                            aa_2 in list(interactions[aa_2_interaction_type].keys())
+                            and aa_1 not in interactions[aa_2_interaction_type][aa_2]
+                        ):
+                            interactions[aa_2_interaction_type][aa_2].append(aa_1)
 
                 ring_df_dict = OrderedDict({'VDW_MC_MC': ['']*dssp_df.shape[0],
                                             'HBOND_MC_MC': ['']*dssp_df.shape[0],
