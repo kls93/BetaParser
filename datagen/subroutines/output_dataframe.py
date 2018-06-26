@@ -28,7 +28,7 @@ class output_calcs():
         for line in pdb_file_lines:
             chain_res_num = line[21:27].replace(' ', '')
             res_name = line[17:20].strip()
-            if chain_res_num not in consec_res_id_list:
+            if not chain_res_num in consec_res_id_list:
                 consec_res_id_list.append(chain_res_num)
                 consec_res_name_list.append(res_name)
 
@@ -85,10 +85,13 @@ class output_calcs():
                             lower_bound = float(line[46:54])
 
             z_coordinates = list(strand_coordinates.values())
-            # Ensures that all residues are in the OPM structure
+            # Ensures that all residues in input domain are present in the OPM
+            # structure
             if len(z_coordinates) != len(res_ids_list):
-                unprocessed_list.append('{}_strand_{}'.format(domain_id, strand_id))
+                unprocessed_list.append(domain_id)
             else:
+                # Orients strands from the extracellular environment to the
+                # periplasm
                 if z_coordinates[0] < z_coordinates[-1]:
                     reverse = True
 
@@ -107,7 +110,7 @@ class output_calcs():
 
         if (
             in_database is True
-            and '{}_strand_{}'.format(domain_id, strand_id) not in unprocessed_list
+            and domain_id not in unprocessed_list
         ):
             for index, res_id in enumerate(res_ids_list):
                 z_coord = strand_coordinates[res_id]
@@ -181,7 +184,10 @@ class output_calcs():
     def find_minus_plus_residues(domain_id, strand_df, displacement,
                                  consec_res_id_list, res_id_to_fasta_dict):
         # Generates lists of residues +/- x (where x is a user-specified number
-        # of residues) from each input residue
+        # of residues) from each input residue. Currently will not exclude
+        # small molecule HETATM such as water if the chain_id is the same as
+        # the previous residue, however it will be listed with res_id X (and so
+        # excluded from further analysis anyway)
         minus_list = []
         plus_list = []
         for row in range(strand_df.shape[0]):
@@ -190,7 +196,8 @@ class output_calcs():
             try:
                 minus_res = consec_res_id_list[res_id_index - displacement]
                 plus_res = consec_res_id_list[res_id_index + displacement]
-                if res_id[0:1] != minus_res[0:1]:
+                if res_id[0:1] != minus_res[0:1]:  # Prevents residues in
+                # different chains from being considered as consecutive residues
                     minus_res = ''
                 else:
                     minus_res = res_id_to_fasta_dict[minus_res]
@@ -278,7 +285,15 @@ def gen_interaction_lists(properties_list, interaction_type_abbrev,
                           interaction_type_long, strand_df, reverse,
                           res_ids_list, strand_or_res, res_id_to_fasta_dict,
                           chain_id):
-    for chain_combo in ['mc_mc', 'mc_sc', 'sc_mc', 'sc_sc']:
+    if interaction_type_abbrev == ['PIPISTACK']:
+        chain_combos = ['mc_mc', 'mc_mc_p', 'mc_mc_l', 'mc_mc_n', 'mc_mc_t',
+                        'mc_sc', 'mc_sc_p', 'mc_sc_l', 'mc_sc_n', 'mc_sc_t',
+                        'sc_mc', 'sc_mc_p', 'sc_mc_l', 'sc_mc_n', 'sc_mc_t',
+                        'sc_sc', 'sc_sc_p', 'sc_sc_l', 'sc_sc_n', 'sc_sc_t']
+    else:
+        chain_combos = ['mc_mc', 'mc_sc', 'sc_mc', 'sc_sc']
+
+    for chain_combo in chain_combos:
         (properties_list['{}_{}'.format(interaction_type_long, chain_combo)],
          sub_list) = reverse_and_append(
             '{}_{}'.format(interaction_type_abbrev, chain_combo.upper()),
@@ -292,11 +307,15 @@ def gen_interaction_lists(properties_list, interaction_type_abbrev,
         )
         (properties_list['{}_fasta_intra_{}'.format(interaction_type_long, chain_combo)]
          ) = append_to_output_lists(
-            fasta_sub_list_intra, fasta_intra, res_ids_list, strand_or_res
+            fasta_sub_list_intra,
+            properties_list['{}_fasta_intra_{}'.format(interaction_type_long, chain_combo)],
+            res_ids_list, strand_or_res
         )
         (properties_list['{}_fasta_inter_{}'.format(interaction_type_long, chain_combo)]
          ) = append_to_output_lists(
-            fasta_sub_list_inter, fasta_inter, res_ids_list, strand_or_res
+            fasta_sub_list_inter,
+            properties_list['{}_fasta_inter_{}'.format(interaction_type_long, chain_combo)],
+            res_ids_list, strand_or_res
         )
 
     return properties_list
@@ -394,24 +413,40 @@ class gen_output(run_stages):
                                        'ionic_mc_mc': [],
                                        'ss_bonds_mc_mc': [],
                                        'pi_pi_stacking_mc_mc': [],
+                                       'pi_pi_stacking_mc_mc_p': [],
+                                       'pi_pi_stacking_mc_mc_n': [],
+                                       'pi_pi_stacking_mc_mc_n': [],
+                                       'pi_pi_stacking_mc_mc_t': [],
                                        'cation_pi_mc_mc': [],
                                        'van_der_waals_mc_sc': [],
                                        'h_bonds_mc_sc': [],
                                        'ionic_mc_sc': [],
                                        'ss_bonds_mc_sc': [],
                                        'pi_pi_stacking_mc_sc': [],
+                                       'pi_pi_stacking_mc_sc_p': [],
+                                       'pi_pi_stacking_mc_sc_n': [],
+                                       'pi_pi_stacking_mc_sc_n': [],
+                                       'pi_pi_stacking_mc_sc_t': [],
                                        'cation_pi_mc_sc': [],
                                        'van_der_waals_sc_mc': [],
                                        'h_bonds_sc_mc': [],
                                        'ionic_sc_mc': [],
                                        'ss_bonds_sc_mc': [],
                                        'pi_pi_stacking_sc_mc': [],
+                                       'pi_pi_stacking_sc_mc_p': [],
+                                       'pi_pi_stacking_sc_mc_n': [],
+                                       'pi_pi_stacking_sc_mc_n': [],
+                                       'pi_pi_stacking_sc_mc_t': [],
                                        'cation_pi_sc_mc': [],
                                        'van_der_waals_sc_sc': [],
                                        'h_bonds_sc_sc': [],
                                        'ionic_sc_sc': [],
                                        'ss_bonds_sc_sc': [],
                                        'pi_pi_stacking_sc_sc': [],
+                                       'pi_pi_stacking_sc_sc_p': [],
+                                       'pi_pi_stacking_sc_sc_n': [],
+                                       'pi_pi_stacking_sc_sc_n': [],
+                                       'pi_pi_stacking_sc_sc_t': [],
                                        'cation_pi_sc_sc': [],
                                        'minus_1': [],
                                        'plus_1': [],
@@ -426,24 +461,40 @@ class gen_output(run_stages):
                                        'ionic_fasta_intra_mc_mc': [],
                                        'ss_bonds_fasta_intra_mc_mc': [],
                                        'pi_pi_stacking_fasta_intra_mc_mc': [],
+                                       'pi_pi_stacking_fasta_intra_mc_mc_p': [],
+                                       'pi_pi_stacking_fasta_intra_mc_mc_n': [],
+                                       'pi_pi_stacking_fasta_intra_mc_mc_l': [],
+                                       'pi_pi_stacking_fasta_intra_mc_mc_t': [],
                                        'cation_pi_fasta_intra_mc_mc': [],
                                        'van_der_waals_fasta_intra_mc_sc': [],
                                        'h_bonds_fasta_intra_mc_sc': [],
                                        'ionic_fasta_intra_mc_sc': [],
                                        'ss_bonds_fasta_intra_mc_sc': [],
                                        'pi_pi_stacking_fasta_intra_mc_sc': [],
+                                       'pi_pi_stacking_fasta_intra_mc_sc_p': [],
+                                       'pi_pi_stacking_fasta_intra_mc_sc_n': [],
+                                       'pi_pi_stacking_fasta_intra_mc_sc_l': [],
+                                       'pi_pi_stacking_fasta_intra_mc_sc_t': [],
                                        'cation_pi_fasta_intra_mc_sc': [],
                                        'van_der_waals_fasta_intra_sc_mc': [],
                                        'h_bonds_fasta_intra_sc_mc': [],
                                        'ionic_fasta_intra_sc_mc': [],
                                        'ss_bonds_fasta_intra_sc_mc': [],
                                        'pi_pi_stacking_fasta_intra_sc_mc': [],
+                                       'pi_pi_stacking_fasta_intra_sc_mc_p': [],
+                                       'pi_pi_stacking_fasta_intra_sc_mc_n': [],
+                                       'pi_pi_stacking_fasta_intra_sc_mc_l': [],
+                                       'pi_pi_stacking_fasta_intra_sc_mc_t': [],
                                        'cation_pi_fasta_intra_sc_mc': [],
                                        'van_der_waals_fasta_intra_sc_sc': [],
                                        'h_bonds_fasta_intra_sc_sc': [],
                                        'ionic_fasta_intra_sc_sc': [],
                                        'ss_bonds_fasta_intra_sc_sc': [],
                                        'pi_pi_stacking_fasta_intra_sc_sc': [],
+                                       'pi_pi_stacking_fasta_intra_sc_sc_p': [],
+                                       'pi_pi_stacking_fasta_intra_sc_sc_n': [],
+                                       'pi_pi_stacking_fasta_intra_sc_sc_l': [],
+                                       'pi_pi_stacking_fasta_intra_sc_sc_t': [],
                                        'cation_pi_fasta_intra_sc_sc': [],
                                        'neighbours_fasta_inter': [],
                                        'bridge_pairs_fasta_inter': [],
@@ -454,24 +505,40 @@ class gen_output(run_stages):
                                        'ionic_fasta_inter_mc_mc': [],
                                        'ss_bonds_fasta_inter_mc_mc': [],
                                        'pi_pi_stacking_fasta_inter_mc_mc': [],
+                                       'pi_pi_stacking_fasta_inter_mc_mc_p': [],
+                                       'pi_pi_stacking_fasta_inter_mc_mc_n': [],
+                                       'pi_pi_stacking_fasta_inter_mc_mc_l': [],
+                                       'pi_pi_stacking_fasta_inter_mc_mc_t': [],
                                        'cation_pi_fasta_inter_mc_mc': [],
                                        'van_der_waals_fasta_inter_mc_sc': [],
                                        'h_bonds_fasta_inter_mc_sc': [],
                                        'ionic_fasta_inter_mc_sc': [],
                                        'ss_bonds_fasta_inter_mc_sc': [],
                                        'pi_pi_stacking_fasta_inter_mc_sc': [],
+                                       'pi_pi_stacking_fasta_inter_mc_sc_p': [],
+                                       'pi_pi_stacking_fasta_inter_mc_sc_n': [],
+                                       'pi_pi_stacking_fasta_inter_mc_sc_l': [],
+                                       'pi_pi_stacking_fasta_inter_mc_sc_t': [],
                                        'cation_pi_fasta_inter_mc_sc': [],
                                        'van_der_waals_fasta_inter_sc_mc': [],
                                        'h_bonds_fasta_inter_sc_mc': [],
                                        'ionic_fasta_inter_sc_mc': [],
                                        'ss_bonds_fasta_inter_sc_mc': [],
                                        'pi_pi_stacking_fasta_inter_sc_mc': [],
+                                       'pi_pi_stacking_fasta_inter_sc_mc_p': [],
+                                       'pi_pi_stacking_fasta_inter_sc_mc_n': [],
+                                       'pi_pi_stacking_fasta_inter_sc_mc_l': [],
+                                       'pi_pi_stacking_fasta_inter_sc_mc_t': [],
                                        'cation_pi_fasta_inter_sc_mc': [],
                                        'van_der_waals_fasta_inter_sc_sc': [],
                                        'h_bonds_fasta_inter_sc_sc': [],
                                        'ionic_fasta_inter_sc_sc': [],
                                        'ss_bonds_fasta_inter_sc_sc': [],
                                        'pi_pi_stacking_fasta_inter_sc_sc': [],
+                                       'pi_pi_stacking_fasta_inter_sc_sc_p': [],
+                                       'pi_pi_stacking_fasta_inter_sc_sc_n': [],
+                                       'pi_pi_stacking_fasta_inter_sc_sc_l': [],
+                                       'pi_pi_stacking_fasta_inter_sc_sc_t': [],
                                        'cation_pi_fasta_inter_sc_sc': []})
 
         unprocessed_list = []
@@ -504,13 +571,10 @@ class gen_output(run_stages):
                 )
 
                 # Gives strand a unique ID
-                if strand_or_res == 'strand':
-                    properties_list['domain_strand_ids'].append(
-                        '{}_strand_{}'.format(domain_id, strand_num)
-                    )
-                elif strand_or_res == 'res':
-                    properties_list['domain_strand_ids'] += ['{}_strand_{}'.format(
-                        domain_id, strand_num)]*len(res_ids_list)
+                properties_list['domain_strand_ids'] = append_to_output_lists(
+                    '{}_strand_{}'.format(domain_id, strand_num),
+                     properties_list['domain_strand_ids'], res_ids_list, strand_or_res
+                )
 
                 # Lists parent sheet of each strand
                 sheet = strand_df['SHEET_NUM'].tolist()[0]
@@ -555,11 +619,6 @@ class gen_output(run_stages):
 
                 # Determines whether the strand is an edge or central strand
                 if self.code[0:4] in ['2.60']:
-                    edge_or_central_list = [label for label in
-                                            set(strand_df['EDGE_OR_CNTRL'].tolist())]
-                    if len(edge_or_central_list) != 1:
-                        unprocessed_list.append(domain_id)
-
                     properties_list['edge_or_central'] = append_to_output_lists(
                         edge_or_central_list[0],
                         properties_list['edge_or_central'], res_ids_list,
@@ -761,6 +820,7 @@ class gen_output(run_stages):
                     properties_list['bridge_pairs_fasta_inter'],
                     res_ids_list, strand_or_res
                 )
+
                 (hb_pairs_fasta_sub_list_intra, hb_pairs_fasta_sub_list_inter
                  ) = output_calcs.convert_res_id_to_fasta(
                     hb_pairs_list, res_id_to_fasta_dict, True, chain_id
@@ -775,6 +835,7 @@ class gen_output(run_stages):
                     properties_list['hb_pairs_fasta_inter'],
                     res_ids_list, strand_or_res
                 )
+
                 (nhb_pairs_fasta_sub_list_intra, nhb_pairs_fasta_sub_list_inter
                  ) = output_calcs.convert_res_id_to_fasta(
                     nhb_pairs_list, res_id_to_fasta_dict, True, chain_id
@@ -873,234 +934,24 @@ class gen_output(run_stages):
 
         # Generates csv file of beta-barrel dataset
         if self.code[0:4] in ['2.40']:
-            beta_strands_df_dict = OrderedDict({'STRAND_ID': domain_strand_ids,
-                                                'TILT_ANGLE(DEGREES)': tilt_angle,
-                                                'TOTAL_STRAND_NUMBER': total_strand_number,
-                                                'PARENT_STRAND_NUMBER': indv_strand_number,
-                                                'SHEAR_NUMBER': shear_number,
-                                                'RES_ID': res_ids,
-                                                'FASTA': fasta_seq,
-                                                'Z_COORDS': z_coords,
-                                                'STRAND_POS(%)': tm_pos,
-                                                'INT_EXT': int_ext,
-                                                'TM_OR_EXT': tm_ext,
-                                                'OMEGA': omega,
-                                                'PHI': phi,
-                                                'PSI': psi,
-                                                'CHI_ANGLES': chi,
-                                                'SOLV_ACSBLTY': solv_acsblty,
-                                                'NEIGHBOURING_RESIDUES(<{}A)'.format(
-                                                    self.radius
-                                                ): neighbours,
-                                                'BRIDGE_PAIRS': bridge_pairs,
-                                                'HB_PAIRS': hb_pairs,
-                                                'NHB_PAIRS': nhb_pairs,
-                                                'VDW_MC_MC': van_der_waals_mc_mc,
-                                                'HBOND_MC_MC': h_bonds_mc_mc,
-                                                'IONIC_MC_MC': ionic_mc_mc,
-                                                'SSBOND_MC_MC': ss_bonds_mc_mc,
-                                                'PIPISTACK_MC_MC': pi_pi_stacking_mc_mc,
-                                                'PICATION_MC_MC': cation_pi_mc_mc,
-                                                'VDW_MC_SC': van_der_waals_mc_sc,
-                                                'HBOND_MC_SC': h_bonds_mc_sc,
-                                                'IONIC_MC_SC': ionic_mc_sc,
-                                                'SSBOND_MC_SC': ss_bonds_mc_sc,
-                                                'PIPISTACK_MC_SC': pi_pi_stacking_mc_sc,
-                                                'PICATION_MC_SC': cation_pi_mc_sc,
-                                                'VDW_SC_MC': van_der_waals_sc_mc,
-                                                'HBOND_SC_MC': h_bonds_sc_mc,
-                                                'IONIC_SC_MC': ionic_sc_mc,
-                                                'SSBOND_SC_MC': ss_bonds_sc_mc,
-                                                'PIPISTACK_SC_MC': pi_pi_stacking_sc_mc,
-                                                'PICATION_SC_MC': cation_pi_sc_mc,
-                                                'VDW_SC_SC': van_der_waals_sc_sc,
-                                                'HBOND_SC_SC': h_bonds_sc_sc,
-                                                'IONIC_SC_SC': ionic_sc_sc,
-                                                'SSBOND_SC_SC': ss_bonds_sc_sc,
-                                                'PIPISTACK_SC_SC': pi_pi_stacking_sc_sc,
-                                                'PICATION_SC_SC': cation_pi_sc_sc,
-                                                'MINUS_1_POS': minus_1,
-                                                'PLUS_1_POS': plus_1,
-                                                'MINUS_2_POS': minus_2,
-                                                'PLUS_2_POS': plus_2,
-                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA_INTRA_CHAIN'.format(
-                                                    self.radius
-                                                ): neighbours_fasta_intra,
-                                                'BRIDGE_PAIRS_FASTA_INTRA_CHAIN': bridge_pairs_fasta_intra,
-                                                'HB_PAIRS_FASTA_INTRA_CHAIN': hb_pairs_fasta_intra,
-                                                'NHB_PAIRS_FASTA_INTRA_CHAIN': nhb_pairs_fasta_intra,
-                                                'VDW_FASTA_INTRA_CHAIN_MC_MC': van_der_waals_fasta_intra_mc_mc,
-                                                'HBOND_FASTA_INTRA_CHAIN_MC_MC': h_bonds_fasta_intra_mc_mc,
-                                                'IONIC_FASTA_INTRA_CHAIN_MC_MC': ionic_fasta_intra_mc_mc,
-                                                'SSBOND_FASTA_INTRA_CHAIN_MC_MC': ss_bonds_fasta_intra_mc_mc,
-                                                'PIPISTACK_FASTA_INTRA_CHAIN_MC_MC': pi_pi_stacking_fasta_intra_mc_mc,
-                                                'PICATION_FASTA_INTRA_CHAIN_MC_MC': cation_pi_fasta_intra_mc_mc,
-                                                'VDW_FASTA_INTRA_CHAIN_MC_SC': van_der_waals_fasta_intra_mc_sc,
-                                                'HBOND_FASTA_INTRA_CHAIN_MC_SC': h_bonds_fasta_intra_mc_sc,
-                                                'IONIC_FASTA_INTRA_CHAIN_MC_SC': ionic_fasta_intra_mc_sc,
-                                                'SSBOND_FASTA_INTRA_CHAIN_MC_SC': ss_bonds_fasta_intra_mc_sc,
-                                                'PIPISTACK_FASTA_INTRA_CHAIN_MC_SC': pi_pi_stacking_fasta_intra_mc_sc,
-                                                'PICATION_FASTA_INTRA_CHAIN_MC_SC': cation_pi_fasta_intra_mc_sc,
-                                                'VDW_FASTA_INTRA_CHAIN_SC_MC': van_der_waals_fasta_intra_sc_mc,
-                                                'HBOND_FASTA_INTRA_CHAIN_SC_MC': h_bonds_fasta_intra_sc_mc,
-                                                'IONIC_FASTA_INTRA_CHAIN_SC_MC': ionic_fasta_intra_sc_mc,
-                                                'SSBOND_FASTA_INTRA_CHAIN_SC_MC': ss_bonds_fasta_intra_sc_mc,
-                                                'PIPISTACK_FASTA_INTRA_CHAIN_SC_MC': pi_pi_stacking_fasta_intra_sc_mc,
-                                                'PICATION_FASTA_INTRA_CHAIN_SC_MC': cation_pi_fasta_intra_sc_mc,
-                                                'VDW_FASTA_INTRA_CHAIN_SC_SC': van_der_waals_fasta_intra_sc_sc,
-                                                'HBOND_FASTA_INTRA_CHAIN_SC_SC': h_bonds_fasta_intra_sc_sc,
-                                                'IONIC_FASTA_INTRA_CHAIN_SC_SC': ionic_fasta_intra_sc_sc,
-                                                'SSBOND_FASTA_INTRA_CHAIN_SC_SC': ss_bonds_fasta_intra_sc_sc,
-                                                'PIPISTACK_FASTA_INTRA_CHAIN_SC_SC': pi_pi_stacking_fasta_intra_sc_sc,
-                                                'PICATION_FASTA_INTRA_CHAIN_SC_SC': cation_pi_fasta_intra_sc_sc,
-                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA_INTER_CHAIN'.format(
-                                                    self.radius
-                                                ): neighbours_fasta_inter,
-                                                'BRIDGE_PAIRS_FASTA_INTER_CHAIN': bridge_pairs_fasta_inter,
-                                                'HB_PAIRS_FASTA_INTER_CHAIN': hb_pairs_fasta_inter,
-                                                'NHB_PAIRS_FASTA_INTER_CHAIN': nhb_pairs_fasta_inter,
-                                                'VDW_FASTA_INTER_CHAIN_MC_MC': van_der_waals_fasta_inter_mc_mc,
-                                                'HBOND_FASTA_INTER_CHAIN_MC_MC': h_bonds_fasta_inter_mc_mc,
-                                                'IONIC_FASTA_INTER_CHAIN_MC_MC': ionic_fasta_inter_mc_mc,
-                                                'SSBOND_FASTA_INTER_CHAIN_MC_MC': ss_bonds_fasta_inter_mc_mc,
-                                                'PIPISTACK_FASTA_INTER_CHAIN_MC_MC': pi_pi_stacking_fasta_inter_mc_mc,
-                                                'PICATION_FASTA_INTER_CHAIN_MC_MC': cation_pi_fasta_inter_mc_mc,
-                                                'VDW_FASTA_INTER_CHAIN_MC_SC': van_der_waals_fasta_inter_mc_sc,
-                                                'HBOND_FASTA_INTER_CHAIN_MC_SC': h_bonds_fasta_inter_mc_sc,
-                                                'IONIC_FASTA_INTER_CHAIN_MC_SC': ionic_fasta_inter_mc_sc,
-                                                'SSBOND_FASTA_INTER_CHAIN_MC_SC': ss_bonds_fasta_inter_mc_sc,
-                                                'PIPISTACK_FASTA_INTER_CHAIN_MC_SC': pi_pi_stacking_fasta_inter_mc_sc,
-                                                'PICATION_FASTA_INTER_CHAIN_MC_SC': cation_pi_fasta_inter_mc_sc,
-                                                'VDW_FASTA_INTER_CHAIN_SC_MC': van_der_waals_fasta_inter_sc_mc,
-                                                'HBOND_FASTA_INTER_CHAIN_SC_MC': h_bonds_fasta_inter_sc_mc,
-                                                'IONIC_FASTA_INTER_CHAIN_SC_MC': ionic_fasta_inter_sc_mc,
-                                                'SSBOND_FASTA_INTER_CHAIN_SC_MC': ss_bonds_fasta_inter_sc_mc,
-                                                'PIPISTACK_FASTA_INTER_CHAIN_SC_MC': pi_pi_stacking_fasta_inter_sc_mc,
-                                                'PICATION_FASTA_INTER_CHAIN_SC_MC': cation_pi_fasta_inter_sc_mc,
-                                                'VDW_FASTA_INTER_CHAIN_SC_SC': van_der_waals_fasta_inter_sc_sc,
-                                                'HBOND_FASTA_INTER_CHAIN_SC_SC': h_bonds_fasta_inter_sc_sc,
-                                                'IONIC_FASTA_INTER_CHAIN_SC_SC': ionic_fasta_inter_sc_sc,
-                                                'SSBOND_FASTA_INTER_CHAIN_SC_SC': ss_bonds_fasta_inter_sc_sc,
-                                                'PIPISTACK_FASTA_INTER_CHAIN_SC_SC': pi_pi_stacking_fasta_inter_sc_sc,
-                                                'PICATION_FASTA_INTER_CHAIN_SC_SC': cation_pi_fasta_inter_sc_sc})
-            beta_strands_df = pd.DataFrame(beta_strands_df_dict)
-            beta_strands_df = beta_strands_df.dropna()
-            beta_strands_df = beta_strands_df.reset_index(drop=True)
-            beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
-            beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
-
+            unwanted_columns = ['sheet_number', 'edge_or_central',
+                                'strand_abs_pos, strand_percentage_pos',
+                                'core_surf', 'buried_surface_area']
         # Generates csv file of beta-sandwich dataset
         elif self.code[0:4] in ['2.60']:
-            beta_strands_df_dict = OrderedDict({'STRAND_ID': domain_strand_ids,
-                                                'SHEET_ID': sheet_number,
-                                                'EDGE_OR_CNTRL': edge_or_central,
-                                                'RES_ID': res_ids,
-                                                'FASTA': fasta_seq,
-                                                'STRAND_POS(ABS)': strand_abs_pos,
-                                                'STRAND_POS(%)': strand_percentage_pos,
-                                                'INT_EXT': int_ext,
-                                                'CORE_OR_SURFACE': core_surf,
-                                                'BURIED_SURFACE_AREA(%)': buried_surface_area,
-                                                'OMEGA': omega,
-                                                'PHI': phi,
-                                                'PSI': psi,
-                                                'CHI_ANGLES': chi,
-                                                'SOLV_ACSBLTY': solv_acsblty,
-                                                'NEIGHBOURING_RESIDUES(<{}A)'.format(
-                                                    self.radius
-                                                ): neighbours,
-                                                'BRIDGE_PAIRS': bridge_pairs,
-                                                'VDW_MC_MC': van_der_waals_mc_mc,
-                                                'HBOND_MC_MC': h_bonds_mc_mc,
-                                                'IONIC_MC_MC': ionic_mc_mc,
-                                                'SSBOND_MC_MC': ss_bonds_mc_mc,
-                                                'PIPISTACK_MC_MC': pi_pi_stacking_mc_mc,
-                                                'PICATION_MC_MC': cation_pi_mc_mc,
-                                                'VDW_MC_SC': van_der_waals_mc_sc,
-                                                'HBOND_MC_SC': h_bonds_mc_sc,
-                                                'IONIC_MC_SC': ionic_mc_sc,
-                                                'SSBOND_MC_SC': ss_bonds_mc_sc,
-                                                'PIPISTACK_MC_SC': pi_pi_stacking_mc_sc,
-                                                'PICATION_MC_SC': cation_pi_mc_sc,
-                                                'VDW_SC_MC': van_der_waals_sc_mc,
-                                                'HBOND_SC_MC': h_bonds_sc_mc,
-                                                'IONIC_SC_MC': ionic_sc_mc,
-                                                'SSBOND_SC_MC': ss_bonds_sc_mc,
-                                                'PIPISTACK_SC_MC': pi_pi_stacking_sc_mc,
-                                                'PICATION_SC_MC': cation_pi_sc_mc,
-                                                'VDW_SC_SC': van_der_waals_sc_sc,
-                                                'HBOND_SC_SC': h_bonds_sc_sc,
-                                                'IONIC_SC_SC': ionic_sc_sc,
-                                                'SSBOND_SC_SC': ss_bonds_sc_sc,
-                                                'PIPISTACK_SC_SC': pi_pi_stacking_sc_sc,
-                                                'PICATION_SC_SC': cation_pi_sc_sc,
-                                                'MINUS_1_POS': minus_1,
-                                                'PLUS_1_POS': plus_1,
-                                                'MINUS_2_POS': minus_2,
-                                                'PLUS_2_POS': plus_2,
-                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA_INTRA_CHAIN'.format(
-                                                    self.radius
-                                                ): neighbours_fasta_intra,
-                                                'BRIDGE_PAIRS_FASTA_INTRA_CHAIN': bridge_pairs_fasta_intra,
-                                                'VDW_FASTA_INTRA_CHAIN_MC_MC': van_der_waals_fasta_intra_mc_mc,
-                                                'HBOND_FASTA_INTRA_CHAIN_MC_MC': h_bonds_fasta_intra_mc_mc,
-                                                'IONIC_FASTA_INTRA_CHAIN_MC_MC': ionic_fasta_intra_mc_mc,
-                                                'SSBOND_FASTA_INTRA_CHAIN_MC_MC': ss_bonds_fasta_intra_mc_mc,
-                                                'PIPISTACK_FASTA_INTRA_CHAIN_MC_MC': pi_pi_stacking_fasta_intra_mc_mc,
-                                                'PICATION_FASTA_INTRA_CHAIN_MC_MC': cation_pi_fasta_intra_mc_mc,
-                                                'VDW_FASTA_INTRA_CHAIN_MC_SC': van_der_waals_fasta_intra_mc_sc,
-                                                'HBOND_FASTA_INTRA_CHAIN_MC_SC': h_bonds_fasta_intra_mc_sc,
-                                                'IONIC_FASTA_INTRA_CHAIN_MC_SC': ionic_fasta_intra_mc_sc,
-                                                'SSBOND_FASTA_INTRA_CHAIN_MC_SC': ss_bonds_fasta_intra_mc_sc,
-                                                'PIPISTACK_FASTA_INTRA_CHAIN_MC_SC': pi_pi_stacking_fasta_intra_mc_sc,
-                                                'PICATION_FASTA_INTRA_CHAIN_MC_SC': cation_pi_fasta_intra_mc_sc,
-                                                'VDW_FASTA_INTRA_CHAIN_SC_MC': van_der_waals_fasta_intra_sc_mc,
-                                                'HBOND_FASTA_INTRA_CHAIN_SC_MC': h_bonds_fasta_intra_sc_mc,
-                                                'IONIC_FASTA_INTRA_CHAIN_SC_MC': ionic_fasta_intra_sc_mc,
-                                                'SSBOND_FASTA_INTRA_CHAIN_SC_MC': ss_bonds_fasta_intra_sc_mc,
-                                                'PIPISTACK_FASTA_INTRA_CHAIN_SC_MC': pi_pi_stacking_fasta_intra_sc_mc,
-                                                'PICATION_FASTA_INTRA_CHAIN_SC_MC': cation_pi_fasta_intra_sc_mc,
-                                                'VDW_FASTA_INTRA_CHAIN_SC_SC': van_der_waals_fasta_intra_sc_sc,
-                                                'HBOND_FASTA_INTRA_CHAIN_SC_SC': h_bonds_fasta_intra_sc_sc,
-                                                'IONIC_FASTA_INTRA_CHAIN_SC_SC': ionic_fasta_intra_sc_sc,
-                                                'SSBOND_FASTA_INTRA_CHAIN_SC_SC': ss_bonds_fasta_intra_sc_sc,
-                                                'PIPISTACK_FASTA_INTRA_CHAIN_SC_SC': pi_pi_stacking_fasta_intra_sc_sc,
-                                                'PICATION_FASTA_INTRA_CHAIN_SC_SC': cation_pi_fasta_intra_sc_sc,
-                                                'NEIGHBOURING_RESIDUES(<{}A)_FASTA_INTER_CHAIN'.format(
-                                                    self.radius
-                                                ): neighbours_fasta_inter,
-                                                'BRIDGE_PAIRS_FASTA_INTER_CHAIN': bridge_pairs_fasta_inter,
-                                                'VDW_FASTA_INTER_CHAIN_MC_MC': van_der_waals_fasta_inter_mc_mc,
-                                                'HBOND_FASTA_INTER_CHAIN_MC_MC': h_bonds_fasta_inter_mc_mc,
-                                                'IONIC_FASTA_INTER_CHAIN_MC_MC': ionic_fasta_inter_mc_mc,
-                                                'SSBOND_FASTA_INTER_CHAIN_MC_MC': ss_bonds_fasta_inter_mc_mc,
-                                                'PIPISTACK_FASTA_INTER_CHAIN_MC_MC': pi_pi_stacking_fasta_inter_mc_mc,
-                                                'PICATION_FASTA_INTER_CHAIN_MC_MC': cation_pi_fasta_inter_mc_mc,
-                                                'VDW_FASTA_INTER_CHAIN_MC_SC': van_der_waals_fasta_inter_mc_sc,
-                                                'HBOND_FASTA_INTER_CHAIN_MC_SC': h_bonds_fasta_inter_mc_sc,
-                                                'IONIC_FASTA_INTER_CHAIN_MC_SC': ionic_fasta_inter_mc_sc,
-                                                'SSBOND_FASTA_INTER_CHAIN_MC_SC': ss_bonds_fasta_inter_mc_sc,
-                                                'PIPISTACK_FASTA_INTER_CHAIN_MC_SC': pi_pi_stacking_fasta_inter_mc_sc,
-                                                'PICATION_FASTA_INTER_CHAIN_MC_SC': cation_pi_fasta_inter_mc_sc,
-                                                'VDW_FASTA_INTER_CHAIN_SC_MC': van_der_waals_fasta_inter_sc_mc,
-                                                'HBOND_FASTA_INTER_CHAIN_SC_MC': h_bonds_fasta_inter_sc_mc,
-                                                'IONIC_FASTA_INTER_CHAIN_SC_MC': ionic_fasta_inter_sc_mc,
-                                                'SSBOND_FASTA_INTER_CHAIN_SC_MC': ss_bonds_fasta_inter_sc_mc,
-                                                'PIPISTACK_FASTA_INTER_CHAIN_SC_MC': pi_pi_stacking_fasta_inter_sc_mc,
-                                                'PICATION_FASTA_INTER_CHAIN_SC_MC': cation_pi_fasta_inter_sc_mc,
-                                                'VDW_FASTA_INTER_CHAIN_SC_SC': van_der_waals_fasta_inter_sc_sc,
-                                                'HBOND_FASTA_INTER_CHAIN_SC_SC': h_bonds_fasta_inter_sc_sc,
-                                                'IONIC_FASTA_INTER_CHAIN_SC_SC': ionic_fasta_inter_sc_sc,
-                                                'SSBOND_FASTA_INTER_CHAIN_SC_SC': ss_bonds_fasta_inter_sc_sc,
-                                                'PIPISTACK_FASTA_INTER_CHAIN_SC_SC': pi_pi_stacking_fasta_inter_sc_sc,
-                                                'PICATION_FASTA_INTER_CHAIN_SC_SC': cation_pi_fasta_inter_sc_sc})
-            beta_strands_df = pd.DataFrame(beta_strands_df_dict)
-            beta_strands_df = beta_strands_df.dropna()
-            beta_strands_df = beta_strands_df.reset_index(drop=True)
-            beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
-            beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
+            unwanted_columns = ['tilt_angle', 'shear_number', 'z_coords',
+                                'tm_pos', 'tm_ext']
+
+            beta_strands_df_dict = OrderedDict({key: value for key, value in properties_list
+                                                if not key in unwanted_columns})
+
+        beta_strands_df = pd.DataFrame(beta_strands_df_dict)
+        beta_strands_df = beta_strands_df.dropna()
+        beta_strands_df = beta_strands_df.reset_index(drop=True)
+        beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
+        beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nERROR with strand processing:\n')
+            unprocessed_file.write('\n\nError with strand processing:\n')
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))

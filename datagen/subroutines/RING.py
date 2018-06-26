@@ -1,5 +1,4 @@
 
-
 import os
 import pandas as pd
 from collections import OrderedDict
@@ -16,21 +15,20 @@ class calculate_residue_interaction_network(run_stages):
 
     def run_RING(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Runs RING on the parent structure (biological assembly / asymmetric
-        # unit as specified by the user)
+        # unit, as specified by the user)
         os.mkdir('ring')
         for domain_id in list(sec_struct_dfs_dict.keys()):
             print('Running RING for {}'.format(domain_id[0:4]))
-            os.system(
-                '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 > ring/{}.ring'.format(
-                    domain_id[0:4], domain_id[0:4]
+            if not os.path.isfile('ring/{}.ring'.format(domain_id[0:4])):
+                os.system(
+                    '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 > ring/{}.ring'.format(
+                        domain_id[0:4], domain_id[0:4]
+                    )
                 )
-            )
 
     def parse_RING_output(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Appends residue interaction network information to dssp_df.
         unprocessed_list = []
-        interaction_types = ['VDW', 'HBOND', 'IONIC', 'SSBOND', 'PIPISTACK',
-                             'PICATION']
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
             print('Identifying interacting residues for {}'.format(domain_id))
@@ -42,24 +40,40 @@ class calculate_residue_interaction_network(run_stages):
                             'IONIC_MC_MC': {},
                             'SSBOND_MC_MC': {},
                             'PIPISTACK_MC_MC': {},
+                            'PIPISTACK_MC_MC_P': {},
+                            'PIPISTACK_MC_MC_N': {},
+                            'PIPISTACK_MC_MC_L': {},
+                            'PIPISTACK_MC_MC_T': {},
                             'PICATION_MC_MC': {},
                             'VDW_SC_MC': {},
                             'HBOND_SC_MC': {},
                             'IONIC_SC_MC': {},
                             'SSBOND_SC_MC': {},
                             'PIPISTACK_SC_MC': {},
+                            'PIPISTACK_SC_MC_P': {},
+                            'PIPISTACK_SC_MC_N': {},
+                            'PIPISTACK_SC_MC_L': {},
+                            'PIPISTACK_SC_MC_T': {},
                             'PICATION_SC_MC': {},
                             'VDW_MC_SC': {},
                             'HBOND_MC_SC': {},
                             'IONIC_MC_SC': {},
                             'SSBOND_MC_SC': {},
                             'PIPISTACK_MC_SC': {},
+                            'PIPISTACK_MC_SC_P': {},
+                            'PIPISTACK_MC_SC_N': {},
+                            'PIPISTACK_MC_SC_L': {},
+                            'PIPISTACK_MC_SC_T': {},
                             'PICATION_MC_SC': {},
                             'VDW_SC_SC': {},
                             'HBOND_SC_SC': {},
                             'IONIC_SC_SC': {},
                             'SSBOND_SC_SC': {},
                             'PIPISTACK_SC_SC': {},
+                            'PIPISTACK_SC_SC_P': {},
+                            'PIPISTACK_SC_SC_N': {},
+                            'PIPISTACK_SC_SC_L': {},
+                            'PIPISTACK_SC_SC_T': {},
                             'PICATION_SC_SC': {}}
 
             for res_id in set(dssp_df['RES_ID'].tolist()):
@@ -71,7 +85,7 @@ class calculate_residue_interaction_network(run_stages):
             ring_output = ''.join(ring_output)
 
             if not 'NodeId' in ring_output:
-                print('ERROR: {}.ring unable to be analysed by RING'.format(domain_id[0:4]))
+                print('ERROR: {} unable to be processed by RING'.format(domain_id[0:4]))
                 unprocessed_list.append(domain_id)
                 sec_struct_dfs_dict[domain_id] = None
                 sheet_ids = [sheet_id for sheet_id in list(domain_sheets_dict.keys())
@@ -120,36 +134,67 @@ class calculate_residue_interaction_network(run_stages):
                         ):
                             interactions[aa_2_interaction_type][aa_2].append(aa_1)
 
+                    # Records the orientation of pi-pi stacking interactions
+                    if interaction_type == 'PIPISTACK':
+                        orientation = line.split()[-2]
+                        aa_1_interaction_orientation = '{}_{}'.format(
+                            aa_1_interaction_type, orientation
+                        )
+                        if aa_1 in list(interactions[aa_1_interaction_orientation].keys()):
+                            interactions[aa_1_interaction_orientation][aa_1].append(aa_2)
+
+                        aa_2_interaction_orientation = '{}_{}'.format(
+                            aa_2_interaction_type, orientation
+                        )
+                        if aa_2 in list(interactions[aa_2_interaction_orientation].keys()):
+                            interactions[aa_2_interaction_orientation][aa_2].append(aa_1)
+
                 ring_df_dict = OrderedDict({'VDW_MC_MC': ['']*dssp_df.shape[0],
                                             'HBOND_MC_MC': ['']*dssp_df.shape[0],
                                             'IONIC_MC_MC': ['']*dssp_df.shape[0],
                                             'SSBOND_MC_MC': ['']*dssp_df.shape[0],
                                             'PIPISTACK_MC_MC': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_MC_P': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_MC_N': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_MC_L': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_MC_T': ['']*dssp_df.shape[0],
                                             'PICATION_MC_MC': ['']*dssp_df.shape[0],
                                             'VDW_SC_MC': ['']*dssp_df.shape[0],
                                             'HBOND_SC_MC': ['']*dssp_df.shape[0],
                                             'IONIC_SC_MC': ['']*dssp_df.shape[0],
                                             'SSBOND_SC_MC': ['']*dssp_df.shape[0],
                                             'PIPISTACK_SC_MC': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_MC_P': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_MC_N': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_MC_L': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_MC_T': ['']*dssp_df.shape[0],
                                             'PICATION_SC_MC': ['']*dssp_df.shape[0],
                                             'VDW_MC_SC': ['']*dssp_df.shape[0],
                                             'HBOND_MC_SC': ['']*dssp_df.shape[0],
                                             'IONIC_MC_SC': ['']*dssp_df.shape[0],
                                             'SSBOND_MC_SC': ['']*dssp_df.shape[0],
                                             'PIPISTACK_MC_SC': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_SC_P': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_SC_N': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_SC_L': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_MC_SC_T': ['']*dssp_df.shape[0],
                                             'PICATION_MC_SC': ['']*dssp_df.shape[0],
                                             'VDW_SC_SC': ['']*dssp_df.shape[0],
                                             'HBOND_SC_SC': ['']*dssp_df.shape[0],
                                             'IONIC_SC_SC': ['']*dssp_df.shape[0],
                                             'SSBOND_SC_SC': ['']*dssp_df.shape[0],
                                             'PIPISTACK_SC_SC': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_SC_P': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_SC_N': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_SC_L': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_SC_SC_T': ['']*dssp_df.shape[0],
                                             'PICATION_SC_SC': ['']*dssp_df.shape[0]})
 
                 for row in range(dssp_df.shape[0]):
                     res_id = dssp_df['RES_ID'][row]
                     for interaction_type in list(ring_df_dict.keys()):
                         if (
-                            res_id in interactions[interaction_type]
+                            res_id in list(interactions[interaction_type].keys())
                             and dssp_df['ATMNAME'][row] == 'CA'
                         ):
                             ring_df_dict[interaction_type][row] = interactions[interaction_type][res_id]
@@ -175,7 +220,8 @@ class calculate_residue_interaction_network(run_stages):
     def identify_int_ext_sandwich(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Identifies residues facing towards the interior of the sandwich as
         # the group of residues in (direct or indirect) van der Waals contact
-        # with one another that has the highest average buried surface area
+        # (via their main-chain atoms) with one another that has the highest
+        # average buried surface area
         unprocessed_list = []
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
@@ -196,8 +242,8 @@ class calculate_residue_interaction_network(run_stages):
                         groups[group] += dssp_df['VDW_MC_MC'][row]
                 if in_current_group is False:
                     count += 1
-                    if dssp_df['VDW'][row] != '':
-                        groups[str(count)] = [res_id] + dssp_df['VDW'][row]  # Must be list!
+                    if dssp_df['VDW_MC_MC'][row] != '':
+                        groups[str(count)] = [res_id] + dssp_df['VDW_MC_MC'][row]  # Must be list!
 
             # Merges overlapping groups
             merged_group_lists = []
@@ -280,8 +326,8 @@ class calculate_residue_interaction_network(run_stages):
 
         # Writes PDB accession codes that could not be processed to output file
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nERROR - failed to identify interior '
-                                   'and exterior surfaces of sandwich:\n')
+            unprocessed_file.write('\n\nFailed to identify interior and '
+                                   'exterior surfaces of sandwich:\n')
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
