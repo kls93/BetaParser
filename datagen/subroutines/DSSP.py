@@ -76,6 +76,7 @@ class beta_structure_dssp_classification(run_stages):
         for index_1, domain_id in enumerate(list(dssp_residues_dict.keys())):
             dssp_indv_file_lines = dssp_residues_dict[domain_id]
             pdb_df = all_atoms_dfs_dict[domain_id]
+            dssp_to_pdb_dict[domain_id] = OrderedDict()
 
             print('Generating dataframe summarising DSSP info for {}'.format(domain_id))
             print('{:0.2f}%'.format(((index_1+1)/len(list(dssp_residues_dict.keys())))*100))
@@ -94,7 +95,7 @@ class beta_structure_dssp_classification(run_stages):
             for index_2, line in enumerate(dssp_indv_file_lines):
                 if not line.startswith('TER'):
                     res_id = line[11:12].strip() + line[5:11].replace(' ', '')
-                    dssp_to_pdb_dict[line[0:5].strip()] = res_id
+                    dssp_to_pdb_dict[domain_id][line[0:5].strip()] = res_id
 
                     chain_res_num.append(res_id)
                     dssp_num.append(line[0:5].strip())

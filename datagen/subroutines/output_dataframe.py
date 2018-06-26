@@ -156,7 +156,7 @@ class output_calcs():
 
         return membrane_loc
 
-    def convert_dssp_num_to_res_id(strand_df, dssp_df, dssp_to_pdb_dict):
+    def convert_dssp_num_to_res_id(strand_df, dssp_df, dssp_to_pdb_sub_dict):
         # Converts bridge pairs extracted from DSSP file to res_ids. NOTE: will
         # only list bridge partners that are also in the retained
         # beta-sandwich/barrel strands. Bridge pairs are split into hydrogen
@@ -168,8 +168,8 @@ class output_calcs():
             bridges = strand_df['BRIDGE_PAIRS'][row]
             bridges_renum = []
             for dssp_num in bridges:
-                if dssp_num in list(dssp_to_pdb_dict.keys()):
-                    bridges_renum.append(dssp_to_pdb_dict[dssp_num])
+                if dssp_num in list(dssp_to_pdb_sub_dict.keys()):
+                    bridges_renum.append(dssp_to_pdb_sub_dict[dssp_num])
             bridge_pairs_list.append(bridges_renum)
 
             for index, pdb_num in enumerate(bridges_renum):
@@ -285,7 +285,7 @@ def gen_interaction_lists(properties_list, interaction_type_abbrev,
                           interaction_type_long, strand_df, reverse,
                           res_ids_list, strand_or_res, res_id_to_fasta_dict,
                           chain_id):
-    if interaction_type_abbrev == ['PIPISTACK']:
+    if interaction_type_abbrev == 'PIPISTACK':
         chain_combos = ['mc_mc', 'mc_mc_p', 'mc_mc_l', 'mc_mc_n', 'mc_mc_t',
                         'mc_sc', 'mc_sc_p', 'mc_sc_l', 'mc_sc_n', 'mc_sc_t',
                         'sc_mc', 'sc_mc_p', 'sc_mc_l', 'sc_mc_n', 'sc_mc_t',
@@ -415,7 +415,7 @@ class gen_output(run_stages):
                                        'pi_pi_stacking_mc_mc': [],
                                        'pi_pi_stacking_mc_mc_p': [],
                                        'pi_pi_stacking_mc_mc_n': [],
-                                       'pi_pi_stacking_mc_mc_n': [],
+                                       'pi_pi_stacking_mc_mc_l': [],
                                        'pi_pi_stacking_mc_mc_t': [],
                                        'cation_pi_mc_mc': [],
                                        'van_der_waals_mc_sc': [],
@@ -425,7 +425,7 @@ class gen_output(run_stages):
                                        'pi_pi_stacking_mc_sc': [],
                                        'pi_pi_stacking_mc_sc_p': [],
                                        'pi_pi_stacking_mc_sc_n': [],
-                                       'pi_pi_stacking_mc_sc_n': [],
+                                       'pi_pi_stacking_mc_sc_l': [],
                                        'pi_pi_stacking_mc_sc_t': [],
                                        'cation_pi_mc_sc': [],
                                        'van_der_waals_sc_mc': [],
@@ -435,7 +435,7 @@ class gen_output(run_stages):
                                        'pi_pi_stacking_sc_mc': [],
                                        'pi_pi_stacking_sc_mc_p': [],
                                        'pi_pi_stacking_sc_mc_n': [],
-                                       'pi_pi_stacking_sc_mc_n': [],
+                                       'pi_pi_stacking_sc_mc_l': [],
                                        'pi_pi_stacking_sc_mc_t': [],
                                        'cation_pi_sc_mc': [],
                                        'van_der_waals_sc_sc': [],
@@ -445,7 +445,7 @@ class gen_output(run_stages):
                                        'pi_pi_stacking_sc_sc': [],
                                        'pi_pi_stacking_sc_sc_p': [],
                                        'pi_pi_stacking_sc_sc_n': [],
-                                       'pi_pi_stacking_sc_sc_n': [],
+                                       'pi_pi_stacking_sc_sc_l': [],
                                        'pi_pi_stacking_sc_sc_t': [],
                                        'cation_pi_sc_sc': [],
                                        'minus_1': [],
@@ -546,6 +546,7 @@ class gen_output(run_stages):
         # Extracts property values for each domain_id
         for domain_id in list(sec_struct_dfs_dict.keys()):
             dssp_df = sec_struct_dfs_dict[domain_id]
+            dssp_to_pdb_sub_dict = dssp_to_pdb_dict[domain_id]
 
             # Generates dictionary of residue ids (= chain + residue number +
             # insertion code) and names
@@ -644,7 +645,7 @@ class gen_output(run_stages):
 
                 sequence = reverse_strand_lists(sequence, reverse)
                 properties_list['fasta_seq'] = append_to_output_lists(
-                    sequence, properties['fasta_seq'], res_ids_list,
+                    sequence, properties_list['fasta_seq'], res_ids_list,
                     strand_or_res
                 )
 
@@ -764,8 +765,8 @@ class gen_output(run_stages):
                 )
 
                 # Generates list of neighbouring residues
-                properties['neighbours'], neighbours_sub_list = reverse_and_append(
-                    'NEIGHBOURS', strand_df, properties['neighbours'], reverse,
+                properties_list['neighbours'], neighbours_sub_list = reverse_and_append(
+                    'NEIGHBOURS', strand_df, properties_list['neighbours'], reverse,
                     res_ids_list, strand_or_res
                 )
 
@@ -788,7 +789,7 @@ class gen_output(run_stages):
                 # with the residue in question
                 (hb_pairs_list, nhb_pairs_list, bridge_pairs_list
                  ) = output_calcs.convert_dssp_num_to_res_id(
-                    strand_df, dssp_df, dssp_to_pdb_dict
+                    strand_df, dssp_df, dssp_to_pdb_sub_dict
                 )
                 bridge_pairs_list = reverse_strand_lists(bridge_pairs_list, reverse)
                 properties_list['bridge_pairs'] = append_to_output_lists(
@@ -861,7 +862,7 @@ class gen_output(run_stages):
                 # Generates list of residues that form hydrogen bonds with the
                 # residue in question
                 properties_list = gen_interaction_lists(
-                    properties_list, 'HBOND', 'hbonds', strand_df,
+                    properties_list, 'HBOND', 'h_bonds', strand_df,
                     reverse, res_ids_list, strand_or_res, res_id_to_fasta_dict,
                     chain_id
                 )
@@ -927,23 +928,22 @@ class gen_output(run_stages):
                     strand_or_res
                 )
 
-        for index, strand_id in enumerate(domain_strand_ids):
-            if strand_id.split('_')[0] in unprocessed_list:
-                for property in properties_list:
-                    properties_list[property][index] = np.nan
-
         # Generates csv file of beta-barrel dataset
         if self.code[0:4] in ['2.40']:
             unwanted_columns = ['sheet_number', 'edge_or_central',
-                                'strand_abs_pos, strand_percentage_pos',
+                                'strand_abs_pos', 'strand_percentage_pos',
                                 'core_surf', 'buried_surface_area']
         # Generates csv file of beta-sandwich dataset
         elif self.code[0:4] in ['2.60']:
             unwanted_columns = ['tilt_angle', 'shear_number', 'z_coords',
                                 'tm_pos', 'tm_ext']
 
-            beta_strands_df_dict = OrderedDict({key: value for key, value in properties_list
-                                                if not key in unwanted_columns})
+        beta_strands_df_dict = OrderedDict({key: value for key, value in properties_list.items()
+                                            if not key in unwanted_columns})
+        for index, strand_id in enumerate(beta_strands_df_dict['domain_strand_ids']):
+            if strand_id.split('_')[0] in unprocessed_list:
+                for property in list(beta_strands_df_dict.keys()):
+                    beta_strands_df_dict[property][index] = np.nan
 
         beta_strands_df = pd.DataFrame(beta_strands_df_dict)
         beta_strands_df = beta_strands_df.dropna()

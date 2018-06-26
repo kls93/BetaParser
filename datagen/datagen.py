@@ -21,7 +21,7 @@ def main():
             find_radius
         )
         from datagen.subroutines.run_stages import run_stages
-    orig_dir = sys.path[0]
+    orig_dir = sys.path[0].split('datagen')[0]
 
     # Reads in command line inputs
     parser = argparse.ArgumentParser()
