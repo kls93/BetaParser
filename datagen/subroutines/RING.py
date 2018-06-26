@@ -16,10 +16,11 @@ class calculate_residue_interaction_network(run_stages):
     def run_RING(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Runs RING on the parent structure (biological assembly / asymmetric
         # unit, as specified by the user)
-        os.mkdir('ring')
+        if not os.path.isdir('ring'):
+            os.mkdir('ring')
         for domain_id in list(sec_struct_dfs_dict.keys()):
-            print('Running RING for {}'.format(domain_id[0:4]))
             if not os.path.isfile('ring/{}.ring'.format(domain_id[0:4])):
+                print('Running RING for {}'.format(domain_id[0:4]))
                 os.system(
                     '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 > ring/{}.ring'.format(
                         domain_id[0:4], domain_id[0:4]
@@ -137,6 +138,8 @@ class calculate_residue_interaction_network(run_stages):
                     # Records the orientation of pi-pi stacking interactions
                     if interaction_type == 'PIPISTACK':
                         orientation = line.split()[-2]
+                        if orientation in ['T-EF', 'T-FE']:
+                            orientation = 'T'
                         aa_1_interaction_orientation = '{}_{}'.format(
                             aa_1_interaction_type, orientation
                         )

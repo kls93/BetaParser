@@ -210,7 +210,6 @@ class run_stages():
                 sec_struct_dfs_dict, domain_sheets_dict
             )
 
-
         # For beta-barrel domains, calculates the strand number, plus, if the
         # barrel is in the OPM database, extracts its average strand tilt
         # number from the database

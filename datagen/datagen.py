@@ -1,5 +1,5 @@
 
-import os
+import sys
 import argparse
 
 # Script to run the DataGen pipeline to extract a dataset of PDB structures of
@@ -21,7 +21,7 @@ def main():
             find_radius
         )
         from datagen.subroutines.run_stages import run_stages
-    orig_dir = os.getcwd()
+    orig_dir = sys.path[0]
 
     # Reads in command line inputs
     parser = argparse.ArgumentParser()

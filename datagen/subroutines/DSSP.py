@@ -176,7 +176,8 @@ class beta_structure_dssp_classification(run_stages):
                     extnd_df.loc[row, 'REC'] = None
             filtered_extnd_df = extnd_df[extnd_df['REC'].notnull()]
             filtered_extnd_df = filtered_extnd_df.reset_index(drop=True)
-            filtered_extnd_df.to_pickle('Beta_strands/{}.pkl'.format(domain_id))  # Remove this line?
+            filtered_extnd_df.to_pickle(
+                'Beta_strands/{}.pkl'.format(domain_id))  # Remove this line?
             sec_struct_dfs_dict[domain_id] = filtered_extnd_df
 
         return all_atoms_dfs_dict, sec_struct_dfs_dict, dssp_to_pdb_dict

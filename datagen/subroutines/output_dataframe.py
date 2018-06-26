@@ -197,7 +197,7 @@ class output_calcs():
                 minus_res = consec_res_id_list[res_id_index - displacement]
                 plus_res = consec_res_id_list[res_id_index + displacement]
                 if res_id[0:1] != minus_res[0:1]:  # Prevents residues in
-                # different chains from being considered as consecutive residues
+                    # different chains from being considered as consecutive residues
                     minus_res = ''
                 else:
                     minus_res = res_id_to_fasta_dict[minus_res]
@@ -573,7 +573,7 @@ class gen_output(run_stages):
                 # Gives strand a unique ID
                 properties_list['domain_strand_ids'] = append_to_output_lists(
                     '{}_strand_{}'.format(domain_id, strand_num),
-                     properties_list['domain_strand_ids'], res_ids_list, strand_or_res
+                    properties_list['domain_strand_ids'], res_ids_list, strand_or_res
                 )
 
                 # Lists parent sheet of each strand
