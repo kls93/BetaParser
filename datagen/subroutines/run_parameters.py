@@ -339,7 +339,6 @@ def gen_run_parameters(args):
 def determine_if_discard_tm(args, run_parameters):
     # Determines whether or not the user wants to keep only transmembrane
     # structures
-    discard_tm = ''
     if (run_parameters['structuredatabase'] == 'CATH'
             and run_parameters['id'][0:4] in ['2.40']):
         if vars(args)['tm']:
@@ -357,6 +356,8 @@ def determine_if_discard_tm(args, run_parameters):
                 print('Input not recognised - please enter "yes" or "no"')
             else:
                 break
+    else:
+        discard_tm = 'no'
 
     if discard_tm in ['yes', 'y']:
         discard_tm = True
