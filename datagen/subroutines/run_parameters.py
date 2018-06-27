@@ -295,10 +295,11 @@ def gen_run_parameters(args):
 
     # Requires user input if a suffix for the PDB files in the biological
     # assembly database is not specified in the input file
-    if not 'suffix' in run_parameters:
-        print('Specify suffix of biological assembly PDB files:')
-        suffix = input(prompt)
-        run_parameters['suffix'] = suffix
+    if run_parameters['auorba'] == 'ba':
+        if not 'suffix' in run_parameters:
+            print('Specify suffix of biological assembly PDB files:')
+            suffix = input(prompt)
+            run_parameters['suffix'] = suffix
 
     # Creates and / or sets the output directory as the current working
     # directory
