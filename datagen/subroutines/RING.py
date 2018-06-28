@@ -231,22 +231,33 @@ class calculate_residue_interaction_network(run_stages):
             print('Identifying interior- and exterior-facing residues in '
                   '{}'.format(domain_id))
             dssp_df = sec_struct_dfs_dict[domain_id]
+            dssp_ca_df = dssp_df[dssp_df['ATMNAME'] == 'CA']
+            dssp_ca_df = dssp_ca_df.reset_index(drop=True)
 
             # Groups residues in van der Waals contact together
             groups = OrderedDict()
             count = 0
-            for row in range(dssp_df.shape[0]):
-                res_id = dssp_df['RES_ID'][row]
+            res_id_list = dssp_ca_df['RES_ID'].tolist()
+            for row in range(dssp_ca_df.shape[0]):
+                res_id = dssp_ca_df['RES_ID'][row]
 
                 in_current_group = False
                 for group in list(groups.keys()):
                     if res_id in groups[group]:
                         in_current_group = True
-                        groups[group] += dssp_df['VDW_MC_MC'][row]
+                        new_group = list(set(groups[group]))
+                        for new_res_id in dssp_ca_df['VDW_SC_SC'][row]:
+                            if new_res_id in res_id_list and not new_res_id in new_group:
+                                new_group.append(new_res_id)
+                        groups[group] = new_group
                 if in_current_group is False:
-                    count += 1
-                    if dssp_df['VDW_MC_MC'][row] != '':
-                        groups[str(count)] = [res_id] + dssp_df['VDW_MC_MC'][row]  # Must be list!
+                    count += 1  # Generates new group key label
+
+                    new_group = [res_id]  # Must be list!
+                    for new_res_id in dssp_ca_df['VDW_SC_SC'][row]:
+                        if new_res_id in res_id_list and not new_res_id in new_group:
+                            new_group.append(new_res_id)
+                    groups[str(count)] = new_group
 
             # Merges overlapping groups
             merged_group_lists = []
@@ -254,7 +265,8 @@ class calculate_residue_interaction_network(run_stages):
                 merged_group_lists += group_list
 
             while sorted(set(merged_group_lists)) != sorted(merged_group_lists):
-                group_1 = groups[list(groups.keys())[0]]
+                group_1_key = list(groups.keys())[0]
+                group_1 = groups[group_1_key]
                 overlap = False
                 for group in list(groups.keys()):
                     if (
@@ -263,12 +275,12 @@ class calculate_residue_interaction_network(run_stages):
                     ):
                         merged_group = group_1 + groups[group]
                         groups[group] = list(set(merged_group))
-                        del groups[list(groups.keys())[0]]
+                        del groups[group_1_key]
                         overlap = True
                         break
 
                 if overlap is False:
-                    groups.move_to_end(group_1)
+                    groups.move_to_end(group_1_key)
 
                 merged_group_lists = []
                 for group_list in list(groups.values()):
@@ -279,7 +291,7 @@ class calculate_residue_interaction_network(run_stages):
             # TO LOOK AT A WIDER RANGE OF STRUCTURES!
             # PROBLEM: At the moment all residues are considered to be in van
             # der waals contact with one another => 1 surface. How to split into three?
-            if len(list(groups.keys())) != 3:
+            if len(list(groups.keys())) < 3:
                 print('ERROR in determining interior- and exterior-facing '
                       'surfaces')
                 unprocessed_list.append(domain_id)
@@ -291,27 +303,19 @@ class calculate_residue_interaction_network(run_stages):
             else:
                 # Finds the group with the largest average buried surface area,
                 # which is assumed to be the interior surface
-                buried_surface_areas = {}
-                dssp_ca_df = dssp_df[dssp_df['ATMNAME'] == 'CA']
-                dssp_ca_df = dssp_ca_df.reset_index(drop=True)
+                num_res_in_groups = {}
                 for group in list(groups.keys()):
-                    buried_surface_area_sum = 0
-                    for res_id in groups[group]:
-                        buried_surface_area = dssp_ca_df['BURIED_SURFACE_AREA(%)'].tolist()[
-                            dssp_ca_df['RES_ID'].tolist().index(res_id)
-                        ]
-                        buried_surface_area_sum += buried_surface_area
-                    average_buried_surface_area = buried_surface_area_sum / len(groups[group])
-                    buried_surface_areas[average_buried_surface_area] = group
+                    num_res_in_groups[len(groups[group])] = group
 
-                interior_group = buried_surface_areas[max(list(buried_surface_areas.keys()))]
+                interior_group = num_res_in_groups[max(list(num_res_in_groups.keys()))]
                 int_ext_dict = {}
                 for group in groups:
-                    for res_id in group:
+                    for res_id in groups[group]:
                         if group == interior_group:
                             int_ext_dict[res_id] = 'interior'
                         else:
                             int_ext_dict[res_id] = 'exterior'
+                print(int_ext_dict)
 
                 # Updates dataframe with interior / exterior-facing calculation
                 # results

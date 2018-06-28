@@ -625,7 +625,7 @@ class gen_output(run_stages):
                 # Determines whether the strand is an edge or central strand
                 if self.code[0:4] in ['2.60']:
                     properties_list['edge_or_central'] = append_to_output_lists(
-                        edge_or_central_list[0],
+                        strand_df['EDGE_OR_CNTRL'].tolist()[0],
                         properties_list['edge_or_central'], res_ids_list,
                         strand_or_res
                     )
@@ -939,7 +939,8 @@ class gen_output(run_stages):
                                 'core_surf', 'buried_surface_area']
         # Generates csv file of beta-sandwich dataset
         elif self.code[0:4] in ['2.60']:
-            unwanted_columns = ['tilt_angle', 'shear_number', 'z_coords',
+            unwanted_columns = ['tilt_angle', 'total_strand_number',
+                                'shear_number', 'z_coords',
                                 'tm_pos', 'tm_ext']
 
         beta_strands_df_dict = OrderedDict({key: value for key, value in properties_list.items()
