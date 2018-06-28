@@ -170,12 +170,14 @@ class output_calcs():
             for dssp_num in bridges:
                 if dssp_num in list(dssp_to_pdb_sub_dict.keys()):
                     bridges_renum.append(dssp_to_pdb_sub_dict[dssp_num])
+                else:
+                    bridges_renum.append('')
             bridge_pairs_list.append(bridges_renum)
 
             hb_sub_list = []
             nhb_sub_list = []
             for index, pdb_num in enumerate(bridges_renum):
-                if strand_df['ORIENTATION'][row][index] == 'A':
+                if pdb_num != '' and strand_df['ORIENTATION'][row][index] == 'A':
                     if pdb_num in strand_df['HBOND_MC_MC'][row]:
                         hb_sub_list.append(pdb_num)
                     else:

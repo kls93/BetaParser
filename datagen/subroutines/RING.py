@@ -315,7 +315,6 @@ class calculate_residue_interaction_network(run_stages):
                             int_ext_dict[res_id] = 'interior'
                         else:
                             int_ext_dict[res_id] = 'exterior'
-                print(int_ext_dict)
 
                 # Updates dataframe with interior / exterior-facing calculation
                 # results
