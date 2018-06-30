@@ -22,8 +22,9 @@ class run_stages():
         self.resn = float(self.run_parameters['resolution'])
         self.rfac = float(self.run_parameters['rfactor'])
         self.suffix = self.run_parameters['suffix']
+        self.discard_tm = self.run_parameters['discardtm']
 
-    def run_stage_1_cath(self, orig_dir, discard_tm):
+    def run_stage_1_cath(self, orig_dir):
         # Runs stage 1 of the DataGen pipeline, extracting sequences of the
         # structural domain of interest from the CATH database
         if __name__ == 'subroutines.run_stages':
@@ -43,7 +44,7 @@ class run_stages():
         # earlier user input), picking out PDB accession codes and sequences
         # (whose values are stored in the 'domain_df' dataframe).
         domains_desc = gen_domain_desc_list(orig_dir)
-        domain_df = domain_desc_filter(self.code, domains_desc, discard_tm)
+        domain_df = domain_desc_filter(self.code, domains_desc, self.discard_tm)
 
         # Filters the domain_df for X-ray structures below user-specified
         # resolution and R_factor (working value) cutoffs. Writes a file
@@ -53,7 +54,7 @@ class run_stages():
         filtered_domain_df = beta_structure.resn_rfac_filter(domain_df)
         beta_structure.gen_cdhit_list(filtered_domain_df)
 
-    def run_stage_1_scope(self, orig_dir, discard_tm):
+    def run_stage_1_scope(self, orig_dir):
         return
 
     def run_stage_2(self, cdhit_entries, cdhit_output):

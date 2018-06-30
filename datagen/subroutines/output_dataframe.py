@@ -46,8 +46,9 @@ class output_calcs():
 
         return res_id_to_fasta_dict, consec_res_id_list
 
-    def determine_strand_orientation(domain_id, strand_id, strand_df,
-                                     opm_database, unprocessed_list):
+    def determine_strand_orientation(domain_id, strand_id, strand_df, tm,
+                                     opm_database, unprocessed_list,
+                                     unprocessed_strands):
         # Determines orientation of input strand in domain if that domain is in
         # the OPM database. If the N-terminus is in the periplasm
         # (Z-coordinate = negative) and C-terminus is extracellular
@@ -55,48 +56,74 @@ class output_calcs():
         # output dataframe.
 
         pdb_code = domain_id[0:4]
-        res_ids_list = strand_df['RES_ID'].tolist()
-        strand_coordinates = OrderedDict()
+        res_ids_pdb = strand_df['RES_ID'].tolist()
+        resname_pdb = dict(zip(strand_df['RES_ID'].tolist(), strand_df['RESNAME'].tolist()))
+        conformers_pdb = dict(zip(strand_df['RES_ID'].tolist(), strand_df['CONFORMER'].tolist()))
+        strand_coordinates_opm = OrderedDict()
         in_database = False
         lower_bound = 0
         upper_bound = 0
         reverse = False
 
-        if os.path.isfile('{}/{}.pdb'.format(opm_database, pdb_code)):
-            print('Determining strand orientation in {} strand '
-                  '{}'.format(domain_id, strand_id))
-            in_database = True
+        if tm:
+            if os.path.isfile('{}/{}.pdb'.format(opm_database, pdb_code)):
+                print('Determining strand orientation in {} strand '
+                      '{}'.format(domain_id, strand_id))
+                in_database = True
 
-            with open('{}/{}.pdb'.format(opm_database, pdb_code), 'r') as opm_file:
-                for line in opm_file:
-                    if line[17:20].strip() != 'DUM':  # Don't put as 'and'
-                        # statement with line below (see corresponding 'else' statement)
-                        if line[0:6].strip() in ['ATOM', 'HETATM']:
-                            chain_res_num = line[21:27].replace(' ', '')
-                            if (
-                                line[12:16].strip() == 'CA'
-                                and chain_res_num in res_ids_list
-                            ):
-                                strand_coordinates[chain_res_num] = float(line[46:54])
-                    else:
-                        if float(line[46:54]) > upper_bound:
-                            upper_bound = float(line[46:54])
-                        elif float(line[46:54]) < lower_bound:
-                            lower_bound = float(line[46:54])
+                with open('{}/{}.pdb'.format(opm_database, pdb_code), 'r') as opm_file:
+                    for line in opm_file:
+                        if line[17:20].strip() != 'DUM':  # Don't put as 'and'
+                            # statement with line below (see corresponding 'else' statement)
+                            if line[0:6].strip() in ['ATOM', 'HETATM']:
+                                chain_res_num = line[21:27].replace(' ', '')
+                                if (
+                                    line[12:16].strip() == 'CA'
+                                    and chain_res_num in res_ids_pdb
+                                    and line[17:20].strip() == resname_pdb[chain_res_num]  # NOTE
+                                    # that OPM sometimes adds in alternate conformers that were
+                                    # not present in the original PDB file - consequently, I ignore
+                                    # the alternate conformer label, as I am only interested in the
+                                    # Calpha position (since this would not be expected to vary
+                                    # greatly between conformers unless those conformers are within
+                                    # a consecutive sequence of alternate conformers). This means
+                                    # that the code will always take the final listed conformer's
+                                    # Calpha position.
+                                    # and line[16:17].strip() == conformers_pdb[chain_res_num]
+                                ):
+                                    strand_coordinates_opm[chain_res_num] = float(line[46:54])
+                        else:
+                            if float(line[46:54]) > upper_bound:
+                                upper_bound = float(line[46:54])
+                            elif float(line[46:54]) < lower_bound:
+                                lower_bound = float(line[46:54])
 
-            z_coordinates = list(strand_coordinates.values())
-            # Ensures that all residues in input domain are present in the OPM
-            # structure
-            if len(z_coordinates) != len(res_ids_list):
-                unprocessed_list.append(domain_id)
+                z_coordinates = list(strand_coordinates_opm.values())
+                # Ensures that all residues in input domain are present in the OPM
+                # structure
+                if len(z_coordinates) != len(res_ids_pdb):
+                    strand_coordinates_opm = OrderedDict()
+                    unprocessed_list.append(domain_id)
+                else:
+                    # Orients strands from the extracellular environment to the
+                    # periplasm
+                    if z_coordinates[0] < z_coordinates[-1]:
+                        reverse = True
+
+                # Ensures that input domain is transmembrane - NOTE that one
+                # non-transmembrane strand does not necessarily mean that the
+                # entire domain is non-transmembrane, so do not merge this
+                # statement with the one above!
+                if not domain_id in unprocessed_list:
+                    if not (any(z < 0 for z in z_coordinates) and any(z > 0 for z in z_coordinates)):
+                        unprocessed_strands.append(strand_id)
+
             else:
-                # Orients strands from the extracellular environment to the
-                # periplasm
-                if z_coordinates[0] < z_coordinates[-1]:
-                    reverse = True
+                unprocessed_list.append(domain_id)
 
-        return (in_database, reverse, res_ids_list, strand_coordinates,
-                lower_bound, upper_bound, unprocessed_list)
+        return (in_database, reverse, res_ids_pdb, strand_coordinates_opm,
+                lower_bound, upper_bound, unprocessed_list,
+                unprocessed_strands)
 
     def determine_tm_or_ext(domain_id, strand_id, res_ids_list, in_database,
                             strand_coordinates, lower_bound, upper_bound,
@@ -563,6 +590,8 @@ class gen_output(run_stages):
             strands_list = [strand_num for strand_num in set(dssp_df['STRAND_NUM'].tolist())
                             if strand_num != '']
 
+            unprocessed_strands = []
+
             for strand_num in strands_list:
                 strand_df = dssp_df[dssp_df['STRAND_NUM'] == strand_num]
                 strand_df = strand_df.reset_index(drop=True)
@@ -570,11 +599,16 @@ class gen_output(run_stages):
 
                 # If the strand's parent structure is in the OPM database,
                 # determines the orientation of the strand in the OM
+                if self.code[0:4] in ['2.40']:
+                    tm = True
+                else:
+                    tm = False
                 (in_database, reverse, res_ids_list, strand_coordinates,
-                 lower_bound, upper_bound, unprocessed_list
+                 lower_bound, upper_bound, unprocessed_list,
+                 unprocessed_strands
                  ) = output_calcs.determine_strand_orientation(
-                    domain_id, strand_num, strand_df, self.opm_database,
-                    unprocessed_list
+                    domain_id, strand_num, strand_df, tm, self.opm_database,
+                    unprocessed_list, unprocessed_strands
                 )
 
                 # Gives strand a unique ID
@@ -933,6 +967,10 @@ class gen_output(run_stages):
                     plus_2_list, properties_list['plus_2'], res_ids_list,
                     strand_or_res
                 )
+
+            # Ensures that domain is transmembrane
+            if self.discard_tm and sorted(set(strands_list)) == sorted(set(unprocessed_strands)):
+                unprocessed_list.append(domain_id)
 
         # Generates csv file of beta-barrel dataset
         if self.code[0:4] in ['2.40']:

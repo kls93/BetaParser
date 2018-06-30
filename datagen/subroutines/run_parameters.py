@@ -301,6 +301,41 @@ def gen_run_parameters(args):
             suffix = input(prompt)
             run_parameters['suffix'] = suffix
 
+    # Determines whether or not the user wants to keep only transmembrane
+    # structures
+    if (
+        run_parameters['structuredatabase'] == 'CATH'
+        and run_parameters['id'][0:4] in ['2.40']
+    ):
+        if 'discardtm' in run_parameters:
+            try:
+                run_parameters['discardtm'] = run_parameters['discardtm'].lower()
+                if not run_parameters['discardtm'] in ['yes', 'no', 'y', 'n', True, False]:
+                    print('Discard TM structures selection not recognised')
+                    run_parameters.pop('discardtm')
+            except SyntaxError:
+                print('Discard TM structures selection not recognised')
+                run_parameters.pop('discardtm')
+
+        if not 'discardtm' in run_parameters:
+            print('Discard non-TM structures?')
+            discard_tm = ''
+            while not discard_tm in ['yes', 'no', 'y', 'n']:
+                discard_tm = input(prompt).lower()
+                if discard_tm in ['yes', 'no', 'y', 'n']:
+                    run_parameters['discardtm'] = discard_tm
+                    break
+                else:
+                    print('Input not recognised - please enter "yes" or "no"')
+
+    else:
+        run_parameters['discardtm'] = 'no'
+
+    if run_parameters['discardtm'] in ['yes', 'y']:
+        run_parameters['discardtm'] = True
+    elif run_parameters['discardtm'] in ['no', 'n']:
+        run_parameters['discardtm'] = False
+
     # Creates and / or sets the output directory as the current working
     # directory
     os.chdir('{}'.format(run_parameters['workingdirectory']))
@@ -325,6 +360,7 @@ def gen_run_parameters(args):
         parameters_file.write('Structure database: {}\n'.format(run_parameters['structuredatabase']) +
                               'ID: {}\n'.format(run_parameters['id']) +
                               'AU or BA: {}\n'.format(run_parameters['auorba']) +
+                              'Working directory: {}\n'.format(run_parameters['workingdirectory']) +
                               'PDB AU database: {}\n'.format(run_parameters['pdbaudatabase']) +
                               'PDB BA database: {}\n'.format(run_parameters['pdbbadatabase']) +
                               'DSSP database: {}\n'.format(run_parameters['dsspdatabase']) +
@@ -332,40 +368,10 @@ def gen_run_parameters(args):
                               'RING database: {}\n'.format(run_parameters['ringdatabase']) +
                               'Resolution: {}\n'.format(run_parameters['resolution']) +
                               'Rfactor: {}\n'.format(run_parameters['rfactor']) +
-                              'Suffix: {}\n'.format(run_parameters['suffix']))
+                              'Suffix: {}\n'.format(run_parameters['suffix']) +
+                              'Discard TM: {}\n'.format(run_parameters['discardtm']))
 
     return stage, run_parameters
-
-
-def determine_if_discard_tm(args, run_parameters):
-    # Determines whether or not the user wants to keep only transmembrane
-    # structures
-    if (run_parameters['structuredatabase'] == 'CATH'
-            and run_parameters['id'][0:4] in ['2.40']):
-        if vars(args)['tm']:
-            try:
-                discard_tm = vars(args)['tm'].lower()
-            except:
-                discard_tm = ''
-        else:
-            discard_tm = ''
-
-        while not discard_tm in ['yes', 'no', 'y', 'n']:
-            print('Discard non-TM structures?')
-            discard_tm = input(prompt).lower()
-            if not discard_tm in ['yes', 'no', 'y', 'n']:
-                print('Input not recognised - please enter "yes" or "no"')
-            else:
-                break
-    else:
-        discard_tm = 'no'
-
-    if discard_tm in ['yes', 'y']:
-        discard_tm = True
-    elif discard_tm in ['no', 'n']:
-        discard_tm = False
-
-    return discard_tm
 
 
 def find_cdhit_input(args):

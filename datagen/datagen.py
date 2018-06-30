@@ -11,14 +11,12 @@ import argparse
 def main():
     if __name__ == '__main__':
         from subroutines.run_parameters import (
-            gen_run_parameters, determine_if_discard_tm, find_cdhit_input,
-            find_radius
+            gen_run_parameters, find_cdhit_input, find_radius
         )
         from subroutines.run_stages import run_stages
     else:
         from datagen.subroutines.run_parameters import (
-            gen_run_parameters, determine_if_discard_tm, find_cdhit_input,
-            find_radius
+            gen_run_parameters, find_cdhit_input, find_radius
         )
         from datagen.subroutines.run_stages import run_stages
     orig_dir = sys.path[0].split('datagen')[0]
@@ -28,8 +26,6 @@ def main():
     parser.add_argument('-i', '--input_file', help='OPTIONAL: Specifies the '
                         'absolute file path of an input file listing run '
                         'parameters')
-    parser.add_argument('--tm', help='OPTIONAL: Specifies whether or not to '
-                        'retain only TM structures')
     parser.add_argument('-s', '--sequences', nargs='+', help='OPTIONAL: '
                         'Specifies the absolute file path of an input file of '
                         'CDHIT filtered FASTA sequences required for stage 2 '
@@ -48,11 +44,10 @@ def main():
     if stage in ['1']:
         # Determines whether the user wants to extract structures from the CATH
         # or from the SCOPe structural database
-        discard_tm = determine_if_discard_tm(args, run_parameters)
         if run_parameters['structuredatabase'] == 'CATH':
-            analysis.run_stage_1_cath(orig_dir, discard_tm)
+            analysis.run_stage_1_cath(orig_dir)
         elif run_parameters['structuredatabase'] == 'SCOP':
-            analysis.run_stage_1_scope(orig_dir, discard_tm)
+            analysis.run_stage_1_scope(orig_dir)
 
     # Extracts PDB structures and structural information for each of the
     # sequences listed in a CDHIT output txt file
