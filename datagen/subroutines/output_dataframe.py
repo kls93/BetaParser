@@ -319,18 +319,19 @@ def gen_interaction_lists(properties_list, interaction_type_abbrev,
                           res_ids_list, strand_or_res, res_id_to_fasta_dict,
                           chain_id):
     if interaction_type_abbrev == 'PIPISTACK':
-        chain_combos = ['mc_mc', 'mc_mc_p', 'mc_mc_l', 'mc_mc_n', 'mc_mc_t',
-                        'mc_sc', 'mc_sc_p', 'mc_sc_l', 'mc_sc_n', 'mc_sc_t',
-                        'sc_mc', 'sc_mc_p', 'sc_mc_l', 'sc_mc_n', 'sc_mc_t',
-                        'sc_sc', 'sc_sc_p', 'sc_sc_l', 'sc_sc_n', 'sc_sc_t']
+        chain_combos = ['', '_p', '_l', '_n', '_t',
+                        '_mc_mc', '_mc_mc_p', '_mc_mc_l', '_mc_mc_n', '_mc_mc_t',
+                        '_mc_sc', '_mc_sc_p', '_mc_sc_l', '_mc_sc_n', '_mc_sc_t',
+                        '_sc_mc', '_sc_mc_p', '_sc_mc_l', '_sc_mc_n', '_sc_mc_t',
+                        '_sc_sc', '_sc_sc_p', '_sc_sc_l', '_sc_sc_n', '_sc_sc_t']
     else:
-        chain_combos = ['mc_mc', 'mc_sc', 'sc_mc', 'sc_sc']
+        chain_combos = ['', '_mc_mc', '_mc_sc', '_sc_mc', '_sc_sc']
 
     for chain_combo in chain_combos:
-        (properties_list['{}_{}'.format(interaction_type_long, chain_combo)],
+        (properties_list['{}{}'.format(interaction_type_long, chain_combo)],
          sub_list) = reverse_and_append(
-            '{}_{}'.format(interaction_type_abbrev, chain_combo.upper()),
-            strand_df, properties_list['{}_{}'.format(interaction_type_long, chain_combo)],
+            '{}{}'.format(interaction_type_abbrev, chain_combo.upper()),
+            strand_df, properties_list['{}{}'.format(interaction_type_long, chain_combo)],
             reverse, res_ids_list, strand_or_res
         )
 
@@ -338,16 +339,16 @@ def gen_interaction_lists(properties_list, interaction_type_abbrev,
          ) = output_calcs.convert_res_id_to_fasta(
             sub_list, res_id_to_fasta_dict, True, chain_id
         )
-        (properties_list['{}_fasta_intra_{}'.format(interaction_type_long, chain_combo)]
+        (properties_list['{}_fasta_intra{}'.format(interaction_type_long, chain_combo)]
          ) = append_to_output_lists(
             fasta_sub_list_intra,
-            properties_list['{}_fasta_intra_{}'.format(interaction_type_long, chain_combo)],
+            properties_list['{}_fasta_intra{}'.format(interaction_type_long, chain_combo)],
             res_ids_list, strand_or_res
         )
-        (properties_list['{}_fasta_inter_{}'.format(interaction_type_long, chain_combo)]
+        (properties_list['{}_fasta_inter{}'.format(interaction_type_long, chain_combo)]
          ) = append_to_output_lists(
             fasta_sub_list_inter,
-            properties_list['{}_fasta_inter_{}'.format(interaction_type_long, chain_combo)],
+            properties_list['{}_fasta_inter{}'.format(interaction_type_long, chain_combo)],
             res_ids_list, strand_or_res
         )
 
@@ -441,6 +442,16 @@ class gen_output(run_stages):
                                        'bridge_pairs': [],
                                        'hb_pairs': [],
                                        'nhb_pairs': [],
+                                       'van_der_waals': [],
+                                       'h_bonds': [],
+                                       'ionic': [],
+                                       'ss_bonds': [],
+                                       'pi_pi_stacking': [],
+                                       'pi_pi_stacking_p': [],
+                                       'pi_pi_stacking_n': [],
+                                       'pi_pi_stacking_l': [],
+                                       'pi_pi_stacking_t': [],
+                                       'cation_pi': [],
                                        'van_der_waals_mc_mc': [],
                                        'h_bonds_mc_mc': [],
                                        'ionic_mc_mc': [],
@@ -489,6 +500,16 @@ class gen_output(run_stages):
                                        'bridge_pairs_fasta_intra': [],
                                        'hb_pairs_fasta_intra': [],
                                        'nhb_pairs_fasta_intra': [],
+                                       'van_der_waals_fasta_intra': [],
+                                       'h_bonds_fasta_intra': [],
+                                       'ionic_fasta_intra': [],
+                                       'ss_bonds_fasta_intra': [],
+                                       'pi_pi_stacking_fasta_intra': [],
+                                       'pi_pi_stacking_fasta_intra_p': [],
+                                       'pi_pi_stacking_fasta_intra_n': [],
+                                       'pi_pi_stacking_fasta_intra_l': [],
+                                       'pi_pi_stacking_fasta_intra_t': [],
+                                       'cation_pi_fasta_intra': [],
                                        'van_der_waals_fasta_intra_mc_mc': [],
                                        'h_bonds_fasta_intra_mc_mc': [],
                                        'ionic_fasta_intra_mc_mc': [],
@@ -533,6 +554,16 @@ class gen_output(run_stages):
                                        'bridge_pairs_fasta_inter': [],
                                        'hb_pairs_fasta_inter': [],
                                        'nhb_pairs_fasta_inter': [],
+                                       'van_der_waals_fasta_inter': [],
+                                       'h_bonds_fasta_inter': [],
+                                       'ionic_fasta_inter': [],
+                                       'ss_bonds_fasta_inter': [],
+                                       'pi_pi_stacking_fasta_inter': [],
+                                       'pi_pi_stacking_fasta_inter_p': [],
+                                       'pi_pi_stacking_fasta_inter_n': [],
+                                       'pi_pi_stacking_fasta_inter_l': [],
+                                       'pi_pi_stacking_fasta_inter_t': [],
+                                       'cation_pi_fasta_inter': [],
                                        'van_der_waals_fasta_inter_mc_mc': [],
                                        'h_bonds_fasta_inter_mc_mc': [],
                                        'ionic_fasta_inter_mc_mc': [],

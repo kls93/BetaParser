@@ -22,7 +22,7 @@ class calculate_residue_interaction_network(run_stages):
             if not os.path.isfile('ring/{}.ring'.format(domain_id[0:4])):
                 print('Running RING for {}'.format(domain_id[0:4]))
                 os.system(
-                    '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 > ring/{}.ring'.format(
+                    '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 --all_edges > ring/{}.ring'.format(
                         domain_id[0:4], domain_id[0:4]
                     )
                 )
@@ -36,7 +36,17 @@ class calculate_residue_interaction_network(run_stages):
 
             dssp_df = sec_struct_dfs_dict[domain_id]
 
-            interactions = {'VDW_MC_MC': {},
+            interactions = {'VDW': {},
+                            'HBOND': {},
+                            'IONIC': {},
+                            'SSBOND': {},
+                            'PIPISTACK': {},
+                            'PIPISTACK_P': {},
+                            'PIPISTACK_N': {},
+                            'PIPISTACK_L': {},
+                            'PIPISTACK_T': {},
+                            'PICATION': {},
+                            'VDW_MC_MC': {},
                             'HBOND_MC_MC': {},
                             'IONIC_MC_MC': {},
                             'SSBOND_MC_MC': {},
@@ -119,7 +129,21 @@ class calculate_residue_interaction_network(run_stages):
                         interaction_type, aa_2_label, aa_1_label
                     )
 
-                    # Records interaction for both residues involved
+                    # Records side-chain and main-chain interactions in a
+                    # single list
+                    if interaction_type in list(interactions.keys()):
+                        if (
+                            aa_1 in list(interactions[interaction_type].keys())
+                            and aa_2 not in interactions[interaction_type][aa_1]
+                        ):
+                            interactions[interaction_type][aa_1].append(aa_2)
+                        if (
+                            aa_2 in list(interactions[interaction_type].keys())
+                            and aa_1 not in interactions[interaction_type][aa_2]
+                        ):
+                            interactions[interaction_type][aa_2].append(aa_1)
+
+                    # Records side-chain and main-chain interactions separately
                     if (
                         aa_1_interaction_type in list(interactions.keys())
                         and aa_2_interaction_type in list(interactions.keys())
@@ -140,6 +164,22 @@ class calculate_residue_interaction_network(run_stages):
                         orientation = line.split()[-2]
                         if orientation in ['T-EF', 'T-FE']:
                             orientation = 'T'
+
+                        # Records side-chain and main-chain interactions in a
+                        # single list
+                        interaction_orientation = '{}_{}'.format(
+                            interaction_type, orientation
+                        )
+                        if aa_1 in list(interactions[interaction_orientation].keys()):
+                            interactions[interaction_orientation][aa_1].append(aa_2)
+
+                        interaction_orientation = '{}_{}'.format(
+                            interaction_type, orientation
+                        )
+                        if aa_2 in list(interactions[interaction_orientation].keys()):
+                            interactions[interaction_orientation][aa_2].append(aa_1)
+
+                        # Records side-chain and main-chain interactions separately
                         aa_1_interaction_orientation = '{}_{}'.format(
                             aa_1_interaction_type, orientation
                         )
@@ -152,7 +192,17 @@ class calculate_residue_interaction_network(run_stages):
                         if aa_2 in list(interactions[aa_2_interaction_orientation].keys()):
                             interactions[aa_2_interaction_orientation][aa_2].append(aa_1)
 
-                ring_df_dict = OrderedDict({'VDW_MC_MC': ['']*dssp_df.shape[0],
+                ring_df_dict = OrderedDict({'VDW': ['']*dssp_df.shape[0],
+                                            'HBOND': ['']*dssp_df.shape[0],
+                                            'IONIC': ['']*dssp_df.shape[0],
+                                            'SSBOND': ['']*dssp_df.shape[0],
+                                            'PIPISTACK': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_P': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_N': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_L': ['']*dssp_df.shape[0],
+                                            'PIPISTACK_T': ['']*dssp_df.shape[0],
+                                            'PICATION': ['']*dssp_df.shape[0],
+                                            'VDW_MC_MC': ['']*dssp_df.shape[0],
                                             'HBOND_MC_MC': ['']*dssp_df.shape[0],
                                             'IONIC_MC_MC': ['']*dssp_df.shape[0],
                                             'SSBOND_MC_MC': ['']*dssp_df.shape[0],
