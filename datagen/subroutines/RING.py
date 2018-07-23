@@ -48,6 +48,7 @@ class calculate_residue_interaction_network(run_stages):
                             'PICATION': {},
                             'VDW_MC_MC': {},
                             'HBOND_MC_MC': {},
+                            'HBOND_MC_MC_all': {},
                             'IONIC_MC_MC': {},
                             'SSBOND_MC_MC': {},
                             'PIPISTACK_MC_MC': {},
@@ -159,6 +160,17 @@ class calculate_residue_interaction_network(run_stages):
                         ):
                             interactions[aa_2_interaction_type][aa_2].append(aa_1)
 
+                    # Records all backbone hydrogen bonding interactions (i.e.
+                    # residues can be listed more than once), to allow the
+                    # identification of beta-bridge pairs that interact via two
+                    # or more hydrogen bonds as "HB pairs" in a later step
+                    if (
+                        aa_1_interaction_type == 'HBOND_MC_MC'
+                        and aa_2_interaction_type == 'HBOND_MC_MC'
+                    ):
+                        interactions['H_BOND_MC_MC_all'][aa_1].append(aa_2)
+                        interactions['H_BOND_MC_MC_all'][aa_2].append(aa_1)
+
                     # Records the orientation of pi-pi stacking interactions
                     if interaction_type == 'PIPISTACK':
                         orientation = line.split()[-2]
@@ -204,6 +216,7 @@ class calculate_residue_interaction_network(run_stages):
                                             'PICATION': ['']*dssp_df.shape[0],
                                             'VDW_MC_MC': ['']*dssp_df.shape[0],
                                             'HBOND_MC_MC': ['']*dssp_df.shape[0],
+                                            'HBOND_MC_MC_all': ['']*dssp_df.shape[0],
                                             'IONIC_MC_MC': ['']*dssp_df.shape[0],
                                             'SSBOND_MC_MC': ['']*dssp_df.shape[0],
                                             'PIPISTACK_MC_MC': ['']*dssp_df.shape[0],

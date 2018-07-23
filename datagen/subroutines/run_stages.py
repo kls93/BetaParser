@@ -58,6 +58,7 @@ class run_stages():
         return
 
     def run_stage_2(self, cdhit_entries, cdhit_output):
+        # To be run on local machine within ISAMBARD (in docker container).
         if __name__ == 'subroutines.run_stages':
             from subroutines.extract_coordinates import extract_beta_structure_coords
             from subroutines.DSSP import beta_structure_dssp_classification
@@ -180,6 +181,7 @@ class run_stages():
                          dssp_to_pdb_dict, radius), pickle_file)
 
     def run_stage_4(self, orig_dir):
+        # To be run on local machine (in docker container).
         if __name__ == 'subroutines.run_stages':
             from subroutines.RING import calculate_residue_interaction_network
             from subroutines.OPM import (

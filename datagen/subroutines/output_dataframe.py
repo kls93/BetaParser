@@ -205,9 +205,9 @@ class output_calcs():
             nhb_sub_list = []
             for index, pdb_num in enumerate(bridges_renum):
                 if pdb_num != '' and strand_df['ORIENTATION'][row][index] == 'A':
-                    if pdb_num in strand_df['HBOND_MC_MC'][row]:
+                    if strand_df['HBOND_MC_MC_all'][row].count(pdb_num) == 2:
                         hb_sub_list.append(pdb_num)
-                    else:
+                    elif not pdb_num in strand_df['H_BOND_MC_MC_all'][row]:
                         nhb_sub_list.append(pdb_num)
             hb_list[row] = hb_sub_list
             nhb_list[row] = nhb_sub_list
