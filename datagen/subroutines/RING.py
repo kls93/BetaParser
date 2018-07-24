@@ -168,8 +168,14 @@ class calculate_residue_interaction_network(run_stages):
                         aa_1_interaction_type == 'HBOND_MC_MC'
                         and aa_2_interaction_type == 'HBOND_MC_MC'
                     ):
-                        interactions['H_BOND_MC_MC_all'][aa_1].append(aa_2)
-                        interactions['H_BOND_MC_MC_all'][aa_2].append(aa_1)
+                        if (
+                            aa_1 in list(interactions['HBOND_MC_MC_all'].keys())
+                        ):
+                            interactions['HBOND_MC_MC_all'][aa_1].append(aa_2)
+                        if (
+                            aa_2 in list(interactions['HBOND_MC_MC_all'].keys())
+                        ):
+                            interactions['HBOND_MC_MC_all'][aa_2].append(aa_1)
 
                     # Records the orientation of pi-pi stacking interactions
                     if interaction_type == 'PIPISTACK':

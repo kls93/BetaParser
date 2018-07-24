@@ -184,10 +184,8 @@ class output_calcs():
         return membrane_loc
 
     def convert_dssp_num_to_res_id(strand_df, dssp_df, dssp_to_pdb_sub_dict):
-        # Converts bridge pairs extracted from DSSP file to res_ids. NOTE: will
-        # only list bridge partners that are also in the retained
-        # beta-sandwich/barrel strands. Bridge pairs are split into hydrogen
-        # bonding and non-hydrogen bonding pairs.
+        # Converts bridge pairs extracted from DSSP file to res_ids. Bridge
+        # pairs are split into hydrogen bonding and non-hydrogen bonding pairs.
         hb_list = ['']*strand_df.shape[0]
         nhb_list = ['']*strand_df.shape[0]
         bridge_pairs_list = []
@@ -207,7 +205,7 @@ class output_calcs():
                 if pdb_num != '' and strand_df['ORIENTATION'][row][index] == 'A':
                     if strand_df['HBOND_MC_MC_all'][row].count(pdb_num) == 2:
                         hb_sub_list.append(pdb_num)
-                    elif not pdb_num in strand_df['H_BOND_MC_MC_all'][row]:
+                    elif not pdb_num in strand_df['HBOND_MC_MC_all'][row]:
                         nhb_sub_list.append(pdb_num)
             hb_list[row] = hb_sub_list
             nhb_list[row] = nhb_sub_list
