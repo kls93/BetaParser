@@ -307,34 +307,34 @@ def gen_run_parameters(args):
         run_parameters['structuredatabase'] == 'CATH'
         and run_parameters['id'][0:4] in ['2.40']
     ):
-        if 'discardtm' in run_parameters:
+        if 'discardnontm' in run_parameters:
             try:
-                run_parameters['discardtm'] = run_parameters['discardtm'].lower()
-                if not run_parameters['discardtm'] in ['yes', 'no', 'y', 'n', 'true', 'false']:
+                run_parameters['discardnontm'] = run_parameters['discardnontm'].lower()
+                if not run_parameters['discardnontm'] in ['yes', 'no', 'y', 'n', 'true', 'false']:
                     print('Discard TM structures selection not recognised')
-                    run_parameters.pop('discardtm')
+                    run_parameters.pop('discardnontm')
             except SyntaxError:
                 print('Discard TM structures selection not recognised')
-                run_parameters.pop('discardtm')
+                run_parameters.pop('discardnontm')
 
-        if not 'discardtm' in run_parameters:
+        if not 'discardnontm' in run_parameters:
             print('Discard non-TM structures?')
-            discard_tm = ''
-            while not discard_tm in ['yes', 'no', 'y', 'n', 'true', 'false']:
-                discard_tm = input(prompt).lower()
-                if discard_tm in ['yes', 'no', 'y', 'n', 'true', 'false']:
-                    run_parameters['discardtm'] = discard_tm
+            discard_non_tm = ''
+            while not discard_non_tm in ['yes', 'no', 'y', 'n', 'true', 'false']:
+                discard_non_tm = input(prompt).lower()
+                if discard_non_tm in ['yes', 'no', 'y', 'n', 'true', 'false']:
+                    run_parameters['discardnontm'] = discard_non_tm
                     break
                 else:
                     print('Input not recognised - please enter "yes" or "no"')
 
     else:
-        run_parameters['discardtm'] = 'no'
+        run_parameters['discardnontm'] = 'no'
 
-    if run_parameters['discardtm'] in ['yes', 'y', 'true']:
-        run_parameters['discardtm'] = True
-    elif run_parameters['discardtm'] in ['no', 'n', 'false']:
-        run_parameters['discardtm'] = False
+    if run_parameters['discardnontm'] in ['yes', 'y', 'true']:
+        run_parameters['discardnontm'] = True
+    elif run_parameters['discardnontm'] in ['no', 'n', 'false']:
+        run_parameters['discardnontm'] = False
 
     # Creates and / or sets the output directory as the current working
     # directory
@@ -369,7 +369,7 @@ def gen_run_parameters(args):
                               'Resolution: {}\n'.format(run_parameters['resolution']) +
                               'Rfactor: {}\n'.format(run_parameters['rfactor']) +
                               'Suffix: {}\n'.format(run_parameters['suffix']) +
-                              'Discard TM: {}\n'.format(run_parameters['discardtm']))
+                              'Discard non TM: {}\n'.format(run_parameters['discardnontm']))
 
     return stage, run_parameters
 

@@ -36,7 +36,7 @@ def gen_domain_desc_list(orig_dir):
     return domains_desc
 
 
-def domain_desc_filter(cathcode, domains_desc, discard_tm):
+def domain_desc_filter(cathcode, domains_desc, discard_non_tm):
     # Filters the domain descriptions list for beta-structures (either
     # sandwiches or barrels depending upon the user's choice), picking out PDB
     # accession codes and sequences, whose values are stored in a dataframe.
@@ -61,14 +61,14 @@ def domain_desc_filter(cathcode, domains_desc, discard_tm):
                     (code.count('.') < 3 and 'CATHCODE  {}.'.format(code) in domain)
             ):
                 # Discards structures whose PDB codes are not in the OPM
-                # database if the user has set discard_tm to True
+                # database if the user has set discard_non_tm to True
                 domain_sublist = domain.split('\n')
                 pdb_code = [line for line in domain_sublist if
                             line.startswith('DOMAIN')][0][10:14]
                 if (
-                        (discard_tm is True and pdb_code in tm_pdb_codes)
+                        (discard_non_tm is True and pdb_code in tm_pdb_codes)
                         or
-                        (discard_tm is False)
+                        (discard_non_tm is False)
                 ):
                     dseqs_list = []
                     sseqs_consec_list = []

@@ -421,6 +421,7 @@ class gen_output(run_stages):
                                        'indv_strand_number': [],
                                        'shear_number': [],
                                        'res_ids': [],
+                                       'res_nums': [],
                                        'edge_or_central': [],
                                        'fasta_seq': [],
                                        'z_coords': [],
@@ -699,6 +700,14 @@ class gen_output(run_stages):
                 res_ids_list = reverse_strand_lists(res_ids_list, reverse)
                 properties_list['res_ids'] = append_to_output_lists(
                     res_ids_list, properties_list['res_ids'], res_ids_list,
+                    strand_or_res
+                )
+
+                # Lists residue numbers in strand
+                res_nums_list = strand_df['RESNUM'].tolist()
+                res_nums_list = reverse_strand_lists(res_nums_list, reverse)
+                properties_list['res_nums'] = append_to_output_lists(
+                    res_nums_list, properties_list['res_nums'], res_ids_list,
                     strand_or_res
                 )
 
@@ -998,7 +1007,7 @@ class gen_output(run_stages):
                 )
 
             # Ensures that domain is transmembrane
-            if self.discard_tm and sorted(set(strands_list)) == sorted(set(unprocessed_strands)):
+            if self.discard_non_tm and sorted(set(strands_list)) == sorted(set(unprocessed_strands)):
                 unprocessed_list.append(domain_id)
 
         # Generates csv file of beta-barrel dataset
