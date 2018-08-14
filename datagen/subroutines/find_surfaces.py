@@ -13,6 +13,55 @@ else:
     from datagen.subroutines.run_stages import run_stages
 
 
+def align_with_z_axis(ampal_object, xyz_coords, coord_dict, xy_or_z,
+                      rel_to_centre, unprocessed_list, domain_id):
+    s1 = [xyz_coords[0], xyz_coords[1], xyz_coords[2]]
+    e1 = [xyz_coords[3], xyz_coords[4], xyz_coords[5]]
+    s2 = [0.0, 0.0, 0.0]
+    e2 = [0.0, 0.0, 1.0]
+    translation, angle, axis, point = isambard.geometry.find_transformations(
+        s1, e1, s2, e2
+    )
+    ampal_object.rotate(angle, axis, point=point)  # ROTATION MUST BE PERFORMED
+    # BEFORE TRANSLATION
+    ampal_object.translate(translation)
+
+    # Generates dictionary of residues and their new xyz coordinates
+    object_pdb_string = ampal_object.make_pdb().split('\n')
+    sub_dict = OrderedDict()
+
+    for line in object_pdb_string:
+        if line[0:6].strip() in ['ATOM', 'HETATM']:
+            if len(line) > 80:
+                unprocessed_list.append(domain_id)
+                break
+            else:
+                atom_id = line[21:27].replace(' ', '') + '_' + line[12:16].strip()
+
+                x_coord_atom = float(line[30:38])
+                y_coord_atom = float(line[38:46])
+                z_coord_atom = float(line[46:54])
+                if xy_or_z == 'xy':
+                    xy_coords = np.array([[x_coord_atom],
+                                          [y_coord_atom]])
+                    sub_dict[atom_id] = xy_coords
+                elif xy_or_z == 'z':
+                    sub_dict[atom_id] = z_coord_atom
+
+    if rel_to_centre is True:
+        avrg_z_coord = np.sum(np.array(list(sub_dict.values())))
+
+        for atom_id in list(sub_dict.keys()):
+            z_coord = sub_dict[atom_id]
+            new_z_coord = abs(z_coord - avrg_z_coord)
+            sub_dict[atom_id] = new_z_coord
+
+    for atom_id in list(sub_dict.keys()):
+        coord_dict[atom_id] = sub_dict[atom_id]
+
+    return coord_dict, unprocessed_list
+
+
 class barrel_interior_exterior_calcs():
 
     def find_strands_network(G, domain_id, unprocessed_list):
@@ -124,35 +173,13 @@ class barrel_interior_exterior_calcs():
             'Beta_strands/{}.pdb'.format(domain_id)
         )
 
-        # Aligns the barrel with z-axis
-        s1 = [xyz_coords[0], xyz_coords[1], xyz_coords[2]]
-        e1 = [xyz_coords[3], xyz_coords[4], xyz_coords[5]]
-        s2 = [0.0, 0.0, 0.0]
-        e2 = [0.0, 0.0, 1.0]
-        translation, angle, axis, point = isambard.geometry.find_transformations(
-            s1, e1, s2, e2
-        )
-        barrel.rotate(angle, axis, point=point)  # ROTATION MUST BE PERFORMED
-        # BEFORE TRANSLATION
-        barrel.translate(translation)
-
-        # Generates dictionary of residues and their new xyz coordinates
-        barrel_pdb_string = barrel.make_pdb().split('\n')
+        # Aligns barrel with the z-axis, returns dictionary of atom ids and
+        # their corresponding x and y coordinates in the aligned barrel
         xy_dict = OrderedDict()
-
-        for line in barrel_pdb_string:
-            if line[0:6].strip() in ['ATOM', 'HETATM']:
-                if len(line) > 80:
-                    unprocessed_list.append(domain_id)
-                    break
-                else:
-                    atom_id = line[21:27].replace(' ', '') + '_' + line[12:16].strip()
-
-                    x_coord_atom = float(line[30:38])
-                    y_coord_atom = float(line[38:46])
-                    xy_coords = np.array([[x_coord_atom],
-                                          [y_coord_atom]])
-                    xy_dict[atom_id] = xy_coords
+        xy_dict, unprocessed_list = align_with_z_axis(
+            barrel, xyz_coords, xy_dict, 'xy', False, unprocessed_list,
+            domain_id
+        )
 
         return xy_dict, unprocessed_list
 
@@ -163,9 +190,10 @@ class barrel_interior_exterior_calcs():
         count = 0
 
         for res_id in list(xy_dict.keys()):
-            if (res_id.split('_')[0] in sheets_df['RES_ID'].tolist()
-                    and res_id.split('_')[1] == 'CA'
-                    ):
+            if (
+                res_id.split('_')[0] in sheets_df['RES_ID'].tolist()
+                and res_id.split('_')[1] == 'CA'
+            ):
                 x_sum += xy_dict[res_id][0][0]
                 y_sum += xy_dict[res_id][1][0]
                 count += 1
@@ -231,211 +259,137 @@ class barrel_interior_exterior_calcs():
         return int_ext_dict
 
 
-class sandwich_interior_exterior_calcs():
+class sandwich_strand_position_calcs():
 
-    def find_z_axis(sheets_df):
-        # Finds axis between the two sheets of the beta-sandwiches as the
-        # average vector between its hydrogen bonded residues
-        """
-        # Generates dataframe of longest strand and its longest neighbouring
-        # strand
-        strands = set(sheets_df['STRAND_NUM'].tolist())
-        strand_len = [0]*max(strands)
+    def find_strand_principal_components(domain_id, sheets_df):
+        # Finds principal component of the C_alpha atoms of each individual
+        # strand in input beta-sandwich structure
+        res_ids_dict = OrderedDict()
+        princ_comp_coords_dict = OrderedDict()
 
-        for row in range(sheets_df.shape[0]):
-            if sheets_df['ATMNAME'][row] == 'CA':
-                strand_len[(sheets_df['STRAND_NUM'][row]) - 1] += 1
+        # Makes ordered list of strand ids in sheet_df
+        strand_ids_all = sheets_df['STRAND_NUM'].tolist()
+        strand_ids = []
+        for strand_id in strand_ids_all:
+            if not strand_id in strand_ids:
+                strand_ids.append(strand_id)
 
-        longest_strand = strand_len.index(max(strand_len)) + 1
-        sheets_df = sheets_df[~sheets_df['STRAND_NUM'].isin([longest_strand])]
-        sheets_df = sheets_df.reset_index(drop=True)
-        sheets_df = sheets_df.iloc[::5, :]
-        sheets_df = sheets_df.reset_index(drop=True)
-        """
+        # Calculates principal component of each strand and stores the
+        # resulting coordinates in a dictionary
+        for strand_id in strand_ids:
+            print(
+                'Calculating principal component of {} strand {}'.format(
+                    domain_id, strand_id
+                )
+            )
 
-        # Extracts hydrogen bonded residues
-        h_bonds_dict = {}
-        for row in range(sheets_df.shape[0]):
-            if sheets_df['SHEET?'][row] == 'E':
-                res_1 = sheets_df['DSSP_NUM'][row]
-                res_2 = sheets_df['BRIDGE_PAIRS'][row][0]
-                res_3 = sheets_df['BRIDGE_PAIRS'][row][1]
+            strand_df = sheets_df[sheets_df['STRAND_NUM'] == strand_id]
+            strand_df = strand_df.reset_index(drop=True)
 
-                if res_2 != '0':
-                    pair_1 = [str(min([int(res_1), int(res_2)])),
-                              str(max([int(res_1), int(res_2)]))]
-                    if pair_1[0] not in list(h_bonds_dict.keys()):
-                        h_bonds_dict[pair_1[0]] = pair_1[1]
-                if res_3 != '0':
-                    pair_2 = [str(min([int(res_1), int(res_3)])),
-                              str(max([int(res_1), int(res_3)]))]
-                    if pair_2[0] not in list(h_bonds_dict.keys()):
-                        h_bonds_dict[pair_2[0]] = pair_2[1]
+            res_ids_dict[strand_id] = strand_df['RES_ID'].tolist()
 
-        # Calculates vectors between C_alpha atoms of hydrogen bonded residues
-        vectors_array = np.empty((len(list(h_bonds_dict.keys())), 3))
-        for index, res_1 in enumerate(list(h_bonds_dict.keys())):
-            res_2 = h_bonds_dict[res_1]
-            xyz_1 = np.array([])
-            xyz_2 = np.array([])
+            xyz = np.zeros((strand_df.shape[0], 3))
+            for row in range(strand_df.shape[0]):
+                xyz[row][0] = strand_df['XPOS'][row]
+                xyz[row][1] = strand_df['YPOS'][row]
+                xyz[row][2] = strand_df['ZPOS'][row]
 
-            for row in range(sheets_df.shape[0]):
-                if sheets_df['DSSP_NUM'][row] == res_1:
-                    x_1 = sheets_df['XPOS'][row]
-                    y_1 = sheets_df['YPOS'][row]
-                    z_1 = sheets_df['ZPOS'][row]
-                    xyz_1 = np.array([[x_1],
-                                      [y_1],
-                                      [z_1]])
-                elif sheets_df['DSSP_NUM'][row] == res_2:
-                    x_2 = sheets_df['XPOS'][row]
-                    y_2 = sheets_df['YPOS'][row]
-                    z_2 = sheets_df['ZPOS'][row]
-                    xyz_2 = np.array([[x_2],
-                                      [y_2],
-                                      [z_2]])
-                    break
+            xyz_centred = xyz - xyz.mean(axis=0)
 
-            # Excludes beta-bridge pairs from the z-axis calculation (since
-            # these residues will be included in the DSSP hydrogen-bonding
-            # interactions, but not in the dataframe of residues in the
-            # beta-sheets)
-            if xyz_1.size and xyz_2.size:
-                # TODO: Ensure that only consider vectors pointing in the same
-                # direction (select central vector between two largest strands,
-                # then if subsequent vectors are > 90 apart then ignore?)
-                vectors_array[index][0] = xyz_2[0][0] - xyz_1[0][0]
-                vectors_array[index][1] = xyz_2[1][0] - xyz_1[1][0]
-                vectors_array[index][2] = xyz_2[2][0] - xyz_1[2][0]
+            U, S, V = np.linalg.svd(xyz_centred, full_matrices=True)
 
-        vector = np.mean(vectors_array, axis=0)
+            # NEED TO INTRODUCE CHECK TO ENSURE THAT THIS IS THE EIGENVECTOR WITH THE LARGEST CORRESPONDING EIGENVALUE!
+            princ_comp_coords_centred = V[0] * np.array([[-1], [1]])
+            princ_comp_coords = princ_comp_coords_centred + xyz.mean(axis=0)
+            princ_comp_coords = [princ_comp_coords[0][0], princ_comp_coords[0][1],
+                                 princ_comp_coords[0][2], princ_comp_coords[1][0],
+                                 princ_comp_coords[1][1], princ_comp_coords[1][2]]
 
-        return vector
+            princ_comp_coords_dict[strand_id] = princ_comp_coords
 
-    def align_sandwich(domain_id, vector, unprocessed_list):
-        # Aligns the sandwich to z-axis using the reference axis through the
-        # sandwich core calculated in the previous step
-        print('Aligning {} sandwich with z-axis'.format(domain_id))
+        return princ_comp_coords_dict
 
-        # Creates AMPAL object from sandwich. Protons are added (using reduce)
-        # to allow DataGen to use hydrogen HA3 of a glycine residue as a proxy
-        # for the C_alpha atoms of the chiral amino acids in the interior- /
-        # exterior-facing calculation performed in the following step.
-        sandwich = isambard.external_programs.reduce.assembly_plus_protons(
+    def align_strand_to_princ_comp(domain_id, dssp_df, princ_comp_coords_dict,
+                                   res_ids_dict, unprocessed_list):
+        # Aligns each strand to its principal component and extracts the
+        # z_coordinates of the C_alpha atoms in the aligned strand
+        z_dict = OrderedDict()
+
+        for strand_id in list(res_ids_dict.keys()):
+            print(
+                'Aligning {} strand {} with its principal component'.format(
+                    domain_id, strand_id
+                )
+            )
+
+            pdb_file_lines = []
+
+            for row in range(dssp_df.shape[0]):
+                if dssp_df['RES_ID'][row] in res_ids_dict[strand_id]:
+                    pdb_file_lines.append(dssp_df['PDB_FILE_LINES'][row])
+
+            pdb_file_lines = ('\n').join(pdb_file_lines)
+            pdb_file_lines = pdb_file_lines + '\nEND\n'
+
+            # Creates AMPAL object from sandwich PDB structure
+            strand = isambard.ampal.convert_pdb_to_ampal(
+                pdb_file_lines, path=False
+            )
+
+            # Aligns strand with the z-axis, returns dictionary of atom ids and
+            # their corresponding x and y coordinates in the aligned strand
+            z_dict, unprocessed_list = align_with_z_axis(
+                strand, princ_comp_coords_dict[strand_id], z_dict, 'z', True,
+                unprocessed_list, domain_id
+            )
+
+        return z_dict, unprocessed_list
+
+    def align_sandwich_to_princ_comp(domain_id, princ_comp_coords_dict,
+                                     res_ids_dict, unprocessed_list):
+        # Aligns entire beta-sandwich with the principal component of the
+        # longest strand, then extracts the z-coordinates of the C_alpha atoms
+        # in the aligned sandwich structure
+        z_dict = OrderedDict()
+
+        strand_id = max(res_ids_dict, key=lambda x: len(res_ids_dict[x]))
+        sandwich = isambard.ampal.convert_pdb_to_ampal(
             'Beta_strands/{}.pdb'.format(domain_id)
         )
 
-        # Aligns the sandwich with z-axis
-        s1 = [0.0, 0.0, 0.0]
-        e1 = [vector[0], vector[1], vector[2]]
-        s2 = [0.0, 0.0, 0.0]
-        e2 = [0.0, 0.0, 1.0]
-        translation, angle, axis, point = isambard.geometry.find_transformations(
-            s1, e1, s2, e2
+        z_dict, unprocessed_list = align_with_z_axis(
+            sandwich, princ_comp_coords_dict[strand_id], z_dict, 'z', True,
+            unprocessed_list, domain_id
         )
-        sandwich.rotate(angle, axis, point=point)  # ROTATION MUST BE PERFORMED
-        # BEFORE TRANSLATION
-        sandwich.translate(translation)
 
-        # Generates dictionary of residues and their new xyz coordinates
-        sandwich_pdb_string = sandwich.make_pdb().split('\n')
-        xy_dict = OrderedDict()
+        return z_dict, unprocessed_list
 
-        for line in sandwich_pdb_string:
-            if line[0:6].strip() in ['ATOM', 'HETATM']:
-                if len(line) > 80:
-                    unprocessed_list.append(domain_id)
-                    break
-                else:
-                    atom_id = line[21:27].replace(' ', '') + '_' + line[12:16].strip()
+    def centre_z_coords(z_dict):
+        # Measures z-coordinates relative to either the centre of the parent
+        # strand or the centre of mass of the whole sandwich
 
-                    x_coord_atom = float(line[30:38])
-                    y_coord_atom = float(line[38:46])
-                    xy_coords = np.array([[x_coord_atom],
-                                          [y_coord_atom]])
-                    xy_dict[atom_id] = xy_coords
 
-        return xy_dict, unprocessed_list
+        return z_dict
 
-    def calc_int_ext(domain_id, dssp_df, xy_dict):
-        # Determines whether a residue is interior- or exterior-facing, based
-        # upon whether or not its C_beta atom lies on the same side of the
-        # plane between its N and C atoms as the centre of mass of the sandwich
+    def update_dataframe(dssp_df, z_dict_strand, z_dict_sandwich):
+        # Updates dataframe with z_coordinates (both relative to the parent
+        # strand and relative to the centre of mass of the entire sandwich
+        # input domain)
+        z_coord_parent_strand = ['']*dssp_df.shape[0]
+        z_coord_parent_domain = ['']*dssp_df.shape[0]
 
-        print('Determining interior and exterior residues in {}'.format(domain_id))
-
-        int_ext_dict = {}
-
-        # Calculates centre of mass of C_alpha atoms in sandwich
-        x_sum = 0
-        y_sum = 0
-        count = 0
-        for res in list(xy_dict.keys()):
-            if 'CA' in res:
-                x_sum += xy_dict[res][0][0]
-                y_sum += xy_dict[res][1][0]
-                count += 1
-        x_avrg = x_sum / count
-        y_avrg = y_sum / count
-
-        # For each residue, calculates whether the centre of mass and its
-        # C-beta atom lie on the same side of the plane formed between the
-        # residue's N and C atoms (= 'interior'), or on different sides
-        # (= 'exterior') (using the equation d=(x−x1)(y2−y1)−(y−y1)(x2−x1),
-        # where (x1, y1) and (x2, y2) describe the plane and (x, y) the point
-        # of interest (see https://math.stackexchange.com/questions/274712/
-        # calculate-on-which-side-of-a-straight-line-is-a-given-point-located
-        # ?noredirect=1&lq=1))
-        res_ids_dict = {}
         for row in range(dssp_df.shape[0]):
-            if dssp_df['RES_ID'][row] not in res_ids_dict:
-                res_ids_dict[dssp_df['RES_ID'][row]] = dssp_df['RESNAME'][row]
+            atom_id = '{}_{}'.format(dssp_df['RES_ID'][row], dssp_df['ATMNAME'][row])
+            if atom_id in list(z_dict_strand.keys()):
+                z_coord_strand[row] = z_dict_strand[atom_id]
+            if atom_id in list(z_dict_sandwich.keys()):
+                z_coord_sandwich[row] = z_dict_sandwich[atom_id]
 
-        for res in list(set(dssp_df['RES_ID'].tolist())):
-            n = False
-            c = False
-            cb = False
+        z_coord_df = pd.DataFrame(OrderedDict({'strand_z_coord': z_coord_sandwich,
+                                               'sandwich_z_coord': z_coord_sandwich}))
+        dssp_df = pd.concat([dssp_df, z_coord_df], axis=1)
 
-            xy_sub_dict = {key: value for key, value in xy_dict.items() if res
-                           in key}
-            for atom in list(xy_sub_dict.keys()):
-                if atom.endswith('_N'):
-                    n = True
-                    n_dist = math.sqrt(((xy_sub_dict[atom][0][0] - x_avrg)**2)
-                                       + ((xy_sub_dict[atom][1][0] - y_avrg)**2))
-                    n_x_coord = xy_sub_dict[atom][0][0]
-                    n_y_coord = xy_sub_dict[atom][1][0]
-                elif atom.endswith('_C'):
-                    c = True
-                    c_dist = math.sqrt(((xy_sub_dict[atom][0][0] - x_avrg)**2)
-                                       + ((xy_sub_dict[atom][1][0] - y_avrg)**2))
-                    c_x_coord = xy_sub_dict[atom][0][0]
-                    c_y_coord = xy_sub_dict[atom][1][0]
-                elif (
-                    (atom.endswith('_CB'))
-                    or
-                    (res_ids_dict[atom.split('_')[0]] == 'GLY' and atom.endswith('HA3'))
-                ):
-                    cb = True
-                    cb_x_coord = xy_sub_dict[atom][0][0]
-                    cb_y_coord = xy_sub_dict[atom][1][0]
-
-            if all(x is True for x in [n, c, cb]):
-                distance_com = (((x_avrg-n_x_coord)*(c_y_coord-n_y_coord)) -
-                                ((y_avrg-n_y_coord)*(c_x_coord-n_x_coord)))
-                distance_cb = (((cb_x_coord-n_x_coord)*(c_y_coord-n_y_coord)) -
-                               ((cb_y_coord-n_y_coord)*(c_x_coord-n_x_coord)))
-
-                if (
-                    (distance_com < 0 and distance_cb < 0)
-                    or
-                    (distance_com > 0 and distance_cb > 0)
-                ):
-                    int_ext_dict[res] = 'interior'  # 2 points lie on the same side of the plane
-                else:
-                    int_ext_dict[res] = 'exterior'  # 2 points lie either side of the plane
-
-        return int_ext_dict
+        return dssp_df
 
 
 class int_ext_pipeline():
@@ -516,9 +470,10 @@ class int_ext_pipeline():
         # Updates dataframe to identify interior- / exterior-facing residues
         for row in range(dssp_df.shape[0]):
             res_id = dssp_df['RES_ID'][row]
-            if (res_id in list(int_ext_dict.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
-                ):
+            if (
+                res_id in list(int_ext_dict.keys())
+                and dssp_df['ATMNAME'][row] == 'CA'
+            ):
                 int_ext_list[row] = int_ext_dict[res_id]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
@@ -544,12 +499,15 @@ class int_ext_pipeline():
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-        # Calculates z-axis between the two beta-sheets
+        # Creates dataframe of C_alpha atoms in sandwich
         sheet_ids = [sheet.replace('{}_sheet_'.format(domain_id), '') for sheet
                      in set(sheets.keys()) if sheet != '']
         sheets_df = dssp_df[dssp_df['SHEET_NUM'].isin(sheet_ids)]
         sheets_df = sheets_df.reset_index(drop=True)
 
+        # Calculates principal component of each strand in sandwich
+
+        # Calculates z-axis between the two beta-sheets
         vector = sandwich_interior_exterior_calcs.find_z_axis(sheets_df)
 
         # Aligns the beta-sandwich with z-axis
@@ -573,9 +531,10 @@ class int_ext_pipeline():
         # Updates dataframe to identify interior- / exterior-facing residues
         int_ext_list = ['']*dssp_df.shape[0]
         for row in range(dssp_df.shape[0]):
-            if (dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
-                    and dssp_df['ATMNAME'][row] == 'CA'
-                ):
+            if (
+                dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
+                and dssp_df['ATMNAME'][row] == 'CA'
+            ):
                 int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
         int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
         dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)

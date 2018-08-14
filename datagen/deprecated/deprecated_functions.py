@@ -1,4 +1,211 @@
 
+class sandwich_interior_exterior_calcs():
+
+    def find_z_axis(sheets_df):
+        # Finds axis between the two sheets of the beta-sandwiches as the
+        # average vector between its hydrogen bonded residues
+        """
+        # Generates dataframe of longest strand and its longest neighbouring
+        # strand
+        strands = set(sheets_df['STRAND_NUM'].tolist())
+        strand_len = [0]*max(strands)
+
+        for row in range(sheets_df.shape[0]):
+            if sheets_df['ATMNAME'][row] == 'CA':
+                strand_len[(sheets_df['STRAND_NUM'][row]) - 1] += 1
+
+        longest_strand = strand_len.index(max(strand_len)) + 1
+        sheets_df = sheets_df[~sheets_df['STRAND_NUM'].isin([longest_strand])]
+        sheets_df = sheets_df.reset_index(drop=True)
+        sheets_df = sheets_df.iloc[::5, :]
+        sheets_df = sheets_df.reset_index(drop=True)
+        """
+
+        # Extracts hydrogen bonded residues
+        h_bonds_dict = {}
+        for row in range(sheets_df.shape[0]):
+            if sheets_df['SHEET?'][row] == 'E':
+                res_1 = sheets_df['DSSP_NUM'][row]
+                res_2 = sheets_df['BRIDGE_PAIRS'][row][0]
+                res_3 = sheets_df['BRIDGE_PAIRS'][row][1]
+
+                if res_2 != '0':
+                    pair_1 = [str(min([int(res_1), int(res_2)])),
+                              str(max([int(res_1), int(res_2)]))]
+                    if pair_1[0] not in list(h_bonds_dict.keys()):
+                        h_bonds_dict[pair_1[0]] = pair_1[1]
+                if res_3 != '0':
+                    pair_2 = [str(min([int(res_1), int(res_3)])),
+                              str(max([int(res_1), int(res_3)]))]
+                    if pair_2[0] not in list(h_bonds_dict.keys()):
+                        h_bonds_dict[pair_2[0]] = pair_2[1]
+
+        # Calculates vectors between C_alpha atoms of hydrogen bonded residues
+        vectors_array = np.empty((len(list(h_bonds_dict.keys())), 3))
+        for index, res_1 in enumerate(list(h_bonds_dict.keys())):
+            res_2 = h_bonds_dict[res_1]
+            xyz_1 = np.array([])
+            xyz_2 = np.array([])
+
+            for row in range(sheets_df.shape[0]):
+                if sheets_df['DSSP_NUM'][row] == res_1:
+                    x_1 = sheets_df['XPOS'][row]
+                    y_1 = sheets_df['YPOS'][row]
+                    z_1 = sheets_df['ZPOS'][row]
+                    xyz_1 = np.array([[x_1],
+                                      [y_1],
+                                      [z_1]])
+                elif sheets_df['DSSP_NUM'][row] == res_2:
+                    x_2 = sheets_df['XPOS'][row]
+                    y_2 = sheets_df['YPOS'][row]
+                    z_2 = sheets_df['ZPOS'][row]
+                    xyz_2 = np.array([[x_2],
+                                      [y_2],
+                                      [z_2]])
+                    break
+
+            # Excludes beta-bridge pairs from the z-axis calculation (since
+            # these residues will be included in the DSSP hydrogen-bonding
+            # interactions, but not in the dataframe of residues in the
+            # beta-sheets)
+            if xyz_1.size and xyz_2.size:
+                # TODO: Ensure that only consider vectors pointing in the same
+                # direction (select central vector between two largest strands,
+                # then if subsequent vectors are > 90 apart then ignore?)
+                vectors_array[index][0] = xyz_2[0][0] - xyz_1[0][0]
+                vectors_array[index][1] = xyz_2[1][0] - xyz_1[1][0]
+                vectors_array[index][2] = xyz_2[2][0] - xyz_1[2][0]
+
+        vector = np.mean(vectors_array, axis=0)
+
+        return vector
+
+    def align_sandwich(domain_id, vector, unprocessed_list):
+        # Aligns the sandwich to z-axis using the reference axis through the
+        # sandwich core calculated in the previous step
+        print('Aligning {} sandwich with z-axis'.format(domain_id))
+
+        # Creates AMPAL object from sandwich. Protons are added (using reduce)
+        # to allow DataGen to use hydrogen HA3 of a glycine residue as a proxy
+        # for the C_alpha atoms of the chiral amino acids in the interior- /
+        # exterior-facing calculation performed in the following step.
+        sandwich = isambard.external_programs.reduce.assembly_plus_protons(
+            'Beta_strands/{}.pdb'.format(domain_id)
+        )
+
+        # Aligns the sandwich with z-axis
+        s1 = [0.0, 0.0, 0.0]
+        e1 = [vector[0], vector[1], vector[2]]
+        s2 = [0.0, 0.0, 0.0]
+        e2 = [0.0, 0.0, 1.0]
+        translation, angle, axis, point = isambard.geometry.find_transformations(
+            s1, e1, s2, e2
+        )
+        sandwich.rotate(angle, axis, point=point)  # ROTATION MUST BE PERFORMED
+        # BEFORE TRANSLATION
+        sandwich.translate(translation)
+
+        # Generates dictionary of residues and their new xyz coordinates
+        sandwich_pdb_string = sandwich.make_pdb().split('\n')
+        xy_dict = OrderedDict()
+
+        for line in sandwich_pdb_string:
+            if line[0:6].strip() in ['ATOM', 'HETATM']:
+                if len(line) > 80:
+                    unprocessed_list.append(domain_id)
+                    break
+                else:
+                    atom_id = line[21:27].replace(' ', '') + '_' + line[12:16].strip()
+
+                    x_coord_atom = float(line[30:38])
+                    y_coord_atom = float(line[38:46])
+                    xy_coords = np.array([[x_coord_atom],
+                                          [y_coord_atom]])
+                    xy_dict[atom_id] = xy_coords
+
+        return xy_dict, unprocessed_list
+
+    def calc_int_ext(domain_id, dssp_df, xy_dict):
+        # Determines whether a residue is interior- or exterior-facing, based
+        # upon whether or not its C_beta atom lies on the same side of the
+        # plane between its N and C atoms as the centre of mass of the sandwich
+
+        print('Determining interior and exterior residues in {}'.format(domain_id))
+
+        int_ext_dict = {}
+
+        # Calculates centre of mass of C_alpha atoms in sandwich
+        x_sum = 0
+        y_sum = 0
+        count = 0
+        for res in list(xy_dict.keys()):
+            if 'CA' in res:
+                x_sum += xy_dict[res][0][0]
+                y_sum += xy_dict[res][1][0]
+                count += 1
+        x_avrg = x_sum / count
+        y_avrg = y_sum / count
+
+        # For each residue, calculates whether the centre of mass and its
+        # C-beta atom lie on the same side of the plane formed between the
+        # residue's N and C atoms (= 'interior'), or on different sides
+        # (= 'exterior') (using the equation d=(x−x1)(y2−y1)−(y−y1)(x2−x1),
+        # where (x1, y1) and (x2, y2) describe the plane and (x, y) the point
+        # of interest (see https://math.stackexchange.com/questions/274712/
+        # calculate-on-which-side-of-a-straight-line-is-a-given-point-located
+        # ?noredirect=1&lq=1))
+        res_ids_dict = {}
+        for row in range(dssp_df.shape[0]):
+            if dssp_df['RES_ID'][row] not in res_ids_dict:
+                res_ids_dict[dssp_df['RES_ID'][row]] = dssp_df['RESNAME'][row]
+
+        for res in list(set(dssp_df['RES_ID'].tolist())):
+            n = False
+            c = False
+            cb = False
+
+            xy_sub_dict = {key: value for key, value in xy_dict.items() if res
+                           in key}
+            for atom in list(xy_sub_dict.keys()):
+                if atom.endswith('_N'):
+                    n = True
+                    n_dist = math.sqrt(((xy_sub_dict[atom][0][0] - x_avrg)**2)
+                                       + ((xy_sub_dict[atom][1][0] - y_avrg)**2))
+                    n_x_coord = xy_sub_dict[atom][0][0]
+                    n_y_coord = xy_sub_dict[atom][1][0]
+                elif atom.endswith('_C'):
+                    c = True
+                    c_dist = math.sqrt(((xy_sub_dict[atom][0][0] - x_avrg)**2)
+                                       + ((xy_sub_dict[atom][1][0] - y_avrg)**2))
+                    c_x_coord = xy_sub_dict[atom][0][0]
+                    c_y_coord = xy_sub_dict[atom][1][0]
+                elif (
+                    (atom.endswith('_CB'))
+                    or
+                    (res_ids_dict[atom.split('_')[0]] == 'GLY' and atom.endswith('HA3'))
+                ):
+                    cb = True
+                    cb_x_coord = xy_sub_dict[atom][0][0]
+                    cb_y_coord = xy_sub_dict[atom][1][0]
+
+            if all(x is True for x in [n, c, cb]):
+                distance_com = (((x_avrg-n_x_coord)*(c_y_coord-n_y_coord)) -
+                                ((y_avrg-n_y_coord)*(c_x_coord-n_x_coord)))
+                distance_cb = (((cb_x_coord-n_x_coord)*(c_y_coord-n_y_coord)) -
+                               ((cb_y_coord-n_y_coord)*(c_x_coord-n_x_coord)))
+
+                if (
+                    (distance_com < 0 and distance_cb < 0)
+                    or
+                    (distance_com > 0 and distance_cb > 0)
+                ):
+                    int_ext_dict[res] = 'interior'  # 2 points lie on the same side of the plane
+                else:
+                    int_ext_dict[res] = 'exterior'  # 2 points lie either side of the plane
+
+        return int_ext_dict
+
+
 def merge_models_biological_assembly_pdbs(pdb_file_lines):
     # Combines multiple models in biological assembly PDB files into a single
     # model (which requires updating the chain ids and atom numbers)
@@ -228,8 +435,8 @@ def find_barrel_shear_number(self, sec_struct_dfs_dict):
                 shear_pairs = [[h_bonded_res_2_b, h_bonded_res_3_a],
                                [h_bonded_res_2_a, h_bonded_res_3_b]]
                 if (not any(x in [None, 0] for x in [dssp_num for pair in
-                                                         shear_pairs for dssp_num in pair])
-                        ):
+                                                     shear_pairs for dssp_num in pair])
+                    ):
                     for pair in shear_pairs:
                         print(pair)  # DELETE ME
                         if int(res_1) in pair:

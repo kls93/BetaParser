@@ -155,7 +155,7 @@ class run_stages():
             )
 
         # For each individual residue, calculates whether it faces in towards
-        # or outwards from the centre of the beta_barrel/sheet
+        # or outwards from the centre of the beta_barrel
         if self.code[0:4] in ['2.40']:
             beta_structure = find_interior_exterior_surfaces(self.run_parameters)
             sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
