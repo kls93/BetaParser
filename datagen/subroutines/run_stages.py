@@ -154,13 +154,18 @@ class run_stages():
                 sec_struct_dfs_dict, domain_sheets_dict
             )
 
+        # BARRELS:
         # For each individual residue, calculates whether it faces in towards
         # or outwards from the centre of the beta_barrel
-        if self.code[0:4] in ['2.40']:
-            beta_structure = find_interior_exterior_surfaces(self.run_parameters)
-            sec_struct_dfs_dict, domain_sheets_dict = beta_structure.identify_int_ext(
-                sec_struct_dfs_dict, domain_sheets_dict
-            )
+        # SANDWICHES:
+        # Calculates the z_coordinate of the C_alpha atom of each residue
+        # relative to both its parent strand and the sandwich (the parent
+        # strand / sandwich having been aligned via its principal component /
+        # the principal component of the longest strand to the z-axis)
+        beta_structure = find_interior_exterior_surfaces(self.run_parameters)
+        sec_struct_dfs_dict, domain_sheets_dict = beta_structure.run_pipeline(
+            sec_struct_dfs_dict, domain_sheets_dict
+        )
 
         # Calculates the backbone and side chain dihedral angles of each
         # individual residue

@@ -15,6 +15,8 @@ else:
 
 def align_with_z_axis(ampal_object, xyz_coords, coord_dict, xy_or_z,
                       rel_to_centre, unprocessed_list, domain_id):
+    # Aligns input AMPAL object with the z_axis, and returns a dictionary of
+    # coordinates from the aligned object
     s1 = [xyz_coords[0], xyz_coords[1], xyz_coords[2]]
     e1 = [xyz_coords[3], xyz_coords[4], xyz_coords[5]]
     s2 = [0.0, 0.0, 0.0]
@@ -26,7 +28,7 @@ def align_with_z_axis(ampal_object, xyz_coords, coord_dict, xy_or_z,
     # BEFORE TRANSLATION
     ampal_object.translate(translation)
 
-    # Generates dictionary of residues and their new xyz coordinates
+    # Generates dictionary of atoms and their new xyz coordinates
     object_pdb_string = ampal_object.make_pdb().split('\n')
     sub_dict = OrderedDict()
 
@@ -46,18 +48,21 @@ def align_with_z_axis(ampal_object, xyz_coords, coord_dict, xy_or_z,
                                           [y_coord_atom]])
                     sub_dict[atom_id] = xy_coords
                 elif xy_or_z == 'z':
-                    sub_dict[atom_id] = z_coord_atom
+                    if line[12:16].strip() == 'CA':
+                        sub_dict[atom_id] = z_coord_atom
 
-    if rel_to_centre is True:
-        avrg_z_coord = np.sum(np.array(list(sub_dict.values())))
+    if not domain_id in unprocessed_list:
+        if rel_to_centre is True:
+            z_coord_vals = list(sub_dict.values())
+            avrg_z_coord = np.sum(np.array(z_coord_vals)) / len(z_coord_vals)
+
+            for atom_id in list(sub_dict.keys()):
+                z_coord = sub_dict[atom_id]
+                new_z_coord = round(abs(z_coord - avrg_z_coord), 3)
+                sub_dict[atom_id] = new_z_coord
 
         for atom_id in list(sub_dict.keys()):
-            z_coord = sub_dict[atom_id]
-            new_z_coord = abs(z_coord - avrg_z_coord)
-            sub_dict[atom_id] = new_z_coord
-
-    for atom_id in list(sub_dict.keys()):
-        coord_dict[atom_id] = sub_dict[atom_id]
+            coord_dict[atom_id] = sub_dict[atom_id]
 
     return coord_dict, unprocessed_list
 
@@ -298,7 +303,8 @@ class sandwich_strand_position_calcs():
 
             U, S, V = np.linalg.svd(xyz_centred, full_matrices=True)
 
-            # NEED TO INTRODUCE CHECK TO ENSURE THAT THIS IS THE EIGENVECTOR WITH THE LARGEST CORRESPONDING EIGENVALUE!
+            # The eigenvectors in V are ordered by the size of their
+            # corresponding eigenvalues
             princ_comp_coords_centred = V[0] * np.array([[-1], [1]])
             princ_comp_coords = princ_comp_coords_centred + xyz.mean(axis=0)
             princ_comp_coords = [princ_comp_coords[0][0], princ_comp_coords[0][1],
@@ -307,7 +313,7 @@ class sandwich_strand_position_calcs():
 
             princ_comp_coords_dict[strand_id] = princ_comp_coords
 
-        return princ_comp_coords_dict
+        return princ_comp_coords_dict, res_ids_dict
 
     def align_strand_to_princ_comp(domain_id, dssp_df, princ_comp_coords_dict,
                                    res_ids_dict, unprocessed_list):
@@ -350,6 +356,8 @@ class sandwich_strand_position_calcs():
         # Aligns entire beta-sandwich with the principal component of the
         # longest strand, then extracts the z-coordinates of the C_alpha atoms
         # in the aligned sandwich structure
+        print('Aligning {} with its principal component'.format(domain_id))
+
         z_dict = OrderedDict()
 
         strand_id = max(res_ids_dict, key=lambda x: len(res_ids_dict[x]))
@@ -364,13 +372,6 @@ class sandwich_strand_position_calcs():
 
         return z_dict, unprocessed_list
 
-    def centre_z_coords(z_dict):
-        # Measures z-coordinates relative to either the centre of the parent
-        # strand or the centre of mass of the whole sandwich
-
-
-        return z_dict
-
     def update_dataframe(dssp_df, z_dict_strand, z_dict_sandwich):
         # Updates dataframe with z_coordinates (both relative to the parent
         # strand and relative to the centre of mass of the entire sandwich
@@ -381,18 +382,18 @@ class sandwich_strand_position_calcs():
         for row in range(dssp_df.shape[0]):
             atom_id = '{}_{}'.format(dssp_df['RES_ID'][row], dssp_df['ATMNAME'][row])
             if atom_id in list(z_dict_strand.keys()):
-                z_coord_strand[row] = z_dict_strand[atom_id]
+                z_coord_parent_strand[row] = z_dict_strand[atom_id]
             if atom_id in list(z_dict_sandwich.keys()):
-                z_coord_sandwich[row] = z_dict_sandwich[atom_id]
+                z_coord_parent_domain[row] = z_dict_sandwich[atom_id]
 
-        z_coord_df = pd.DataFrame(OrderedDict({'strand_z_coord': z_coord_sandwich,
-                                               'sandwich_z_coord': z_coord_sandwich}))
+        z_coord_df = pd.DataFrame(OrderedDict({'STRAND_Z_COORDS': z_coord_parent_strand,
+                                               'SANDWICH_Z_COORDS': z_coord_parent_domain}))
         dssp_df = pd.concat([dssp_df, z_coord_df], axis=1)
 
         return dssp_df
 
 
-class int_ext_pipeline():
+class pipeline():
 
     def barrel_pipeline(domain_id, sheets, sec_struct_dfs_dict,
                         domain_sheets_dict, unprocessed_list):
@@ -506,39 +507,45 @@ class int_ext_pipeline():
         sheets_df = sheets_df.reset_index(drop=True)
 
         # Calculates principal component of each strand in sandwich
-
-        # Calculates z-axis between the two beta-sheets
-        vector = sandwich_interior_exterior_calcs.find_z_axis(sheets_df)
-
-        # Aligns the beta-sandwich with z-axis
-        xy_dict, unprocessed_list = sandwich_interior_exterior_calcs.align_sandwich(
-            domain_id, vector, unprocessed_list
+        (
+        strand_princ_comps_dict, res_ids_dict
+        ) = sandwich_strand_position_calcs.find_strand_principal_components(
+            domain_id, sheets_df
         )
+
+        # Aligns each individual strand to the z-axis via its principal
+        # component
+        (
+        z_dict_indv_strands, unprocessed_list
+        ) = sandwich_strand_position_calcs.align_strand_to_princ_comp(
+            domain_id, dssp_df, strand_princ_comps_dict, res_ids_dict,
+            unprocessed_list
+        )
+
+        # Aligns the entire sandwich domain to the z-axis via the principal
+        # component of the longest strand
+        (
+        z_dict_sandwich, unprocessed_list
+        ) = sandwich_strand_position_calcs.align_sandwich_to_princ_comp(
+            domain_id, strand_princ_comps_dict, res_ids_dict,
+            unprocessed_list
+        )
+
+        # Updates dataframe to include new z_coords (**DON'T MIX UP ORDER OF
+        # STRAND AND SANDWICH DICTS**)
+        dssp_df = sandwich_strand_position_calcs.update_dataframe(
+            dssp_df, z_dict_indv_strands, z_dict_sandwich
+        )
+
         if domain_id in unprocessed_list:
-            print('ERROR: Coordinates of rotated and translated sandwich are '
-                  '> 8 characters in length')
+            print('ERROR whilst calculating principal component of sandwich')
             sec_struct_dfs_dict[domain_id] = None
             for sheet in list(sheets.keys()):
                 domain_sheets_dict[sheet] = None
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-
-        # Labels residues as interior or exterior
-        int_ext_dict = sandwich_interior_exterior_calcs.calc_int_ext(
-            domain_id, dssp_df, xy_dict
-        )
-
-        # Updates dataframe to identify interior- / exterior-facing residues
-        int_ext_list = ['']*dssp_df.shape[0]
-        for row in range(dssp_df.shape[0]):
-            if (
-                dssp_df['RES_ID'][row] in list(int_ext_dict.keys())
-                and dssp_df['ATMNAME'][row] == 'CA'
-            ):
-                int_ext_list[row] = int_ext_dict[dssp_df['RES_ID'][row]]
-        int_ext_df = pd.DataFrame({'INT_EXT': int_ext_list})
-        dssp_df = pd.concat([dssp_df, int_ext_df], axis=1)
-        sec_struct_dfs_dict[domain_id] = dssp_df
+        else:
+            sec_struct_dfs_dict[domain_id] = dssp_df
 
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
@@ -548,7 +555,7 @@ class find_interior_exterior_surfaces(run_stages):
     def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
 
-    def identify_int_ext(self, sec_struct_dfs_dict, domain_sheets_dict):
+    def run_pipeline(self, sec_struct_dfs_dict, domain_sheets_dict):
         # Pipeline script to identify interior and exterior-facing residues in
         # barrels / sandwiches
         unprocessed_list = []
@@ -559,13 +566,13 @@ class find_interior_exterior_surfaces(run_stages):
 
             if self.code[0:4] in ['2.40']:
                 (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-                 ) = int_ext_pipeline.barrel_pipeline(
+                 ) = pipeline.barrel_pipeline(
                     domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict,
                     unprocessed_list
                 )
             elif self.code[0:4] in ['2.60']:
                 (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-                 ) = int_ext_pipeline.sandwich_pipeline(
+                 ) = pipeline.sandwich_pipeline(
                     domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict,
                     unprocessed_list
                 )

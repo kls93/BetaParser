@@ -427,6 +427,8 @@ class gen_output(run_stages):
                                        'z_coords': [],
                                        'strand_abs_pos': [],
                                        'strand_percentage_pos': [],
+                                       'strand_z_coords': [],
+                                       'sandwich_z_coords': [],
                                        'tm_pos': [],
                                        'int_ext': [],
                                        'core_surf': [],
@@ -803,6 +805,24 @@ class gen_output(run_stages):
                         strand_or_res
                     )
 
+                    strand_z_coords = strand_df['STRAND_Z_COORDS'].tolist()
+                    strand_z_coords = reverse_strand_lists(
+                        strand_z_coords, reverse
+                    )
+                    properties_list['strand_z_coords'] = append_to_output_lists(
+                        strand_z_coords, properties_list['strand_z_coords'],
+                        res_ids_list, strand_or_res
+                    )
+
+                    sandwich_z_coords = strand_df['SANDWICH_Z_COORDS'].tolist()
+                    sandwich_z_coords = reverse_strand_lists(
+                        sandwich_z_coords, reverse
+                    )
+                    properties_list['sandwich_z_coords'] = append_to_output_lists(
+                        sandwich_z_coords, properties_list['sandwich_z_coords'],
+                        res_ids_list, strand_or_res
+                    )
+
                 # Determines positions of residues in TM region of strand in
                 # beta-barrel - MUST COME AFTER TM / EXTERNAL CALCULATION
                 if self.code[0:4] in ['2.40']:
@@ -1014,6 +1034,7 @@ class gen_output(run_stages):
         if self.code[0:4] in ['2.40']:
             unwanted_columns = ['sheet_number', 'edge_or_central',
                                 'strand_abs_pos', 'strand_percentage_pos',
+                                'strand_z_coords', 'sandwich_z_coords',
                                 'core_surf', 'buried_surface_area']
         # Generates csv file of beta-sandwich dataset
         elif self.code[0:4] in ['2.60']:
