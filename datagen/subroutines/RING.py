@@ -410,7 +410,6 @@ class calculate_residue_interaction_network(run_stages):
                         if (
                             int_ext_dict[res_id] == 'interior'
                             and not line[12:16].strip() in ['N', 'C', 'O', 'CA']
-                            and line[76:78].strip() != 'H'
                         ):
                             atom_id = float(line[6:11])
                             element = line[76:78].strip()
