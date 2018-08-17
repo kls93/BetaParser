@@ -1,6 +1,8 @@
 
 import os
+import numpy as np
 import pandas as pd
+import isambard_dev as isambard
 from collections import OrderedDict
 if __name__ == 'subroutines.RING':
     from subroutines.run_stages import run_stages
@@ -384,6 +386,67 @@ class calculate_residue_interaction_network(run_stages):
                             int_ext_dict[res_id] = 'interior'
                         else:
                             int_ext_dict[res_id] = 'exterior'
+
+                # Runs reduce to add protons to glycine residues
+                sandwich = isambard.external_programs.reduce.assembly_plus_protons(
+                    'Beta_strands/{}.pdb'.format(domain_id)
+                )
+                sandwich_pdb = sandwich.make_pdb().split('\n')
+
+                # Determines whether HA3 proton of each glycine residue is in
+                # van der Waals contact with any of the side chain atoms of the
+                # residues defined as "interior" - if it is then the glycine is
+                # also labelled as "interior"
+                gly_ha3_coords = OrderedDict()
+                interior_coords = OrderedDict()
+                atom_elements = OrderedDict()
+                for line in sandwich_pdb:
+                    if line[0:6].strip() in ['ATOM', 'HETATM']:
+                        res_id = line[21:27].replace(' ', '')
+                        if line[17:20].strip() == 'GLY' and line[12:16].strip() == 'HA3':
+                            gly_ha3_coords[res_id] = np.array([float(line[30:38]),
+                                                               float(line[38:46]),
+                                                               float(line[46:54])])
+                        if (
+                            int_ext_dict[res_id] == 'interior'
+                            and not line[12:16].strip() in ['N', 'C', 'O', 'CA']
+                            and line[76:78].strip() != 'H'
+                        ):
+                            atom_id = float(line[6:11])
+                            element = line[76:78].strip()
+                            interior_coords[atom_id] = np.array([float(line[30:38]),
+                                                                 float(line[38:46]),
+                                                                 float(line[46:54])])
+                            atom_elements[atom_id] = element
+
+                # Elemental van der Waals radii, taken from
+                # doi:10.1039/C3DT50599E (as does RING)
+                van_der_waals_dict = {'H': 1.20,
+                                      'C': 1.77,
+                                      'N': 1.66,
+                                      'O': 1.50,
+                                      'F': 1.46,
+                                      'P': 1.90,
+                                      'S': 1.89,
+                                      'CL': 1.82,
+                                      'SE': 1.82,
+                                      'BR': 1.86}
+
+                # Calculates distances between HA3 protons and interior side
+                # chain atoms
+                for res_id in list(gly_ha3_coords.keys()):
+                    ha3_coords = gly_ha3_coords[res_id]
+                    for atom_id in list(interior_coords.keys()):
+                        coords = interior_coords[atom_id]
+                        element = atom_elements[atom_id]
+
+                        distance = np.sqrt(np.square(coords - ha3_coords).sum())
+                        if element in list(van_der_waals_dict.keys()):
+                            # Agrees with RING van der Waals definition
+                            vdw_threshold = 0.5 + 1.2 + van_der_waals_dict[element]
+                            if distance < vdw_threshold:
+                                int_ext_dict[res_id] = 'interior'
+                                break
 
                 # Updates dataframe with interior / exterior-facing calculation
                 # results
