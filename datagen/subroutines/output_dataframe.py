@@ -355,9 +355,8 @@ def gen_interaction_lists(properties_list, interaction_type_abbrev,
 
 class gen_output(run_stages):
 
-    def __init__(self, run_parameters, radius):
+    def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
-        self.radius = radius
 
     def identify_edge_central(self, domain_sheets_dict, sec_struct_dfs_dict):
         # Uses domain_networks_dict to identify whether strands are edge or

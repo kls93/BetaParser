@@ -11,12 +11,12 @@ import argparse
 def main():
     if __name__ == '__main__':
         from subroutines.run_parameters import (
-            gen_run_parameters, find_cdhit_input, find_radius
+            gen_run_parameters
         )
         from subroutines.run_stages import run_stages
     else:
         from datagen.subroutines.run_parameters import (
-            gen_run_parameters, find_cdhit_input, find_radius
+            gen_run_parameters
         )
         from datagen.subroutines.run_stages import run_stages
     orig_dir = sys.path[0].split('datagen')[0]
@@ -26,40 +26,38 @@ def main():
     parser.add_argument('-i', '--input_file', help='OPTIONAL: Specifies the '
                         'absolute file path of an input file listing run '
                         'parameters')
-    parser.add_argument('-s', '--sequences', nargs='+', help='OPTIONAL: '
-                        'Specifies the absolute file path of an input file of '
-                        'CDHIT filtered FASTA sequences required for stage 2 '
-                        'of the analysis pipeline')
-    parser.add_argument('--radius', help='OPTIONAL: Specifies the radius of '
-                        'the sphere drawn around each atom when calculating '
-                        'the identities of its nearest neighbouring residues')
+    parser.add_argument('--betadesigner', action='store_true', help='OPTIONAL: '
+                        'Used to specify that the program is being run within '
+                        'the BetaDesigner program')
     args = parser.parse_args()
 
     # Extracts run parameters and initialises run_stages object
-    stage, run_parameters = gen_run_parameters(args)
+    run_parameters = gen_run_parameters(args)
+    stage = run_parameters['stage']
     analysis = run_stages(run_parameters)
 
     # Generates txt file of sequences appropriately formatted to be fed into
     # the CDHIT web server
     if stage in ['1']:
-        # Determines whether the user wants to extract structures from the CATH
-        # or from the SCOPe structural database
-        if run_parameters['structuredatabase'] == 'CATH':
-            analysis.run_stage_1_cath(orig_dir)
-        elif run_parameters['structuredatabase'] == 'SCOP':
-            analysis.run_stage_1_scope(orig_dir)
+        if run_parameters['betadesigner'] is True:
+            print('Analysis stage 1 cannot be run within BetaDesigner')
+        else:
+            # Determines whether the user wants to extract structures from the
+            # CATH or from the SCOPe structural database
+            if run_parameters['structuredatabase'] == 'CATH':
+                analysis.run_stage_1_cath(orig_dir)
+            elif run_parameters['structuredatabase'] == 'SCOP':
+                analysis.run_stage_1_scope(orig_dir)
 
     # Extracts PDB structures and structural information for each of the
     # sequences listed in a CDHIT output txt file
     elif stage in ['2']:
-        cdhit_entries, cdhit_output = find_cdhit_input(args)
-        analysis.run_stage_2(cdhit_entries, cdhit_output)
+        analysis.run_stage_2()
 
     # Runs naccess upon each structure to calculate the solvent accessible
     # surface area of its beta-sheets and thus identify those which interact
     elif stage in ['3']:
-        radius = find_radius(args)
-        analysis.run_stage_3(radius)
+        analysis.run_stage_3()
 
     # Summarises the structural characteristics of the dataset in an output
     # dataframe / csv file

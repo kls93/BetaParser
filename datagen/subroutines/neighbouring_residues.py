@@ -11,9 +11,8 @@ else:
 
 class nearest_neighbours(run_stages):
 
-    def __init__(self, run_parameters, radius):
+    def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
-        self.radius = radius
 
     def calculate_nearest_neighbours(self, sec_struct_dfs_dict):
         # For each C_alpha atom in the domain, makes a list of all residues

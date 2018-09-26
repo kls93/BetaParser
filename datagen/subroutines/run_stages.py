@@ -19,10 +19,14 @@ class run_stages():
         self.dssp_database = self.run_parameters['dsspdatabase']
         self.opm_database = self.run_parameters['opmdatabase']
         self.ring_database = self.run_parameters['ringdatabase']
-        self.resn = float(self.run_parameters['resolution'])
-        self.rfac = float(self.run_parameters['rfactor'])
+        self.cdhit_entries = self.run_parameters['cdhitsequencefiles']['cdhit_entries']
+        self.cdhit_output = self.run_parameters['cdhitsequencefiles']['cdhit_output']
+        self.resn = self.run_parameters['resolution']
+        self.rfac = self.run_parameters['rfactor']
+        self.radius = self.run_parameters['radius']
         self.suffix = self.run_parameters['suffix']
         self.discard_non_tm = self.run_parameters['discardnontm']
+        self.beta_designer = self.run_parameters['betadesigner']
 
     def run_stage_1_cath(self, orig_dir):
         # Runs stage 1 of the DataGen pipeline, extracting sequences of the
@@ -57,7 +61,7 @@ class run_stages():
     def run_stage_1_scope(self, orig_dir):
         return
 
-    def run_stage_2(self, cdhit_entries, cdhit_output):
+    def run_stage_2(self):
         # To be run on local machine within ISAMBARD (in docker container).
         if __name__ == 'subroutines.run_stages':
             from subroutines.extract_coordinates import extract_beta_structure_coords
@@ -68,24 +72,24 @@ class run_stages():
             from datagen.subroutines.DSSP import beta_structure_dssp_classification
             from datagen.subroutines.generate_network import calculate_beta_network
 
-        # Loads the dataframe generated in previous steps
-        filtered_domain_df = pd.read_pickle(cdhit_entries)
+        # Entry point for BetaDesigner code is at remove_alternate_conformers
+        if not self.beta_designer is True:
+            # Loads the dataframe generated in previous steps
+            filtered_domain_df = pd.read_pickle(self.cdhit_entries)
 
-        # Obtains xyz coordinates for the sequences output from CD-HIT
-        beta_structure = extract_beta_structure_coords(self.run_parameters)
-        cdhit_domain_df = beta_structure.gen_cdhit_dict(
-            cdhit_output, filtered_domain_df
-        )
+            # Obtains xyz coordinates for the sequences output from CD-HIT
+            beta_structure = extract_beta_structure_coords(self.run_parameters)
+            cdhit_domain_df = beta_structure.gen_cdhit_dict(filtered_domain_df)
 
-        if os.path.isdir('Parent_assemblies'):
-            shutil.rmtree('Parent_assemblies')
-        os.mkdir('Parent_assemblies')
-        cdhit_domain_df = beta_structure.copy_parent_assembly_pdb(
-            cdhit_domain_df, self.suffix
-        )
-        cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
-            cdhit_domain_df
-        )
+            if os.path.isdir('Parent_assemblies'):
+                shutil.rmtree('Parent_assemblies')
+            os.mkdir('Parent_assemblies')
+            cdhit_domain_df = beta_structure.copy_parent_assembly_pdb(
+                cdhit_domain_df, self.suffix
+            )
+            cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
+                cdhit_domain_df
+            )
 
         all_atoms_dfs_dict = beta_structure.remove_alternate_conformers(
             all_atoms_dfs_dict
@@ -121,7 +125,7 @@ class run_stages():
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict, dssp_to_pdb_dict
                          ), pickle_file)
 
-    def run_stage_3(self, radius):
+    def run_stage_3(self):
         # To be run within ISAMBARD. **NOTE** solvent accessibility
         # calculations must be run first.
         if __name__ == 'subroutines.run_stages':
@@ -175,7 +179,7 @@ class run_stages():
         # For each residue, determines the RES_IDs of all residues with at
         # least one atom within a user-specified radius (measured in Angstroms)
         # of its C_alpha atom
-        beta_structure = nearest_neighbours(self.run_parameters, radius)
+        beta_structure = nearest_neighbours(self.run_parameters)
         sec_struct_dfs_dict = beta_structure.calculate_nearest_neighbours(
             sec_struct_dfs_dict
         )
@@ -183,7 +187,7 @@ class run_stages():
         # Pickles variables required for running stage 4
         with open('Output_ISAMBARD_variables.pkl', 'wb') as pickle_file:
             pickle.dump((sec_struct_dfs_dict, domain_sheets_dict,
-                         dssp_to_pdb_dict, radius), pickle_file)
+                         dssp_to_pdb_dict), pickle_file)
 
     def run_stage_4(self, orig_dir):
         # To be run on local machine (in docker container).
@@ -201,7 +205,7 @@ class run_stages():
             from datagen.subroutines.output_dataframe import gen_output
 
         with open('Output_ISAMBARD_variables.pkl', 'rb') as pickle_file:
-            (sec_struct_dfs_dict, domain_sheets_dict, dssp_to_pdb_dict, radius
+            (sec_struct_dfs_dict, domain_sheets_dict, dssp_to_pdb_dict
              ) = pickle.load(pickle_file)
 
         # Calculates residue interaction network of the amino acids in the
@@ -242,7 +246,7 @@ class run_stages():
         # Classifies each beta-strand as either 'edge' or 'central' based upon
         # the number of strands with which it forms backbone hydrogen-bonding
         # interactions
-        output = gen_output(self.run_parameters, radius)
+        output = gen_output(self.run_parameters)
         if self.code[0:4] in ['2.60']:
             sec_struct_dfs_dict = output.identify_edge_central(
                 domain_sheets_dict, sec_struct_dfs_dict
