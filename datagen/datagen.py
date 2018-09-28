@@ -19,7 +19,7 @@ def main():
             gen_run_parameters
         )
         from datagen.subroutines.run_stages import run_stages
-    orig_dir = sys.path[0].split('datagen')[0]
+    datagen_dir = sys.path[0].split('datagen')[0]
 
     # Reads in command line inputs
     parser = argparse.ArgumentParser()
@@ -45,9 +45,9 @@ def main():
             # Determines whether the user wants to extract structures from the
             # CATH or from the SCOPe structural database
             if run_parameters['structuredatabase'] == 'CATH':
-                analysis.run_stage_1_cath(orig_dir)
+                analysis.run_stage_1_cath(datagen_dir)
             elif run_parameters['structuredatabase'] == 'SCOP':
-                analysis.run_stage_1_scope(orig_dir)
+                analysis.run_stage_1_scope(datagen_dir)
 
     # Extracts PDB structures and structural information for each of the
     # sequences listed in a CDHIT output txt file
@@ -62,7 +62,7 @@ def main():
     # Summarises the structural characteristics of the dataset in an output
     # dataframe / csv file
     elif stage in ['4']:
-        analysis.run_stage_4(orig_dir)
+        analysis.run_stage_4(datagen_dir)
 
 
 # Calls 'main' function if datagen.py is run as a script

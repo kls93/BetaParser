@@ -53,7 +53,7 @@ class extract_beta_structure_coords(run_stages):
 
         return cdhit_domain_df
 
-    def copy_parent_assembly_pdb(self, cdhit_domain_df, suffix):
+    def copy_parent_assembly_pdb(self, cdhit_domain_df):
         # Copies the parent assembly (specified by the user to be either the
         # asymmetric unit or the biological assembly) PDB file of every
         # retained structure to the output files directory.
@@ -62,6 +62,7 @@ class extract_beta_structure_coords(run_stages):
 
         for row in range(cdhit_domain_df.shape[0]):
             pdb_code = cdhit_domain_df['PDB_CODE'][row]
+            domain_id = cdhit_domain_df['DOMAIN_ID'][row]
 
             # Finds preferred assembly from screen scrape of PDBe website
             count = 0
@@ -100,25 +101,25 @@ class extract_beta_structure_coords(run_stages):
             # local machine / hard drive) to output directory
             if count != 1:
                 error = True
-                unprocessed_list.append(cdhit_domain_df['DOMAIN_ID'][row])
+                unprocessed_list.append(domain_id)
             elif assembly == 0:
                 error = True
-                unprocessed_list.append(cdhit_domain_df['DOMAIN_ID'][row])
+                unprocessed_list.append(domain_id)
 
             if error is True:
                 pass
             else:
-                if not os.path.isfile('Parent_assemblies/{}.pdb'.format(pdb_code)):
+                if not os.path.isfile('Parent_assemblies/{}.pdb'.format(domain_id)):
                     try:
                         print('Copying {}{}.pdb{} to \'Parent_assemblies/\' '
-                              'output directory'.format(pdb_code, suffix, assembly))
+                              'output directory'.format(pdb_code, self.suffix, assembly))
                         shutil.copy('{}{}/{}{}.pdb{}'.format(
                             self.pdb_ba_database, pdb_code[1:3], pdb_code,
-                            suffix, assembly
-                        ), 'Parent_assemblies/{}.pdb'.format(pdb_code)
+                            self.suffix, assembly
+                        ), 'Parent_assemblies/{}.pdb'.format(domain_id)
                         )
                     except FileNotFoundError:
-                        unprocessed_list.append(cdhit_domain_df['DOMAIN_ID'][row])
+                        unprocessed_list.append(domain_id)
 
         cdhit_domain_df = cdhit_domain_df[~cdhit_domain_df['DOMAIN_ID'].isin(unprocessed_list)]
         cdhit_domain_df = cdhit_domain_df.reset_index(drop=True)
@@ -169,7 +170,7 @@ class extract_beta_structure_coords(run_stages):
             print('Obtaining ATOM / HETATM records for {}'.format(pdb_code))
             print('{:0.2f}%'.format(((row+1)/cdhit_domain_df.shape[0])*100))
 
-            with open('Parent_assemblies/{}.pdb'.format(pdb_code), 'r') as pdb_file:
+            with open('Parent_assemblies/{}.pdb'.format(domain_id), 'r') as pdb_file:
                 pdb_file_lines = [line.strip('\n') for line in pdb_file if
                                   line[0:6].strip() in ['ATOM', 'HETATM', 'TER']]
             pdb_file_lines.append('TER'.ljust(80))

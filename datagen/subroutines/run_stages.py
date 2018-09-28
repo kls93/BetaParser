@@ -13,20 +13,25 @@ class run_stages():
 
     def __init__(self, run_parameters):
         self.run_parameters = run_parameters
+
+        self.beta_designer = self.run_parameters['betadesigner']
+        self.stage = self.run_parameters['stage']
         self.code = self.run_parameters['id']
         self.pdb_au_database = self.run_parameters['pdbaudatabase']
         self.pdb_ba_database = self.run_parameters['pdbbadatabase']
         self.dssp_database = self.run_parameters['dsspdatabase']
         self.opm_database = self.run_parameters['opmdatabase']
         self.ring_database = self.run_parameters['ringdatabase']
-        self.cdhit_entries = self.run_parameters['cdhitsequencefiles']['cdhit_entries']
-        self.cdhit_output = self.run_parameters['cdhitsequencefiles']['cdhit_output']
+        self.input_dataframes = self.run_parameters['dataframes']
         self.resn = self.run_parameters['resolution']
         self.rfac = self.run_parameters['rfactor']
         self.radius = self.run_parameters['radius']
         self.suffix = self.run_parameters['suffix']
         self.discard_non_tm = self.run_parameters['discardnontm']
-        self.beta_designer = self.run_parameters['betadesigner']
+
+        if self.stage == '2' and self.beta_designer is False:
+            self.cdhit_entries = self.run_parameters['cdhitsequencefiles']['cdhit_entries']
+            self.cdhit_output = self.run_parameters['cdhitsequencefiles']['cdhit_output']
 
     def run_stage_1_cath(self, orig_dir):
         # Runs stage 1 of the DataGen pipeline, extracting sequences of the
@@ -73,7 +78,11 @@ class run_stages():
             from datagen.subroutines.generate_network import calculate_beta_network
 
         # Entry point for BetaDesigner code is at remove_alternate_conformers
-        if not self.beta_designer is True:
+        if self.beta_designer is True:
+            beta_structure = extract_beta_structure_coords(self.run_parameters)
+            with open(self.input_dataframes, 'rb') as pickle_file:
+                all_atoms_dfs_dict, cdhit_domain_df = pickle.load(pickle_file)
+        else:
             # Loads the dataframe generated in previous steps
             filtered_domain_df = pd.read_pickle(self.cdhit_entries)
 
@@ -85,7 +94,7 @@ class run_stages():
                 shutil.rmtree('Parent_assemblies')
             os.mkdir('Parent_assemblies')
             cdhit_domain_df = beta_structure.copy_parent_assembly_pdb(
-                cdhit_domain_df, self.suffix
+                cdhit_domain_df
             )
             cdhit_domain_df, all_atoms_dfs_dict = beta_structure.get_xyz_coords(
                 cdhit_domain_df

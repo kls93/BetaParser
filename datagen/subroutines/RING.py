@@ -21,11 +21,11 @@ class calculate_residue_interaction_network(run_stages):
         if not os.path.isdir('ring'):
             os.mkdir('ring')
         for domain_id in list(sec_struct_dfs_dict.keys()):
-            if not os.path.isfile('ring/{}.ring'.format(domain_id[0:4])):
-                print('Running RING for {}'.format(domain_id[0:4]))
+            if not os.path.isfile('ring/{}.ring'.format(domain_id)):
+                print('Running RING for {}'.format(domain_id))
                 os.system(
                     '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 --all_edges > ring/{}.ring'.format(
-                        domain_id[0:4], domain_id[0:4]
+                        domain_id, domain_id
                     )
                 )
 
@@ -94,12 +94,12 @@ class calculate_residue_interaction_network(run_stages):
                 for interaction_type in list(interactions.keys()):
                     interactions[interaction_type][res_id] = []
 
-            with open('ring/{}.ring'.format(domain_id[0:4]), 'r') as ring_file:
+            with open('ring/{}.ring'.format(domain_id), 'r') as ring_file:
                 ring_output = ring_file.readlines()
             ring_output = ''.join(ring_output)
 
             if not 'NodeId' in ring_output:
-                print('ERROR: {} unable to be processed by RING'.format(domain_id[0:4]))
+                print('ERROR: {} unable to be processed by RING'.format(domain_id))
                 unprocessed_list.append(domain_id)
                 sec_struct_dfs_dict[domain_id] = None
                 sheet_ids = [sheet_id for sheet_id in list(domain_sheets_dict.keys())

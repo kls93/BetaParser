@@ -29,17 +29,17 @@ class beta_structure_dssp_classification(run_stages):
 
         for row in range(dssp_domain_df.shape[0]):
             dssp_indv_file_lines = []
-            pdb_code = dssp_domain_df['PDB_CODE'][row]
-            chain_num_list = copy.copy(dssp_domain_df['CHAIN_NUM'][row])
+            domain_id = dssp_domain_df['DOMAIN_ID'][row]
 
-            print('Running DSSP for {}'.format(pdb_code))
+            print('Running DSSP for {}'.format(domain_id))
 
             dssp_out = isambard.external_programs.dssp.run_dssp(
-                pdb='Parent_assemblies/{}.pdb'.format(pdb_code),
+                pdb='Parent_assemblies/{}.pdb'.format(domain_id),
                 path=True, outfile=None
             )
             dssp_out = dssp_out.split('\n')
 
+            chain_num_list = copy.copy(dssp_domain_df['CHAIN_NUM'][row])
             for line in dssp_out:
                 if (line[11:12].strip()+line[5:11].strip()) in chain_num_list:
                     dssp_indv_file_lines.append(line.strip('\n'))
@@ -50,9 +50,9 @@ class beta_structure_dssp_classification(run_stages):
             if len(chain_num_list) == 0:
                 dssp_indv_file_lines.append('TER'.ljust(136)+'\n')  # Extra line
                 # enables strand numbering method in following function
-                dssp_residues_dict[dssp_domain_df['DOMAIN_ID'][row]] = dssp_indv_file_lines
+                dssp_residues_dict[domain_id] = dssp_indv_file_lines
             elif len(chain_num_list) > 0:
-                unprocessed_list.append(dssp_domain_df['DOMAIN_ID'][row])
+                unprocessed_list.append(domain_id)
 
         # Writes PDB accession codes that could not be processed to output file
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:

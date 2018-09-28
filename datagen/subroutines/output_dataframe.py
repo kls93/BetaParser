@@ -19,7 +19,7 @@ class output_calcs():
         # amino acid codes from the input dataframe (dssp_df)
 
         # Extracts list of consecutive res_ids from biological assembly PDB file
-        with open('Parent_assemblies/{}.pdb'.format(domain_id[0:4]), 'r') as pdb_file:
+        with open('Parent_assemblies/{}.pdb'.format(domain_id), 'r') as pdb_file:
             pdb_file_lines = pdb_file.readlines()
         pdb_file_lines = [line for line in pdb_file_lines if line[0:6].strip()
                           in ['ATOM', 'HETATM']]
@@ -212,7 +212,7 @@ class output_calcs():
 
         return hb_list, nhb_list, bridge_pairs_list
 
-    def find_minus_plus_residues(domain_id, strand_df, displacement,
+    def find_minus_plus_residues(domain_id, strand_df, dssp_df, displacement,
                                  consec_res_id_list, res_id_to_fasta_dict):
         # Generates lists of residues +/- x (where x is a user-specified number
         # of residues) from each input residue. Currently will not exclude
@@ -221,29 +221,61 @@ class output_calcs():
         # excluded from further analysis anyway)
         minus_list = []
         plus_list = []
+        minus_list_fasta = []
+        plus_list_fasta = []
+
+        dssp_df_res_ids = dssp_df['RES_ID'].tolist()
+        sheet_ids = dssp_df['STRAND_NUM'].tolist()
+
         for row in range(strand_df.shape[0]):
             res_id = strand_df['RES_ID'][row]
             res_id_index = consec_res_id_list.index(res_id)
+            strand_id = strand_df['STRAND_NUM']
             try:
                 minus_res = consec_res_id_list[res_id_index - displacement]
                 plus_res = consec_res_id_list[res_id_index + displacement]
-                if res_id[0:1] != minus_res[0:1]:  # Prevents residues in
-                    # different chains from being considered as consecutive residues
+
+                try:
+                    minus_res_strand_id = sheet_ids[dssp_df_res_ids.index(minus_res)]
+                except ValueError:
+                    minus_res_strand_id = '-'
+
+                if (
+                        res_id[0:1] != minus_res[0:1]
+                    or not minus_res_strand_id in [strand_id, '-']
+                ):  # Prevents residues in different chains and/or strands from
+                    # being considered as consecutive residues
                     minus_res = ''
+                    minus_res_fasta = ''
                 else:
-                    minus_res = res_id_to_fasta_dict[minus_res]
-                if res_id[0:1] != plus_res[0:1]:
+                    minus_res_fasta = res_id_to_fasta_dict[minus_res]
+
+                try:
+                    plus_res_strand_id = sheet_ids[dssp_df_res_ids.index(plus_res)]
+                except ValueError:
+                    plus_res_strand_id = '-'
+
+                if (
+                        res_id[0:1] != plus_res[0:1]
+                    or not plus_res_strand_id in [strand_id, '-']
+                ):  # Prevents residues in different chains and/or strands from
+                    # being considered as consecutive residues
                     plus_res = ''
+                    plus_res_fasta = ''
                 else:
-                    plus_res = res_id_to_fasta_dict[plus_res]
+                    plus_res_fasta = res_id_to_fasta_dict[plus_res]
             except IndexError:
                 minus_res = ''
                 plus_res = ''
+                minus_res_fasta = ''
+                plus_res_fasta = ''
 
             minus_list.append(minus_res)
             plus_list.append(plus_res)
+            minus_list_fasta.append(minus_res_fasta)
+            plus_list_fasta.append(plus_res_fasta)
 
-        return minus_list, plus_list
+        return minus_list, plus_list, minus_list_fasta, plus_list_fasta
 
     def convert_res_id_to_fasta(sub_list, res_id_to_fasta_dict, nested, chain_id):
         # Converts input list of residue ids (= chain + residue number +
@@ -413,7 +445,8 @@ class gen_output(run_stages):
 
         # Initialises lists of properties to be displayed in the dataframe
         # columns
-        properties_list = OrderedDict({'domain_strand_ids': [],
+        properties_list = OrderedDict({'domain_ids': [],
+                                       'domain_strand_ids': [],
                                        'sheet_number': [],
                                        'tilt_angle': [],
                                        'total_strand_number': [],
@@ -438,6 +471,10 @@ class gen_output(run_stages):
                                        'psi': [],
                                        'chi': [],
                                        'solv_acsblty': [],
+                                       'minus_1': [],
+                                       'plus_1': [],
+                                       'minus_2': [],
+                                       'plus_2': [],
                                        'neighbours': [],
                                        'bridge_pairs': [],
                                        'hb_pairs': [],
@@ -492,10 +529,10 @@ class gen_output(run_stages):
                                        'pi_pi_stacking_sc_sc_l': [],
                                        'pi_pi_stacking_sc_sc_t': [],
                                        'cation_pi_sc_sc': [],
-                                       'minus_1': [],
-                                       'plus_1': [],
-                                       'minus_2': [],
-                                       'plus_2': [],
+                                       'minus_1_fasta': [],
+                                       'plus_1_fasta': [],
+                                       'minus_2_fasta': [],
+                                       'plus_2_fasta': [],
                                        'neighbours_fasta_intra': [],
                                        'bridge_pairs_fasta_intra': [],
                                        'hb_pairs_fasta_intra': [],
@@ -640,6 +677,12 @@ class gen_output(run_stages):
                  ) = output_calcs.determine_strand_orientation(
                     domain_id, strand_num, strand_df, tm, self.opm_database,
                     unprocessed_list, unprocessed_strands
+                )
+
+                # Lists parent domain IDs
+                properties_list['domain_ids'] = append_to_output_lists(
+                    '{}'.format(domain_id),
+                    properties_list['domain_ids'], res_ids_list, strand_or_res
                 )
 
                 # Gives strand a unique ID
@@ -997,11 +1040,15 @@ class gen_output(run_stages):
 
                 # Generates list of residues in +/-1 and +/2 positions to the
                 # residue in question
-                minus_1_list, plus_1_list = output_calcs.find_minus_plus_residues(
-                    domain_id, strand_df, 1, consec_res_id_list, res_id_to_fasta_dict
+                (minus_1_list, plus_1_list, minus_1_list_fasta, plus_1_list_fasta
+                ) = output_calcs.find_minus_plus_residues(
+                    domain_id, strand_df, dssp_df, 1, consec_res_id_list,
+                    res_id_to_fasta_dict
                 )
-                minus_2_list, plus_2_list = output_calcs.find_minus_plus_residues(
-                    domain_id, strand_df, 2, consec_res_id_list, res_id_to_fasta_dict
+                (minus_2_list, plus_2_list, minus_2_list_fasta, plus_2_list_fasta
+                ) = output_calcs.find_minus_plus_residues(
+                    domain_id, strand_df, dssp_df, 2, consec_res_id_list,
+                    res_id_to_fasta_dict
                 )
 
                 minus_1_list = reverse_strand_lists(minus_1_list, reverse)
@@ -1014,6 +1061,16 @@ class gen_output(run_stages):
                     plus_1_list, properties_list['plus_1'], res_ids_list,
                     strand_or_res
                 )
+                minus_1_list_fasta = reverse_strand_lists(minus_1_list_fasta, reverse)
+                properties_list['minus_1_fasta'] = append_to_output_lists(
+                    minus_1_list_fasta, properties_list['minus_1_fasta'],
+                    res_ids_list, strand_or_res
+                )
+                plus_1_list_fasta = reverse_strand_lists(plus_1_list_fasta, reverse)
+                properties_list['plus_1_fasta'] = append_to_output_lists(
+                    plus_1_list_fasta, properties_list['plus_1_fasta'],
+                    res_ids_list, strand_or_res
+                )
                 minus_2_list = reverse_strand_lists(minus_2_list, reverse)
                 properties_list['minus_2'] = append_to_output_lists(
                     minus_2_list, properties_list['minus_2'], res_ids_list,
@@ -1023,6 +1080,16 @@ class gen_output(run_stages):
                 properties_list['plus_2'] = append_to_output_lists(
                     plus_2_list, properties_list['plus_2'], res_ids_list,
                     strand_or_res
+                )
+                minus_2_list_fasta = reverse_strand_lists(minus_2_list_fasta, reverse)
+                properties_list['minus_2_fasta'] = append_to_output_lists(
+                    minus_2_list_fasta, properties_list['minus_2_fasta'],
+                    res_ids_list, strand_or_res
+                )
+                plus_2_list_fasta = reverse_strand_lists(plus_2_list_fasta, reverse)
+                properties_list['plus_2_fasta'] = append_to_output_lists(
+                    plus_2_list_fasta, properties_list['plus_2_fasta'],
+                    res_ids_list, strand_or_res
                 )
 
             # Ensures that domain is transmembrane
