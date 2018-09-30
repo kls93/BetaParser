@@ -1,4 +1,5 @@
 
+import os
 import sys
 import math
 import itertools
@@ -63,7 +64,7 @@ class naccess_solv_acsblty_calcs():
         # beta-sandwich in domain X
 
         # Generates all possible combinations of beta-sheets in the domain
-        combinations = list(itertools.combinations(list(sheets.keys()), 2))
+        combinations = list(itertools.combinations(sheets, 2))
         solv_acsblty_dict = OrderedDict()
         for sheet_pair in combinations:
             # Calculates solvent accessibility of complex of both sheets in pair
@@ -147,8 +148,6 @@ class naccess_solv_acsblty_calcs():
         print('Calculating solvent accessible surface areas of individual '
               'residues in {}'.format(domain_id))
 
-        import os
-        print(os.getcwd())
         with open('Parent_assemblies/{}.pdb'.format(domain_id), 'r') as pdb_file:
             for line in pdb_file.readlines():
                 line_start = line[0:16]
@@ -216,16 +215,16 @@ class naccess_solv_acsblty_calcs():
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
         else:
-            sandwich = solv_acsblty_dict[max(list(solv_acsblty_dict.keys()))]
+            domain_sheet_ids = solv_acsblty_dict[max(list(solv_acsblty_dict.keys()))]
 
             # Removes sheets that do not form part of the sandwich / barrel
             # from further analysis
             for sheet_id in sheets:
-                if not sheet_id in sandwich:
+                if not sheet_id in domain_sheet_ids:
                     domain_sheets_dict[sheet_id] = None
 
             sheets_retained = [sheet_id.replace('{}_sheet_'.format(domain_id), '')
-                               for sheet_id in sandwich]
+                               for sheet_id in domain_sheet_ids]
             sub_dssp_df = dssp_df[dssp_df['SHEET_NUM'].isin(sheets_retained)]
             chain_res_num = sub_dssp_df['RES_ID'].tolist()
 
@@ -248,7 +247,7 @@ class naccess_solv_acsblty_calcs():
 
         return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-    def write_domain_pdb(domain_id, sheets, sec_struct_dfs_dict):
+    def write_domain_pdb(domain_id, sec_struct_dfs_dict):
         # Writes a PDB file of the residues that form the beta-barrel /
         # -sandwich as determined from sheet surface solvent accessibility
         # calculations performed in the previous steps. Individual beta-strands
@@ -269,24 +268,12 @@ class naccess_solv_acsblty_calcs():
                         new_pdb_file.write('{}\n'.format(dssp_df['PDB_FILE_LINES'][row]))
                 new_pdb_file.write('TER'.ljust(80)+'\n')
 
-    def calc_core_residues_sandwich(domain_id, sheets, sec_struct_dfs_dict,
-                                    domain_sheets_dict, unprocessed_list):
+    def calc_core_residues_sandwich(domain_id, sheets, sec_struct_dfs_dict):
         # Calculates whether each residue faces towards the interior or the
         # exterior of the sandwich from the ratio of its solvent accessibility
         # within the sandwich to its solvent accessibility within its
         # individual parent beta-sheet
         dssp_df = sec_struct_dfs_dict[domain_id]
-
-        # Checks that correct number of sheets has been retained for analysis
-        if len(sheets) != 2:
-            print('ERROR: incorrect number of sheets retained in {} following '
-                  'solvent accessibility calculation'.format(domain_id))
-            sec_struct_dfs_dict[domain_id] = None
-            for sheet in sheets:
-                domain_sheets_dict[sheet] = None
-            unprocessed_list.append(domain_id)
-
-            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
         print('Determining core and surface residues in {}'.format(domain_id))
 
@@ -399,7 +386,7 @@ class naccess_solv_acsblty_calcs():
         dssp_df = pd.concat([dssp_df, core_surf_df], axis=1)
         sec_struct_dfs_dict[domain_id] = dssp_df
 
-        return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
+        return sec_struct_dfs_dict
 
 
 class calculate_solvent_accessible_surface_area(run_stages):
@@ -414,49 +401,46 @@ class calculate_solvent_accessible_surface_area(run_stages):
         unprocessed_list_1 = []
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
-            sheets = {key: value for key, value in domain_sheets_dict.items()
-                      if domain_id in key}
+            sheets = [key for key, value in domain_sheets_dict.items() if
+                      domain_id in key]
 
             if (
                 (not sheets)
-                or (self.code[0:4] in ['2.60'] and len(list(sheets.keys())) < 2)
+                or (self.code[0:4] in ['2.60'] and len(sheets) < 2)
             ):
                 print('ERROR: No / only 1 beta-sheet/s retained for {}'.format(domain_id))
                 unprocessed_list_1.append(domain_id)
                 sec_struct_dfs_dict[domain_id] = None
                 for sheet in sheets:
                     domain_sheets_dict[sheet] = None
-                continue
 
-            if self.code[0:4] in ['2.40']:
-                solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_barrel_solv_acsblty(
-                    sheets
-                )
-                (res_solv_acsblty, unprocessed_list_2, sec_struct_dfs_dict, domain_sheets_dict
-                 ) = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
-                    domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict
-                )
-            elif self.code[0:4] in ['2.60']:
-                solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_sandwich_solv_acsblty(
-                    sheets
-                )
-                (res_solv_acsblty, unprocessed_list_2, sec_struct_dfs_dict, domain_sheets_dict
-                 ) = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
-                    domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict
-                )
             else:
-                solv_acsblty_dict = {}
-                res_solv_acsblty = {}
+                if self.code[0:4] in ['2.40']:
+                    solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_barrel_solv_acsblty(
+                        sheets
+                    )
+                    (res_solv_acsblty, unprocessed_list_2, sec_struct_dfs_dict, domain_sheets_dict
+                     ) = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
+                        domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict
+                    )
+                elif self.code[0:4] in ['2.60']:
+                    solv_acsblty_dict = naccess_solv_acsblty_calcs.calculate_sandwich_solv_acsblty(
+                        sheets
+                    )
+                    (res_solv_acsblty, unprocessed_list_2, sec_struct_dfs_dict, domain_sheets_dict
+                     ) = naccess_solv_acsblty_calcs.calculate_residue_solv_acsblty(
+                        domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict
+                    )
+                else:
+                    solv_acsblty_dict = {}
+                    res_solv_acsblty = {}
 
-            (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list_2
-             ) = naccess_solv_acsblty_calcs.add_naccess_info_to_df(
-                domain_id, sheets, self.code, solv_acsblty_dict,
-                res_solv_acsblty, sec_struct_dfs_dict, domain_sheets_dict,
-                unprocessed_list_2
-            )
-            naccess_solv_acsblty_calcs.write_domain_pdb(
-                domain_id, sheets, sec_struct_dfs_dict,
-            )
+                (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list_2
+                 ) = naccess_solv_acsblty_calcs.add_naccess_info_to_df(
+                    domain_id, sheets, self.code, solv_acsblty_dict,
+                    res_solv_acsblty, sec_struct_dfs_dict, domain_sheets_dict,
+                    unprocessed_list_2
+                )
 
         sec_struct_dfs_dict = OrderedDict(
             {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
@@ -465,6 +449,31 @@ class calculate_solvent_accessible_surface_area(run_stages):
             {key: value for key, value in domain_sheets_dict.items() if value is not None}
         )
 
+        # Checks that intended number of sheets has been retained
+        for domain_id in list(sec_struct_dfs_dict.keys()):
+            sheets = [key for key, value in domain_sheets_dict.items() if
+                      domain_id in key]
+            if (
+                   (self.code[0:4] in ['2.40'] and len(sheets) != 1)
+                or (self.code[0:4] in ['2.60'] and len(sheets) != 2)
+            ):
+                print('ERROR: Incorrect number of beta-sheet/s retained for '
+                      '{}'.format(domain_id))
+                unprocessed_list_1.append(domain_id)
+                sec_struct_dfs_dict[domain_id] = None
+                for sheet in sheets:
+                    domain_sheets_dict[sheet] = None
+            else:
+                naccess_solv_acsblty_calcs.write_domain_pdb(domain_id, sec_struct_dfs_dict)
+
+        sec_struct_dfs_dict = OrderedDict(
+            {key: value for key, value in sec_struct_dfs_dict.items() if value is not None}
+        )
+        domain_sheets_dict = OrderedDict(
+            {key: value for key, value in domain_sheets_dict.items() if value is not None}
+        )
+
+        # Updates unprocessed list
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nERROR in network generation - no / '
                                    'only 1 sheet/s retained for solvent '
@@ -487,10 +496,8 @@ class calculate_solvent_accessible_surface_area(run_stages):
             sheets = [key for key in list(domain_sheets_dict.keys()) if
                       domain_id in key]
 
-            (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-             ) = naccess_solv_acsblty_calcs.calc_core_residues_sandwich(
-                domain_id, sheets, sec_struct_dfs_dict, domain_sheets_dict,
-                unprocessed_list
+            sec_struct_dfs_dict = naccess_solv_acsblty_calcs.calc_core_residues_sandwich(
+                domain_id, sheets, sec_struct_dfs_dict
             )
 
         sec_struct_dfs_dict = OrderedDict(
@@ -501,7 +508,7 @@ class calculate_solvent_accessible_surface_area(run_stages):
         )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nERROR in finding core and external '
+            unprocessed_file.write('\n\nERROR in finding core and surface '
                                    'residues:\n')
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))

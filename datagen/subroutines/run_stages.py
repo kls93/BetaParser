@@ -221,7 +221,7 @@ class run_stages():
         # selected beta-strands of the CATH domain in the context of its parent
         # biological assembly
         res_int_network = calculate_residue_interaction_network(self.run_parameters)
-        res_int_network.run_RING(sec_struct_dfs_dict, domain_sheets_dict)
+        res_int_network.run_RING(sec_struct_dfs_dict)
         sec_struct_dfs_dict, domain_sheets_dict = res_int_network.parse_RING_output(
             sec_struct_dfs_dict, domain_sheets_dict
         )

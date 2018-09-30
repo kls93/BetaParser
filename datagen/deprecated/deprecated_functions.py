@@ -1,4 +1,64 @@
 
+    def find_z_axis(strands, sheets_df):
+        # Finds axis through the barrel pore as the line that passes through
+        # the average xyz coordinates of the middle two residues of each
+        # strand.
+        count = 0
+        coords_res_1 = []
+        coords_res_n = []
+
+        # Determines the indices of the central two residues in each strand.
+        for strand in strands:
+            count += 1
+
+            strand_df = sheets_df[sheets_df['STRAND_NUM'] == strand]
+            strand_df = strand_df.reset_index(drop=True)
+
+            row_num = strand_df.shape[0]
+            # If there is an odd number of residues, the central residue plus
+            # its immediate C-terminal residue are selected as the two central
+            # residues
+            if row_num % 2 == 1:
+                row_num += 1
+
+            index_1 = (row_num / 2) - 1
+            index_n = row_num / 2
+            if count % 2 == 1:  # Ensures that residues closer to the
+                # periplasmic side of the membrane are grouped together,
+                # likewise for residues closer to the extracellular side of the
+                # membrane. Note that this assumes that neighbouring strands
+                # interact with one another in an antiparallel hydrogen bonding
+                # arrangement (however, the code will only break if the
+                # majority of strands interact with a parallel instead of a
+                # parallel hydrogen bonding arrangement, which is highly unlikely)
+                index_1 = row_num / 2
+                index_n = (row_num / 2) - 1
+
+            res_1_x = strand_df['XPOS'][index_1]
+            res_1_y = strand_df['YPOS'][index_1]
+            res_1_z = strand_df['ZPOS'][index_1]
+            res_n_x = strand_df['XPOS'][index_n]
+            res_n_y = strand_df['YPOS'][index_n]
+            res_n_z = strand_df['ZPOS'][index_n]
+
+            coords_res_1.append((res_1_x, res_1_y, res_1_z))
+            coords_res_n.append((res_n_x, res_n_y, res_n_z))
+
+        # Calculates average xyz coordinates
+        coords_res_1 = np.array(coords_res_1)
+        coords_res_n = np.array(coords_res_n)
+        x_coord_1 = np.sum(coords_res_1[:, 0]) / coords_res_1.shape[0]
+        y_coord_1 = np.sum(coords_res_1[:, 1]) / coords_res_1.shape[0]
+        z_coord_1 = np.sum(coords_res_1[:, 2]) / coords_res_1.shape[0]
+        x_coord_n = np.sum(coords_res_n[:, 0]) / coords_res_n.shape[0]
+        y_coord_n = np.sum(coords_res_n[:, 1]) / coords_res_n.shape[0]
+        z_coord_n = np.sum(coords_res_n[:, 2]) / coords_res_n.shape[0]
+        xyz_coords = [x_coord_1, y_coord_1, z_coord_1, x_coord_n, y_coord_n,
+                      z_coord_n]
+
+        return xyz_coords
+
+
 class sandwich_interior_exterior_calcs():
 
     def find_z_axis(sheets_df):

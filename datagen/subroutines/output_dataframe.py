@@ -225,24 +225,25 @@ class output_calcs():
         plus_list_fasta = []
 
         dssp_df_res_ids = dssp_df['RES_ID'].tolist()
-        sheet_ids = dssp_df['STRAND_NUM'].tolist()
+        strand_ids = dssp_df['STRAND_NUM'].tolist()
 
         for row in range(strand_df.shape[0]):
             res_id = strand_df['RES_ID'][row]
             res_id_index = consec_res_id_list.index(res_id)
-            strand_id = strand_df['STRAND_NUM']
+            strand_id = strand_df['STRAND_NUM'][row]
+
             try:
                 minus_res = consec_res_id_list[res_id_index - displacement]
                 plus_res = consec_res_id_list[res_id_index + displacement]
 
                 try:
-                    minus_res_strand_id = sheet_ids[dssp_df_res_ids.index(minus_res)]
+                    minus_res_strand_id = strand_ids[dssp_df_res_ids.index(minus_res)]
                 except ValueError:
-                    minus_res_strand_id = '-'
+                    minus_res_strand_id = ''
 
                 if (
                         res_id[0:1] != minus_res[0:1]
-                    or not minus_res_strand_id in [strand_id, '-']
+                    or not minus_res_strand_id in [strand_id, '']
                 ):  # Prevents residues in different chains and/or strands from
                     # being considered as consecutive residues
                     minus_res = ''
@@ -251,13 +252,13 @@ class output_calcs():
                     minus_res_fasta = res_id_to_fasta_dict[minus_res]
 
                 try:
-                    plus_res_strand_id = sheet_ids[dssp_df_res_ids.index(plus_res)]
+                    plus_res_strand_id = strand_ids[dssp_df_res_ids.index(plus_res)]
                 except ValueError:
-                    plus_res_strand_id = '-'
+                    plus_res_strand_id = ''
 
                 if (
                         res_id[0:1] != plus_res[0:1]
-                    or not plus_res_strand_id in [strand_id, '-']
+                    or not plus_res_strand_id in [strand_id, '']
                 ):  # Prevents residues in different chains and/or strands from
                     # being considered as consecutive residues
                     plus_res = ''

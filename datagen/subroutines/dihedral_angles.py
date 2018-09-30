@@ -114,7 +114,7 @@ class calc_torsion_angles():
 
 class backbone_geometry():
     # TODO Maybe calculate rise per residue, residues per turn and radius of
-    # helix
+    # helix (for beta-strands)
 
     def __init__(self, pdb):
         self.pdb = pdb
@@ -133,7 +133,6 @@ class dihedral_angles(run_stages):
             dssp_df = sec_struct_dfs_dict[domain_id]
 
             # Creates AMPAL object
-            pdb_file_lines = '\n'.join(dssp_df['PDB_FILE_LINES'].tolist())
             pdb = isambard.ampal.convert_pdb_to_ampal(
                 'Beta_strands/{}.pdb'.format(domain_id)
             )

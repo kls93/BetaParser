@@ -13,8 +13,8 @@ else:
     from datagen.subroutines.run_stages import run_stages
 
 
-def align_with_z_axis(ampal_object, xyz_coords, coord_dict, xy_or_z,
-                      rel_to_centre, unprocessed_list, domain_id):
+def align_with_z_axis(ampal_object, xyz_coords, xy_or_z, rel_to_centre,
+                      unprocessed_list, domain_id):
     # Aligns input AMPAL object with the z_axis, and returns a dictionary of
     # coordinates from the aligned object
     s1 = [xyz_coords[0], xyz_coords[1], xyz_coords[2]]
@@ -30,7 +30,7 @@ def align_with_z_axis(ampal_object, xyz_coords, coord_dict, xy_or_z,
 
     # Generates dictionary of atoms and their new xyz coordinates
     object_pdb_string = ampal_object.make_pdb().split('\n')
-    sub_dict = OrderedDict()
+    coord_dict = OrderedDict()
 
     for line in object_pdb_string:
         if line[0:6].strip() in ['ATOM', 'HETATM']:
@@ -46,23 +46,20 @@ def align_with_z_axis(ampal_object, xyz_coords, coord_dict, xy_or_z,
                 if xy_or_z == 'xy':
                     xy_coords = np.array([[x_coord_atom],
                                           [y_coord_atom]])
-                    sub_dict[atom_id] = xy_coords
+                    coord_dict[atom_id] = xy_coords
                 elif xy_or_z == 'z':
                     if line[12:16].strip() == 'CA':
-                        sub_dict[atom_id] = z_coord_atom
+                        coord_dict[atom_id] = z_coord_atom
 
     if not domain_id in unprocessed_list:
         if rel_to_centre is True:
-            z_coord_vals = list(sub_dict.values())
+            z_coord_vals = list(coord_dict.values())
             avrg_z_coord = np.sum(np.array(z_coord_vals)) / len(z_coord_vals)
 
-            for atom_id in list(sub_dict.keys()):
-                z_coord = sub_dict[atom_id]
+            for atom_id in list(coord_dict.keys()):
+                z_coord = coord_dict[atom_id]
                 new_z_coord = round(abs(z_coord - avrg_z_coord), 3)
-                sub_dict[atom_id] = new_z_coord
-
-        for atom_id in list(sub_dict.keys()):
-            coord_dict[atom_id] = sub_dict[atom_id]
+                coord_dict[atom_id] = new_z_coord
 
     return coord_dict, unprocessed_list
 
@@ -106,68 +103,43 @@ class barrel_interior_exterior_calcs():
 
         return strands, unprocessed_list
 
-    def find_z_axis(strands, sheets_df):
-        # Finds axis through the barrel pore as the line that passes through
-        # the average xyz coordinates of the middle two residues of each
-        # strand.
-        count = 0
-        coords_res_1 = []
-        coords_res_n = []
+    def find_barrel_principal_component(domain_id, barrel_strands, sheets_df):
+        # Finds principal component of the C_alpha atoms of beta-strands in
+        # barrel
+        princ_comp_coords_dict = OrderedDict()
 
-        # Determines the indices of the central two residues in each strand.
-        for strand in strands:
-            count += 1
+        # Filters sheets_df to retain Calpha atoms in strands in the main barrel
+        sheets_df = sheets_df[sheets_df['STRAND_NUM'].isin(barrel_strands)]
+        sheets_df = sheets_df.reset_index(drop=True)
 
-            strand_df = sheets_df[sheets_df['STRAND_NUM'] == strand]
-            strand_df = strand_df.reset_index(drop=True)
+        # Calculates principal component of strands in barrel and stores the
+        # resulting coordinates in a dictionary
+        print('Calculating principal component of {}'.format(domain_id)
 
-            row_num = strand_df.shape[0]
-            # If there is an odd number of strands, the central residue plus
-            # its immediate C-terminal residue are selected as the two central
-            # residues
-            if row_num % 2 == 1:
-                row_num += 1
+        xyz = np.zeros((sheets_df.shape[0], 3))
+        for row in range(sheets_df.shape[0]):
+            xyz[row][0] = sheets_df['XPOS'][row]
+            xyz[row][1] = sheets_df['YPOS'][row]
+            xyz[row][2] = sheets_df['ZPOS'][row]
 
-            index_1 = (row_num / 2) - 1
-            index_n = row_num / 2
-            if count % 2 == 1:  # Ensures that residues closer to the
-                # periplasmic side of the membrane are grouped together,
-                # likewise for residues closer to the extracellular side of the
-                # membrane. Note that this assumes that neighbouring strands
-                # interact with one another in an antiparallel hydrogen bonding
-                # arrangement (however, the code will only break if the
-                # majority of strands interact with a parallel instead of a
-                # parallel hydrogen bonding arrangement, which is highly unlikely)
-                index_1 = row_num / 2
-                index_n = (row_num / 2) - 1
+        xyz_centred = xyz - xyz.mean(axis=0)
 
-            res_1_x = strand_df['XPOS'][index_1]
-            res_1_y = strand_df['YPOS'][index_1]
-            res_1_z = strand_df['ZPOS'][index_1]
-            res_n_x = strand_df['XPOS'][index_n]
-            res_n_y = strand_df['YPOS'][index_n]
-            res_n_z = strand_df['ZPOS'][index_n]
+        U, S, V = np.linalg.svd(xyz_centred, full_matrices=True)
 
-            coords_res_1.append((res_1_x, res_1_y, res_1_z))
-            coords_res_n.append((res_n_x, res_n_y, res_n_z))
+        # The eigenvectors in V are ordered by the size of their
+        # corresponding eigenvalues, so can simply take V[0] as max.
+        princ_comp_coords_centred = V[0] * np.array([[-1], [1]])
+        princ_comp_coords = princ_comp_coords_centred + xyz.mean(axis=0)
+        princ_comp_coords = [princ_comp_coords[0][0], princ_comp_coords[0][1],
+                             princ_comp_coords[0][2], princ_comp_coords[1][0],
+                             princ_comp_coords[1][1], princ_comp_coords[1][2]]
 
-        # Calculates average xyz coordinates
-        coords_res_1 = np.array(coords_res_1)
-        coords_res_n = np.array(coords_res_n)
-        x_coord_1 = np.sum(coords_res_1[:, 0]) / coords_res_1.shape[0]
-        y_coord_1 = np.sum(coords_res_1[:, 1]) / coords_res_1.shape[0]
-        z_coord_1 = np.sum(coords_res_1[:, 2]) / coords_res_1.shape[0]
-        x_coord_n = np.sum(coords_res_n[:, 0]) / coords_res_n.shape[0]
-        y_coord_n = np.sum(coords_res_n[:, 1]) / coords_res_n.shape[0]
-        z_coord_n = np.sum(coords_res_n[:, 2]) / coords_res_n.shape[0]
-        xyz_coords = [x_coord_1, y_coord_1, z_coord_1, x_coord_n, y_coord_n,
-                      z_coord_n]
+        return sheets_df, princ_comp_coords
 
-        return xyz_coords
-
-    def rotate_translate_barrel(domain_id, xyz_coords, unprocessed_list):
-        # Aligns the barrel to z-axis using the reference axis through the
-        # barrel pore calculated in the previous step
+    def align_barrel_princ_comp_to_z(domain_id, princ_comp_coords,
+                                     unprocessed_list):
+        # Aligns barrel principal component with the z-axis, then extracts the
+        # z-coordinates of the C_alpha atoms in the aligned sandwich structure
         print('Aligning {} barrel with z-axis'.format(domain_id))
 
         # Creates AMPAL object from barrel. Protons are added (using reduce)
@@ -178,18 +150,15 @@ class barrel_interior_exterior_calcs():
             'Beta_strands/{}.pdb'.format(domain_id)
         )
 
-        # Aligns barrel with the z-axis, returns dictionary of atom ids and
-        # their corresponding x and y coordinates in the aligned barrel
-        xy_dict = OrderedDict()
         xy_dict, unprocessed_list = align_with_z_axis(
-            barrel, xyz_coords, xy_dict, 'xy', False, unprocessed_list,
-            domain_id
+            barrel, princ_comp_coords, 'xy', False, unprocessed_list, domain_id
         )
 
         return xy_dict, unprocessed_list
 
     def calc_average_coordinates(domain_id, xy_dict, sheets_df):
-        # Calculates average xy coordinates of the barrel C_alpha atoms
+        # Calculates average xy coordinates of the C_alpha atoms in the strands
+        # in the main barrel
         x_sum = 0
         y_sum = 0
         count = 0
@@ -210,19 +179,22 @@ class barrel_interior_exterior_calcs():
 
         return com
 
-    def calc_int_ext(domain_id, sheets_df, xy_dict, com, int_ext_dict):
-        # Calculates whether a residue faces towards the interior or the
-        # exterior of the barrel
+    def calc_int_ext(domain_id, dssp_df, xy_dict, com, int_ext_dict):
+        # Calculates whether residue in the barrel face towards the interior or
+        # the exterior of the barrel. Note that all strands are included in
+        # this analysis, not just the strands that form the main barrel.
         print('Determining interior and exterior residues in {}'.format(domain_id))
 
         res_dict = OrderedDict()
-        for index, res_id in enumerate(sheets_df['RES_ID'].tolist()):
-            res_dict[res_id] = sheets_df['RESNAME'].tolist()[index]
+        for row in range(dssp_df.shape[0]):
+            if dssp_df['ATMNAME'][row] == 'CA':
+                res_dict[dssp_df['RES_ID'][row]] = dssp_df['RESNAME'][row]
 
         for res_id in list(res_dict.keys()):
             if (
-                (all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
-                     for x in ['N', 'CA', 'C', 'O', 'CB']))
+                   (res_dict[res_id] != 'GLY'
+                    and all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
+                            for x in ['N', 'CA', 'C', 'O', 'CB']))
                 or (res_dict[res_id] == 'GLY'
                     and all('{}_{}'.format(res_id, x) in list(xy_dict.keys())
                             for x in ['N', 'CA', 'C', 'O', 'HA3']))
@@ -272,7 +244,9 @@ class sandwich_strand_position_calcs():
         res_ids_dict = OrderedDict()
         princ_comp_coords_dict = OrderedDict()
 
-        # Makes ordered list of strand ids in sheet_df
+        # Makes ordered list of strand ids in sheet_df. (List is ordered only
+        # because I prefer an ordered list of strands to be printed in the
+        # terminal.)
         strand_ids_all = sheets_df['STRAND_NUM'].tolist()
         strand_ids = []
         for strand_id in strand_ids_all:
@@ -304,7 +278,7 @@ class sandwich_strand_position_calcs():
             U, S, V = np.linalg.svd(xyz_centred, full_matrices=True)
 
             # The eigenvectors in V are ordered by the size of their
-            # corresponding eigenvalues
+            # corresponding eigenvalues, so can simply take V[0] as max.
             princ_comp_coords_centred = V[0] * np.array([[-1], [1]])
             princ_comp_coords = princ_comp_coords_centred + xyz.mean(axis=0)
             princ_comp_coords = [princ_comp_coords[0][0], princ_comp_coords[0][1],
@@ -319,11 +293,9 @@ class sandwich_strand_position_calcs():
                                    res_ids_dict, unprocessed_list):
         # Aligns each strand to its principal component and extracts the
         # z_coordinates of the C_alpha atoms in the aligned strand
-        z_dict = OrderedDict()
-
         for strand_id in list(res_ids_dict.keys()):
             print(
-                'Aligning {} strand {} with its principal component'.format(
+                'Aligning {} strand {} principal component with the z-axis'.format(
                     domain_id, strand_id
                 )
             )
@@ -345,7 +317,7 @@ class sandwich_strand_position_calcs():
             # Aligns strand with the z-axis, returns dictionary of atom ids and
             # their corresponding x and y coordinates in the aligned strand
             z_dict, unprocessed_list = align_with_z_axis(
-                strand, princ_comp_coords_dict[strand_id], z_dict, 'z', True,
+                strand, princ_comp_coords_dict[strand_id], 'z', True,
                 unprocessed_list, domain_id
             )
 
@@ -356,18 +328,18 @@ class sandwich_strand_position_calcs():
         # Aligns entire beta-sandwich with the principal component of the
         # longest strand, then extracts the z-coordinates of the C_alpha atoms
         # in the aligned sandwich structure
-        print('Aligning {} with its principal component'.format(domain_id))
-
-        z_dict = OrderedDict()
+        print('Aligning {} with the z-axis'.format(domain_id))
 
         strand_id = max(res_ids_dict, key=lambda x: len(res_ids_dict[x]))
+        xyz = princ_comp_coords_dict[strand_id]
+
+        # Creates AMPAL object from sandwich.
         sandwich = isambard.ampal.convert_pdb_to_ampal(
             'Beta_strands/{}.pdb'.format(domain_id)
         )
 
         z_dict, unprocessed_list = align_with_z_axis(
-            sandwich, princ_comp_coords_dict[strand_id], z_dict, 'z', True,
-            unprocessed_list, domain_id
+            sandwich, xyz, 'z', True, unprocessed_list, domain_id
         )
 
         return z_dict, unprocessed_list
@@ -406,24 +378,13 @@ class pipeline():
         # barrel.
         dssp_df = sec_struct_dfs_dict[domain_id]
 
-        # Checks that correct number of sheets has been retained for analysis
-        if len(list(sheets.keys())) != 1:
-            print('ERROR: more than 1 sheet retained in {} following solvent '
-                  'accessibility calculation'.format(domain_id))
-            sec_struct_dfs_dict[domain_id] = None
-            for sheet in list(sheets.keys()):
-                domain_sheets_dict[sheet] = None
-            unprocessed_list.append(domain_id)
-
-            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-
         # Creates dataframe of C_alpha atoms in barrel
-        sheet_num = list(sheets.keys())[0].replace('{}_sheet_'.format(domain_id), '')
+        sheet_num = sheets[0].replace('{}_sheet_'.format(domain_id), '')
         sheets_df = dssp_df[dssp_df['SHEET_NUM'] == sheet_num]
         sheets_df = sheets_df.reset_index(drop=True)
 
         # Finds network of interacting neighbouring strands
-        G = list(sheets.values())[0]
+        G = domain_sheets_dict[sheets[0]]
         strands, unprocessed_list = barrel_interior_exterior_calcs.find_strands_network(
             G, domain_id, unprocessed_list
         )
@@ -433,39 +394,47 @@ class pipeline():
             print('ERROR: domain {} does not contain closed circular network '
                   'of hydrogen-bonded strands'.format(domain_id))
             sec_struct_dfs_dict[domain_id] = None
-            for sheet in list(sheets.keys()):
+            for sheet in sheets:
                 domain_sheets_dict[sheet] = None
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
 
-        # Finds axis through barrel pore
-        xyz_coords = barrel_interior_exterior_calcs.find_z_axis(strands, sheets_df)
+        # Finds barrel principal component (= axis through barrel pore,
+        # provided that this is axis is longer than the diameter of the barrel)
+        (
+        sheets_df, princ_comp_coords
+        ) = barrel_interior_exterior_calcs.find_barrel_principal_component(
+            domain_id, strands, sheets_df
+        )
 
         # Aligns barrel with z-axis
-        xy_dict, unprocessed_list = barrel_interior_exterior_calcs.rotate_translate_barrel(
-            domain_id, xyz_coords, unprocessed_list
+        (
+        xy_dict, unprocessed_list
+        ) = barrel_interior_exterior_calcs.align_barrel_princ_comp_to_z(
+            domain_id, princ_comp_coords, unprocessed_list
         )
+
         if domain_id in unprocessed_list:
             print('ERROR: Coordinates of rotated and translated barrel are > '
                   '8 characters in length')
             sec_struct_dfs_dict[domain_id] = None
-            for sheet in list(sheets.keys()):
+            for sheet in sheets:
                 domain_sheets_dict[sheet] = None
 
             return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-
-        # Initialises records of interior / exterior facing residues
-        int_ext_list = ['']*dssp_df.shape[0]
-        int_ext_dict = OrderedDict()
 
         # Calculates average xy coordinates of the barrel C_alpha atoms
         com = barrel_interior_exterior_calcs.calc_average_coordinates(
             domain_id, xy_dict, sheets_df
         )
 
+        # Initialises records of interior / exterior facing residues
+        int_ext_list = ['']*dssp_df.shape[0]
+        int_ext_dict = OrderedDict()
+
         # Calculates interior- and exterior-facing residues
         int_ext_dict = barrel_interior_exterior_calcs.calc_int_ext(
-            domain_id, sheets_df, xy_dict, com, int_ext_dict
+            domain_id, dssp_df, xy_dict, com, int_ext_dict
         )
 
         # Updates dataframe to identify interior- / exterior-facing residues
@@ -488,21 +457,9 @@ class pipeline():
         # exterior of the sandwich
         dssp_df = sec_struct_dfs_dict[domain_id]
 
-        # Checks that correct number of sheets have been retained in the
-        # beta-sandwich
-        if len(list(sheets.keys())) != 2:
-            print('ERROR: incorrect number of sheets retained in {} following '
-                  'solvent accessibility calculation'.format(domain_id))
-            sec_struct_dfs_dict[domain_id] = None
-            for sheet in list(sheets.keys()):
-                domain_sheets_dict[sheet] = None
-            unprocessed_list.append(domain_id)
-
-            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
-
         # Creates dataframe of C_alpha atoms in sandwich
         sheet_ids = [sheet.replace('{}_sheet_'.format(domain_id), '') for sheet
-                     in set(sheets.keys()) if sheet != '']
+                     in sheets]
         sheets_df = dssp_df[dssp_df['SHEET_NUM'].isin(sheet_ids)]
         sheets_df = sheets_df.reset_index(drop=True)
 
@@ -540,10 +497,8 @@ class pipeline():
         if domain_id in unprocessed_list:
             print('ERROR whilst calculating principal component of sandwich')
             sec_struct_dfs_dict[domain_id] = None
-            for sheet in list(sheets.keys()):
+            for sheet in sheets:
                 domain_sheets_dict[sheet] = None
-
-            return sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list
         else:
             sec_struct_dfs_dict[domain_id] = dssp_df
 
@@ -561,8 +516,8 @@ class find_interior_exterior_surfaces(run_stages):
         unprocessed_list = []
 
         for domain_id in list(sec_struct_dfs_dict.keys()):
-            sheets = {key: value for key, value in domain_sheets_dict.items()
-                      if domain_id in key}
+            sheets = [key for key, value in domain_sheets_dict.items() if
+                      domain_id in key]
 
             if self.code[0:4] in ['2.40']:
                 (sec_struct_dfs_dict, domain_sheets_dict, unprocessed_list

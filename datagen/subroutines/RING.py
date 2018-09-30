@@ -15,7 +15,7 @@ class calculate_residue_interaction_network(run_stages):
     def __init__(self, run_parameters):
         run_stages.__init__(self, run_parameters)
 
-    def run_RING(self, sec_struct_dfs_dict, domain_sheets_dict):
+    def run_RING(self, sec_struct_dfs_dict):
         # Runs RING on the parent structure (biological assembly / asymmetric
         # unit, as specified by the user)
         if not os.path.isdir('ring'):
