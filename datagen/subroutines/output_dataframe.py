@@ -47,8 +47,8 @@ class output_calcs():
         return res_id_to_fasta_dict, consec_res_id_list
 
     def determine_strand_orientation(domain_id, strand_id, strand_df, tm,
-                                     opm_database, unprocessed_list,
-                                     unprocessed_strands):
+                                     discard_non_tm, opm_database,
+                                     unprocessed_list, unprocessed_strands):
         # Determines orientation of input strand in domain if that domain is in
         # the OPM database. If the N-terminus is in the periplasm
         # (Z-coordinate = negative) and C-terminus is extracellular
@@ -78,7 +78,7 @@ class output_calcs():
                             if line[0:6].strip() in ['ATOM', 'HETATM']:
                                 chain_res_num = line[21:27].replace(' ', '')
                                 if (
-                                    line[12:16].strip() == 'CA'
+                                        line[12:16].strip() == 'CA'
                                     and chain_res_num in res_ids_pdb
                                     and line[17:20].strip() == resname_pdb[chain_res_num]  # NOTE
                                     # that OPM sometimes adds in alternate conformers that were
@@ -115,11 +115,12 @@ class output_calcs():
                 # entire domain is non-transmembrane, so do not merge this
                 # statement with the one above!
                 if not domain_id in unprocessed_list:
-                    if not (any(z < 0 for z in z_coordinates) and any(z > 0 for z in z_coordinates)):
+                    if not any(lower_bound < z < upper_bound for z in z_coordinates):
                         unprocessed_strands.append(strand_id)
 
             else:
-                unprocessed_list.append(domain_id)
+                if discard_non_tm is True:
+                    unprocessed_list.append(domain_id)
 
         return (in_database, reverse, res_ids_pdb, strand_coordinates_opm,
                 lower_bound, upper_bound, unprocessed_list,
@@ -676,14 +677,14 @@ class gen_output(run_stages):
                  lower_bound, upper_bound, unprocessed_list,
                  unprocessed_strands
                  ) = output_calcs.determine_strand_orientation(
-                    domain_id, strand_num, strand_df, tm, self.opm_database,
-                    unprocessed_list, unprocessed_strands
+                    domain_id, strand_num, strand_df, tm, self.discard_non_tm,
+                    self.opm_database, unprocessed_list, unprocessed_strands
                 )
 
                 # Lists parent domain IDs
                 properties_list['domain_ids'] = append_to_output_lists(
-                    '{}'.format(domain_id),
-                    properties_list['domain_ids'], res_ids_list, strand_or_res
+                    '{}'.format(domain_id), properties_list['domain_ids'],
+                    res_ids_list, strand_or_res
                 )
 
                 # Gives strand a unique ID
@@ -1111,8 +1112,8 @@ class gen_output(run_stages):
 
         beta_strands_df_dict = OrderedDict({key: value for key, value in properties_list.items()
                                             if not key in unwanted_columns})
-        for index, strand_id in enumerate(beta_strands_df_dict['domain_strand_ids']):
-            if strand_id.split('_')[0] in unprocessed_list:
+        for index, domain_id in enumerate(beta_strands_df_dict['domain_ids']):
+            if domain_id in unprocessed_list:
                 for property in list(beta_strands_df_dict.keys()):
                     beta_strands_df_dict[property][index] = np.nan
 
