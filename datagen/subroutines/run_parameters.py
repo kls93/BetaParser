@@ -96,47 +96,79 @@ def gen_run_parameters(args):
 
     # Requires user input if the (all-beta) structural domain the user wishes
     # to analyse is not specified in the input file / is not recognised
-    ids_dict = {'CATH': '2',
-                'SCOP': 'b'}
-    if 'id' in run_parameters:
-        if (
-            type(run_parameters['id']) == list
-                and not
-                all(run_parameters['id'][index].startswith(ids_dict[run_parameters['structuredatabase']])
-                    for index, code in enumerate(run_parameters['id']))
-            ) or (
-            type(run_parameters['id']) != list
-                and
-                run_parameters['id'][0] != ids_dict[run_parameters['structuredatabase']]
-        ):
-            print('DataGen is currently only suitable for generation and '
-                  'analysis of\nall-beta structures')
-            run_parameters.pop('id')
-    if not 'id' in run_parameters:
-        print('Specify list of CATHCODEs:')
-        run = []
-        while (
-                   len(run) == 0
-                or any(run[index][0] != ids_dict[run_parameters['structuredatabase']] for index, code in enumerate(run))
-        ):
-            run = input(prompt).lower()
-            run = run.replace(' ', '')
-            run = run.replace('[', '')
-            run = run.replace(']', '')
-            run = [cathcode for cathcode in run.split(',')]
-            if (
-                    len(run) != 0
-                and all(run[index].startswith(ids_dict[run_parameters['structuredatabase']])
-                        for index, code in enumerate(run))
+    if run_parameters['betadesigner'] is False:
+        ids_dict = {'CATH': '2',
+                    'SCOP': 'b'}
+        if 'id' in run_parameters:
+                if (
+                    type(run_parameters['id']) == list
+                        and not
+                        all(run_parameters['id'][index].startswith(ids_dict[run_parameters['structuredatabase']])
+                            for index, code in enumerate(run_parameters['id']))
+                    ) or (
+                    type(run_parameters['id']) != list
+                        and
+                        run_parameters['id'][0] != ids_dict[run_parameters['structuredatabase']]
+                ):
+                    print('DataGen is currently only suitable for generation and '
+                          'analysis of\nall-beta structures')
+                    run_parameters.pop('id')
+        if not 'id' in run_parameters:
+            print('Specify list of CATHCODEs:')
+            run = []
+            while (
+                       len(run) == 0
+                    or any(run[index][0] != ids_dict[run_parameters['structuredatabase']] for index, code in enumerate(run))
             ):
-                run_parameters['id'] = run
-                break
-            else:
-                print('DataGen is currently only suitable for '
-                      'generation and analysis of\nall-beta structures')
-    # Joins list of CATH / SCOP database codes together
-    if type(run_parameters['id']) == list:
-        run_parameters['id'] = '_'.join(run_parameters['id'])
+                run = input(prompt).lower()
+                run = run.replace(' ', '')
+                run = run.replace('[', '')
+                run = run.replace(']', '')
+                run = [cathcode for cathcode in run.split(',')]
+                if (
+                        len(run) != 0
+                    and all(run[index].startswith(ids_dict[run_parameters['structuredatabase']])
+                            for index, code in enumerate(run))
+                ):
+                    run_parameters['id'] = run
+                    break
+                else:
+                    print('DataGen is currently only suitable for '
+                          'generation and analysis of\nall-beta structures')
+        # Joins list of CATH / SCOP database codes together
+        if type(run_parameters['id']) == list:
+            run_parameters['id'] = '_'.join(run_parameters['id'])
+
+    # Converts 'barrel'/'sandwich' labelling used in BetaDesigner program into
+    # CATHCODEs that can be interpreted by DataGen
+    else:
+        if 'id' in run_parameters:
+            if run_parameters['id'].lower() == 'barrel':
+                id = '2.40'
+                run_parameters['id'] = id
+            elif run_parameters['id'].lower() == 'sandwich':
+                id = '2.60'
+                run_parameters['id'] = id
+
+            if not run_parameters['id'] in ['2.40', '2.60']:
+                print('Structure type not recognised')
+                run_parameters.pop('id')
+
+        if not 'id' in run_parameters:
+            print('Beta-barrel or beta-sandwich?')
+            id = ''
+            while not id in ['2.40', '2.60']:
+                id = input(prompt)
+                if id.lower() == 'barrel':
+                    id = '2.40'
+                elif id.lower() == 'sandwich':
+                    id = '2.60'
+
+                if id in ['2.40', '2.60']:
+                    run_parameters['id'] = id
+                    break
+                else:
+                     print('Structure type not recognised')
 
     # Requires user to specify whether they want to analyse each input domain
     # in the context of the parent asymmetric unit or biological assembly. By
