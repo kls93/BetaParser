@@ -114,7 +114,7 @@ class barrel_interior_exterior_calcs():
 
         # Calculates principal component of strands in barrel and stores the
         # resulting coordinates in a dictionary
-        print('Calculating principal component of {}'.format(domain_id)
+        print('Calculating principal component of {}'.format(domain_id))
 
         xyz = np.zeros((sheets_df.shape[0], 3))
         for row in range(sheets_df.shape[0]):

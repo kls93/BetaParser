@@ -72,7 +72,7 @@ def gen_run_parameters(args):
 
     # Requires user input if the structural database (CATH or SCOPe) is not
     # specified in the input file / is not recognised
-    if run_parameters['betadesigner'] is True:
+    if run_parameters['betadesigner'] is False:
         if 'structuredatabase' in run_parameters:
             run_parameters['structuredatabase'] = run_parameters['structuredatabase'].upper()
             if run_parameters['structuredatabase'] not in ['CATH', 'SCOP']:

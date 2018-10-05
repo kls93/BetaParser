@@ -1,9 +1,14 @@
 
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt  # Necessary to make prevent 'Invalid DISPLAY
+# variable' error, don't remove!
 import os
 import random
 import requests
 import shutil
 import string
+import isambard_dev as isambard
 import pandas as pd
 from collections import OrderedDict
 from difflib import SequenceMatcher
@@ -58,7 +63,8 @@ class extract_beta_structure_coords(run_stages):
         # asymmetric unit or the biological assembly) PDB file of every
         # retained structure to the output files directory.
 
-        unprocessed_list = []
+        unprocessed_list_1 = []
+        unprocessed_list_2 = []
 
         for row in range(cdhit_domain_df.shape[0]):
             pdb_code = cdhit_domain_df['PDB_CODE'][row]
@@ -101,10 +107,10 @@ class extract_beta_structure_coords(run_stages):
             # local machine / hard drive) to output directory
             if count != 1:
                 error = True
-                unprocessed_list.append(domain_id)
+                unprocessed_list_1.append(domain_id)
             elif assembly == 0:
                 error = True
-                unprocessed_list.append(domain_id)
+                unprocessed_list_1.append(domain_id)
 
             if error is True:
                 pass
@@ -118,16 +124,31 @@ class extract_beta_structure_coords(run_stages):
                             self.suffix, assembly
                         ), 'Parent_assemblies/{}.pdb'.format(domain_id)
                         )
+                        # Checks that PDB file of parent assembly can be parsed
+                        # by ISAMBARD
+                        try:
+                            domain = isambard.ampal.convert_pdb_to_ampal(
+                                'Parent_assemblies/{}.pdb'.format(domain_id)
+                            )
+                        except ValueError:
+                            os.remove('Parent_assemblies/{}.pdb'.format(domain_id))
+                            unprocessed_list_2.append(domain_id)
                     except FileNotFoundError:
-                        unprocessed_list.append(domain_id)
+                        unprocessed_list_1.append(domain_id)
 
-        cdhit_domain_df = cdhit_domain_df[~cdhit_domain_df['DOMAIN_ID'].isin(unprocessed_list)]
+        unprocessed_list = unprocessed_list_1 + unprocessed_list_2
+        cdhit_domain_df = cdhit_domain_df[~cdhit_domain_df['DOMAIN_ID'].isin(unprocessed_list)
+                                          ]
         cdhit_domain_df = cdhit_domain_df.reset_index(drop=True)
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nError in identifying / copying '
                                    'parent assembly PDB file:\n')
-            for domain_id in set(unprocessed_list):
+            for domain_id in set(unprocessed_list_1):
+                unprocessed_file.write('{}\n'.format(domain_id))
+            unprocessed_file.write('\n\nParent assembly PDB file unable to be '
+                                   'processed by ISAMBARD:\n')
+            for domain_id in set(unprocessed_list_2):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
         return cdhit_domain_df
@@ -166,6 +187,7 @@ class extract_beta_structure_coords(run_stages):
             # Extracts ATOM / HETATM records from biological assembly PDB file
             # copied to the output files directory in the previous step
             pdb_code = cdhit_domain_df['PDB_CODE'][row]
+            domain_id = cdhit_domain_df['DOMAIN_ID'][row]
 
             print('Obtaining ATOM / HETATM records for {}'.format(pdb_code))
             print('{:0.2f}%'.format(((row+1)/cdhit_domain_df.shape[0])*100))
