@@ -69,6 +69,10 @@ def gen_run_parameters(args):
             else:
                 run_parameters['stage'] = stage
                 break
+    if run_parameters['betadesigner'] is True:
+        if run_parameters['stage'] == '1':
+            sys.exit('Only stages 2-4 are compatible with the BetaDesigner '
+                     'software')
 
     # Requires user input if the structural database (CATH or SCOPe) is not
     # specified in the input file / is not recognised
@@ -281,12 +285,16 @@ def gen_run_parameters(args):
 
     # Requires user input if the absolute file path of the (locally saved) OPM
     # database is not specified in the input file / is not recognised
-    if run_parameters['betadesigner'] is False:
-        if 'opmdatabase' in run_parameters:
-            if not os.path.isdir(run_parameters['opmdatabase']):
-                print('Specified directory for OPM database not recognised')
-                run_parameters.pop('opmdatabase')
-        if not 'opmdatabase' in run_parameters:
+    if 'opmdatabase' in run_parameters:
+        if not os.path.isdir(run_parameters['opmdatabase']):
+            print('Specified directory for OPM database not recognised')
+            run_parameters.pop('opmdatabase')
+    if not 'opmdatabase' in run_parameters:
+        if (
+            (run_parameters['betadesigner'] is False)
+            or
+            (run_parameters['betadesigner'] is True and run_parameters['id'] == '2.40')
+        ):
             print('Specify absolute file path of OPM database:')
             opm_database = ''
             while not os.path.isdir(opm_database):
@@ -296,8 +304,8 @@ def gen_run_parameters(args):
                 else:
                     run_parameters['opmdatabase'] = opm_database
                     break
-    else:
-        run_parameters['opmdatabase'] = ''
+        else:
+            run_parameters['betadesigner'] = ''
 
     # Requires user input if the absolute file path of the (locally saved) RING
     # database is not specified in the input file / is not recognised
