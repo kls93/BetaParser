@@ -87,7 +87,7 @@ class filter_beta_structure(run_stages):
             [filtered_domain_df_part_1, filtered_domain_df_part_2], axis=1
         )
         filtered_domain_df.to_pickle('CDHIT_entries.pkl')
-        filtered_domain_df.to_csv('CDHIT_entries.csv')
+        filtered_domain_df.to_csv('CDHIT_entries.csv', index=False)
 
         with open('Unprocessed_domains.txt', 'w') as unprocessed_file:
             unprocessed_file.write('PDB accession code not in PDB database '

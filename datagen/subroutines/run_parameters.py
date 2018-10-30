@@ -13,7 +13,7 @@ def gen_run_parameters(args):
     run_parameters = OrderedDict()
     if vars(args)['input_file'] is not None:
         try:
-            with open('/{}'.format(vars(args)['input_file'].strip('/')), 'r') as input_file:
+            with open(vars(args)['input_file'], 'r') as input_file:
                 for line in input_file:
                     key = line.split(':')[0].replace(' ', '').lower()
                     value = line.split(':')[1].replace('\n', '').strip()
@@ -404,6 +404,8 @@ def gen_run_parameters(args):
                 if resn <= 0:
                     print('Specified resolution cutoff must be greater than 0')
                     run_parameters.pop('resolution')
+                else:
+                    run_parameters['resolution'] = resn
             except ValueError:
                 print('Specified resolution cutoff must be a number')
                 run_parameters.pop('resolution')
@@ -436,6 +438,8 @@ def gen_run_parameters(args):
                 if rfac < 0 or rfac > 1:
                     print('Specified Rfactor (working value) cutoff must be between 0 and 1')
                     run_parameters.pop('rfactor')
+                else:
+                    run_parameters['rfactor'] = rfac
             except ValueError:
                 print('Specified Rfactor (working value) cutoff must be a number')
                 run_parameters.pop('rfactor')
@@ -538,9 +542,8 @@ def gen_run_parameters(args):
             run_parameters['discardnontm'] = True
         elif run_parameters['discardnontm'] in ['no', 'n', 'false']:
             run_parameters['discardnontm'] = False
-
     else:
-        run_parameters['discardnontm'] = ''
+        run_parameters['discardnontm'] = False
 
     # Creates and / or sets the output directory as the current working
     # directory

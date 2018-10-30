@@ -1,4 +1,6 @@
 
+# CONSIDER INCLUDING MERGED PLUS AND MINUS X RESIDUES COLUMNS?
+
 import os
 import networkx as nx
 import pandas as pd
@@ -1121,7 +1123,8 @@ class gen_output(run_stages):
         beta_strands_df = beta_strands_df.dropna()
         beta_strands_df = beta_strands_df.reset_index(drop=True)
         beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
-        beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res))
+        beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res),
+                               index=False)
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
             unprocessed_file.write('\n\nError with strand processing:\n')
