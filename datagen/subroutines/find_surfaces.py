@@ -293,6 +293,8 @@ class sandwich_strand_position_calcs():
                                    res_ids_dict, unprocessed_list):
         # Aligns each strand to its principal component and extracts the
         # z_coordinates of the C_alpha atoms in the aligned strand
+        z_dict = OrderedDict()
+
         for strand_id in list(res_ids_dict.keys()):
             print(
                 'Aligning {} strand {} principal component with the z-axis'.format(
@@ -316,10 +318,11 @@ class sandwich_strand_position_calcs():
 
             # Aligns strand with the z-axis, returns dictionary of atom ids and
             # their corresponding x and y coordinates in the aligned strand
-            z_dict, unprocessed_list = align_with_z_axis(
+            z_sub_dict, unprocessed_list = align_with_z_axis(
                 strand, princ_comp_coords_dict[strand_id], 'z', True,
                 unprocessed_list, domain_id
             )
+            z_dict = OrderedDict({**z_dict, **z_sub_dict})
 
         return z_dict, unprocessed_list
 
@@ -540,8 +543,12 @@ class find_interior_exterior_surfaces(run_stages):
         )
 
         with open('Unprocessed_domains.txt', 'a') as unprocessed_file:
-            unprocessed_file.write('\n\nError in determination of interior and '
-                                   'exterior facing residues:\n')
+            if self.code[0:4] in ['2.40']:
+                unprocessed_file.write('\n\nError in determination of interior '
+                                       'and exterior facing residues:\n')
+            elif self.code[0:4] in ['2.60']:
+                unprocessed_file.write('\n\nError in aligning sandwich to '
+                                       'z-axis:\n')
             for domain_id in set(unprocessed_list):
                 unprocessed_file.write('{}\n'.format(domain_id))
 
