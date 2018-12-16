@@ -305,7 +305,7 @@ def gen_run_parameters(args):
                     run_parameters['opmdatabase'] = opm_database
                     break
         else:
-            run_parameters['betadesigner'] = ''
+            run_parameters['opmdatabase'] = ''
 
     # Requires user input if the absolute file path of the (locally saved) RING
     # database is not specified in the input file / is not recognised
