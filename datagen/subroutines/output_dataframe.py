@@ -1,6 +1,6 @@
 
-# CONSIDER INCLUDING MERGED PLUS AND MINUS X RESIDUES COLUMNS?
 
+import copy
 import os
 import networkx as nx
 import pandas as pd
@@ -8,9 +8,11 @@ import numpy as np
 from collections import OrderedDict
 if __name__ == 'subroutines.output_dataframe':
     from subroutines.run_stages import run_stages
+    from subroutines.twist_bend_shear import find_strand_twist, find_sheet_shear
     from subroutines.variables import gen_amino_acids_dict
 else:
     from datagen.subroutines.run_stages import run_stages
+    from datagen.subroutines.twist_bend_shear import find_strand_twist, find_sheet_shear
     from datagen.subroutines.variables import gen_amino_acids_dict
 
 
@@ -132,7 +134,7 @@ class output_calcs():
                             strand_coordinates, lower_bound, upper_bound,
                             unprocessed_list):
         # If the parent structure is in the OPM database, labels residues in an
-        # input strand as either 'transmembrane' or 'external'
+        # input strand as either 'transmembrane', 'periplasm' or 'extracellular'
         print('Calculating positions of strands in membrane in '
               '{}'.format(domain_id))
 
@@ -144,8 +146,10 @@ class output_calcs():
         ):
             for index, res_id in enumerate(res_ids_list):
                 z_coord = strand_coordinates[res_id]
-                if z_coord < lower_bound or z_coord > upper_bound:
-                    tm_ext_list[index] = 'external'
+                if z_coord < lower_bound:
+                    tm_ext_list[index] = 'periplasm'
+                elif z_coord > upper_bound:
+                    tm_ext_list[index] = 'extracellular'
                 else:
                     tm_ext_list[index] = 'transmembrane'
 
@@ -437,7 +441,7 @@ class gen_output(run_stages):
 
     def write_beta_strand_dataframe(self, strand_or_res, sec_struct_dfs_dict,
                                     dssp_to_pdb_dict, tilt_angles,
-                                    strand_numbers, shear_numbers):
+                                    strand_numbers):
         # Generates dataframes of residues and strands in the retained domains.
         if __name__ == 'subroutines.output_dataframe':
             from subroutines.output_dataframe import output_calcs
@@ -465,6 +469,7 @@ class gen_output(run_stages):
                                        'strand_percentage_pos': [],
                                        'strand_z_coords': [],
                                        'sandwich_z_coords': [],
+                                       'bend_angles': [],
                                        'tm_pos': [],
                                        'int_ext': [],
                                        'core_surf': [],
@@ -482,7 +487,11 @@ class gen_output(run_stages):
                                        'neighbours': [],
                                        'bridge_pairs': [],
                                        'hb_pairs': [],
+                                       'twist_hb_pairs': [],
+                                       'twist_angle_hb_pairs': [],
                                        'nhb_pairs': [],
+                                       'twist_nhb_pairs': [],
+                                       'twist_angle_nhb_pairs': [],
                                        'van_der_waals': [],
                                        'h_bonds': [],
                                        'ionic': [],
@@ -729,13 +738,6 @@ class gen_output(run_stages):
                     strand_or_res
                 )
 
-                # Lists barrel shear number
-                if self.code[0:4] in ['2.40']:
-                    properties_list['shear_number'] = append_to_output_lists(
-                        '', properties_list['shear_number'], res_ids_list,
-                        strand_or_res
-                    )
-
                 # Determines whether the strand is an edge or central strand
                 if self.code[0:4] in ['2.60']:
                     properties_list['edge_or_central'] = append_to_output_lists(
@@ -795,6 +797,12 @@ class gen_output(run_stages):
                     res_ids_list, strand_or_res
                 )
 
+                # Generates list of strand bend values
+                properties_list['bend_angles'], bend_angle_sub_list = reverse_and_append(
+                    'BEND', strand_df, properties_list['bend_angles'], reverse,
+                    res_ids_list, strand_or_res
+                )
+
                 # Generates list of residues that form the beta-sandwich core
                 if self.code[0:4] in ['2.60']:
                     properties_list['core_surf'], core_surf_sub_list = reverse_and_append(
@@ -813,8 +821,9 @@ class gen_output(run_stages):
                         res_ids_list, strand_or_res
                     )
 
-                # Generates list of transmembrane and external residues in the
-                # strand - MUST COME AFTER REVERSAL (OR NOT) OF RES_IDS_LIST
+                # Generates list of transmembrane, periplasmic and extracellular
+                # residues in the strand - MUST COME AFTER REVERSAL (OR NOT) OF
+                # RES_IDS_LIST
                 if self.code[0:4] in ['2.40']:
                     tm_ext_list = output_calcs.determine_tm_or_ext(
                         domain_id, strand_num, res_ids_list, in_database,
@@ -870,7 +879,8 @@ class gen_output(run_stages):
                     )
 
                 # Determines positions of residues in TM region of strand in
-                # beta-barrel - MUST COME AFTER TM / EXTERNAL CALCULATION
+                # beta-barrel - MUST COME AFTER TM / PERIPLASM / EXTRACELLULAR
+                # CALCULATION
                 if self.code[0:4] in ['2.40']:
                     membrane_loc = output_calcs.determine_strand_position_barrel(
                         strand_df, tm_ext_list
@@ -1100,28 +1110,49 @@ class gen_output(run_stages):
             if self.discard_non_tm and sorted(set(strands_list)) == sorted(set(unprocessed_strands)):
                 unprocessed_list.append(domain_id)
 
-        # Generates csv file of beta-barrel dataset
+        # Makes converts properties_list dict into dataframe
+        for index, domain_id in enumerate(properties_list['domain_ids']):
+            if domain_id in unprocessed_list:
+                for property in list(properties_list.keys()):
+                    properties_list[property][index] = np.nan
+        beta_strands_df = pd.DataFrame(properties_list)
+        beta_strands_df = beta_strands_df.dropna()
+        beta_strands_df = beta_strands_df.reset_index(drop=True)
+
+        # Calculates strand twist angles for HB and NHB pairs
+        domain_dfs = []
+        for domain_id in list(sec_struct_dfs_dict.keys()):
+            domain_df = copy.deepcopy(
+                beta_strands_df[beta_strands_df['domain_ids']==domain_id]
+            ).reset_index(drop=True)
+            domain_df = find_strand_twist(domain_id, domain_df, strand_or_res)
+            domain_dfs.append(domain_df)
+        beta_strands_df = pd.concat(domain_dfs, axis=1).reset_index(drop=True)
+
+        # Calculates barrel shear number
+        if (self.code[0:4] in ['2.40']) and (strand_or_res == 'res'):
+            domain_dfs = []
+            for domain_id in list(sec_struct_dfs_dict.keys()):
+                domain_df = copy.deepcopy(
+                    beta_strands_df[beta_strands_df['domain_ids']==domain_id]
+                ).reset_index(drop=True)
+                domain_df = find_sheet_shear(
+                    domain_id, domain_df, domain_sheets_dict
+                )
+                domain_dfs.append(domain_df)
+            beta_strands_df = pd.concat(domain_dfs, axis=1).reset_index(drop=True)
+
+        # Removes unnecessary columns from beta-barrel dataset
         if self.code[0:4] in ['2.40']:
             unwanted_columns = ['sheet_number', 'edge_or_central',
                                 'strand_abs_pos', 'strand_percentage_pos',
                                 'strand_z_coords', 'sandwich_z_coords',
                                 'core_surf', 'buried_surface_area']
-        # Generates csv file of beta-sandwich dataset
+        # Removes unnecessary columns from beta-sandwich dataset
         elif self.code[0:4] in ['2.60']:
             unwanted_columns = ['tilt_angle', 'total_strand_number',
-                                'shear_number', 'z_coords',
-                                'tm_pos', 'tm_ext']
+                                'shear_number', 'z_coords', 'tm_pos', 'tm_ext']
 
-        beta_strands_df_dict = OrderedDict({key: value for key, value in properties_list.items()
-                                            if not key in unwanted_columns})
-        for index, domain_id in enumerate(beta_strands_df_dict['domain_ids']):
-            if domain_id in unprocessed_list:
-                for property in list(beta_strands_df_dict.keys()):
-                    beta_strands_df_dict[property][index] = np.nan
-
-        beta_strands_df = pd.DataFrame(beta_strands_df_dict)
-        beta_strands_df = beta_strands_df.dropna()
-        beta_strands_df = beta_strands_df.reset_index(drop=True)
         beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
         beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res),
                                index=False)

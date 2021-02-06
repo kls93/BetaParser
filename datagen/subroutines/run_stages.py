@@ -202,12 +202,14 @@ class run_stages():
         # To be run on local machine (in docker container).
         if __name__ == 'subroutines.run_stages':
             from subroutines.RING import calculate_residue_interaction_network
+            from subroutines.twist_bend_shear import calc_twist_bend_shear
             from subroutines.OPM import (
                 extract_barrel_info_from_OPM, calculate_barrel_geometry
             )
             from subroutines.output_dataframe import gen_output
         else:
             from datagen.subroutines.RING import calculate_residue_interaction_network
+            from datagen.subroutines.twist_bend_shear import calc_twist_bend_shear
             from datagen.subroutines.OPM import (
                 extract_barrel_info_from_OPM, calculate_barrel_geometry
             )
@@ -231,13 +233,18 @@ class run_stages():
                 sec_struct_dfs_dict, domain_sheets_dict
             )
 
+        # Calculates the bend and twist of each beta-strand, plus the shear of
+        # each beta-sheet
+        beta_structure = calc_twist_bend_shear(self.run_parameters)
+        sec_struct_dfs_dict = beta_structure.find_strand_geometry(
+            sec_struct_dfs_dict, domain_sheets_dict
+        )
+
         # For beta-barrel domains, calculates the strand number, plus, if the
         # barrel is in the OPM database, extracts its average strand tilt
         # number from the database
-        # TODO: Fix shear number calculation
         tilt_angles = OrderedDict()
         strand_numbers = OrderedDict()
-        shear_numbers = OrderedDict()
         if self.code[0:4] in ['2.40']:
             beta_structure = extract_barrel_info_from_OPM(self.run_parameters)
 
@@ -265,11 +272,11 @@ class run_stages():
         # that each row in the file represents an individual beta-strand.
         output.write_beta_strand_dataframe(
             'strand', sec_struct_dfs_dict, dssp_to_pdb_dict, tilt_angles,
-            strand_numbers, shear_numbers
+            strand_numbers
         )
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual residue.
         output.write_beta_strand_dataframe(
             'res', sec_struct_dfs_dict, dssp_to_pdb_dict, tilt_angles,
-            strand_numbers, shear_numbers
+            strand_numbers
         )
