@@ -1,5 +1,5 @@
 
-import isambard
+import isambard_dev as isambard
 import pandas as pd
 import numpy as np
 from collections import OrderedDict

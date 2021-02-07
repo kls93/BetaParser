@@ -459,7 +459,6 @@ class gen_output(run_stages):
                                        'tilt_angle': [],
                                        'total_strand_number': [],
                                        'indv_strand_number': [],
-                                       'shear_number': [],
                                        'res_ids': [],
                                        'res_nums': [],
                                        'edge_or_central': [],
@@ -487,11 +486,7 @@ class gen_output(run_stages):
                                        'neighbours': [],
                                        'bridge_pairs': [],
                                        'hb_pairs': [],
-                                       'twist_hb_pairs': [],
-                                       'twist_angle_hb_pairs': [],
                                        'nhb_pairs': [],
-                                       'twist_nhb_pairs': [],
-                                       'twist_angle_nhb_pairs': [],
                                        'van_der_waals': [],
                                        'h_bonds': [],
                                        'ionic': [],
@@ -1110,7 +1105,19 @@ class gen_output(run_stages):
             if self.discard_non_tm and sorted(set(strands_list)) == sorted(set(unprocessed_strands)):
                 unprocessed_list.append(domain_id)
 
-        # Makes converts properties_list dict into dataframe
+        # Removes unnecessary columns from dataset
+        if self.code[0:4] in ['2.40']:
+            unwanted_columns = ['sheet_number', 'edge_or_central',
+                                'strand_abs_pos', 'strand_percentage_pos',
+                                'strand_z_coords', 'sandwich_z_coords',
+                                'core_surf', 'buried_surface_area']
+        elif self.code[0:4] in ['2.60']:
+            unwanted_columns = ['tilt_angle', 'total_strand_number',
+                                'z_coords', 'tm_pos', 'tm_ext']
+        for col in unwanted_columns:
+            del properties_list[col]
+
+        # Converts properties_list dict into dataframe
         for index, domain_id in enumerate(properties_list['domain_ids']):
             if domain_id in unprocessed_list:
                 for property in list(properties_list.keys()):
@@ -1142,17 +1149,7 @@ class gen_output(run_stages):
                 domain_dfs.append(domain_df)
             beta_strands_df = pd.concat(domain_dfs, axis=1).reset_index(drop=True)
 
-        # Removes unnecessary columns from beta-barrel dataset
-        if self.code[0:4] in ['2.40']:
-            unwanted_columns = ['sheet_number', 'edge_or_central',
-                                'strand_abs_pos', 'strand_percentage_pos',
-                                'strand_z_coords', 'sandwich_z_coords',
-                                'core_surf', 'buried_surface_area']
-        # Removes unnecessary columns from beta-sandwich dataset
-        elif self.code[0:4] in ['2.60']:
-            unwanted_columns = ['tilt_angle', 'total_strand_number',
-                                'shear_number', 'z_coords', 'tm_pos', 'tm_ext']
-
+        # Saves output dataframe
         beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
         beta_strands_df.to_csv('Beta_{}_dataframe.csv'.format(strand_or_res),
                                index=False)

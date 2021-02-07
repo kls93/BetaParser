@@ -4,7 +4,7 @@ import isambard_dev as isambard
 import numpy as np
 import pandas as pd
 import scipy.stats as stats
-from collection import OrderedDict
+from collections import OrderedDict
 if __name__ == 'subroutines.twist_bend_shear':
     from subroutines.run_stages import run_stages
 else:
@@ -17,6 +17,8 @@ def find_strand_bend(domain_id, dssp_df):
     between the vectors between its alpha carbon atom and the alpha carbon
     atoms of its neighbouring (+/-1) residues
     """
+
+    print('Calculating bend for residues in {}'.format(domain_id))
 
     # Creates AMPAL object
     pdb = isambard.ampal.convert_pdb_to_ampal(
@@ -86,6 +88,8 @@ def find_strand_bend(domain_id, dssp_df):
         if (res_id in list(bend_dict.keys())) and (dssp_df['ATMNAME'][row] == 'CA'):
             bend_angles[row] = bend_dict[res_id]
 
+    print(bend_angles)
+
     return bend_angles
 
 
@@ -94,6 +98,8 @@ def find_strand_twist(domain_id, domain_df, strand_or_res):
     Calculates strand twist for every HB and NHB pair. Residues 1 and 2 are in
     strand A, residues 3 and 4 are in strand B.
     """
+
+    print('Calculating twist for residues in {}'.format(domain_id))
 
     # Creates AMPAL object
     pdb = isambard.ampal.convert_pdb_to_ampal(
@@ -105,9 +111,9 @@ def find_strand_twist(domain_id, domain_df, strand_or_res):
     all_res_ids = []
     for n in range(len(pdb)):
         all_res_ampal += list(pdb[n])
-        for r in pdb[n]:
+        for i, res in enumerate(pdb[n]):
             res_id = '{}{}{}'.format(
-                pdb[n][r].ampal_parent.id, pdb[n][r].id, pdb[n][r].insertion_code
+                pdb[n][i].ampal_parent.id, pdb[n][i].id, pdb[n][i].insertion_code
             )
             all_res_ids.append(res_id)
 
@@ -125,37 +131,37 @@ def find_strand_twist(domain_id, domain_df, strand_or_res):
     # Makes sub-list of residues that form the beta-strands in the domain, plus
     # their HB and NHB pairs
     strands = []
-    strands_res_list = []
+    strands_res = []
     hb_pairs = []
     nhb_pairs = []
     for strand in domain_df['domain_strand_ids'].tolist():
         if not strand in strands:
             strands.append(strand)
     if strand_or_res == 'res':
-        strands_res_list = [
+        strands_res = [
             '{}_{}'.format(domain_df['domain_strand_ids'][n], domain_df['res_ids'][n])
-            for n in domain_df.shape[0]
+            for n in range(domain_df.shape[0])
         ]
         hb_pairs = domain_df['hb_pairs'].tolist()
         nhb_pairs = domain_df['nhb_pairs'].tolist()
     elif strand_or_res == 'strand':
-        strands_res_list = []
-        for n in domain_df.shape[0]:
+        strands_res = []
+        for n in range(domain_df.shape[0]):
             strand = domain_df['domain_strand_ids'][n]
-            sub_strands_res_list = [
+            sub_strands_res = [
                 '{}_{}'.format(strand, domain_df['res_ids'][n][o])
                 for o in range(len(domain_df['res_ids'][n]))
             ]
-            strands_res_list += sub_strands_res_list
-            hb_pairs_list += domain_df['hb_pairs'][n]
-            nhb_pairs_list += domain_df['nhb_pairs'][n]
+            strands_res += sub_strands_res
+            hb_pairs += domain_df['hb_pairs'][n]
+            nhb_pairs += domain_df['nhb_pairs'][n]
 
     # Calculates strand twist angles for HB and NHB pairs and adds them into the
     # input domain_df
-    for res_2_index, res_2_id in enumerate(strands_res_list):
-        res_2_id = res_2_id.split('_')[-1]
+    for res_2_index, res_2_full_id in enumerate(strands_res):
+        res_2_id = res_2_full_id.split('_')[-1]
         res_2 = all_res_ampal[all_res_ids.index(res_2_id)]
-        strand_id = '_'.join(res_2_id.split('_')[:-1])
+        strand_id = '_'.join(res_2_full_id.split('_')[:-1])
         strand_index = domain_df['domain_strand_ids'].tolist().index(strand_id)
 
         for pair_index, pair_list in enumerate([hb_pairs, nhb_pairs]):
@@ -165,34 +171,43 @@ def find_strand_twist(domain_id, domain_df, strand_or_res):
             res_1_id = ''
             res_3_id = ''
             res_4_id = ''
+            res_1_full_id = ''
+            res_3_full_id = ''
+            res_4_full_id = ''
 
             # Identifies residue 3 (forms HB/NHB bond with residue 2)
             if pair_list[res_2_index] != []:
                 res_3_id = pair_list[res_2_index][0]
+                res_3_full_id = '{}_{}'.format(res_3_id)
                 res_3 = all_res_ampal[all_res_ids.index(res_3_id)]
 
             # Identifies residue 1 (residue 2 - 1 position)
             res_1_index = all_res_ids.index(res_2_id) - 1
             if 0 <= res_1_index and res_1_index < len(all_res_ids):
                 res_1_id = all_res_ids[res_1_index]
+                res_1_full_id
                 res_1 = all_res_ampal[res_1_index]
 
             # Identifies residue 4 (residue 3 + 1 position)
-            res_4_index = all_res_ids.index(res_3_id) + 1
-            if 0 <= res_4_index and res_4_index < len(all_res_ids):
-                res_4_id = all_res_ids[res_4_index]
-                res_4 = all_res_ampal[res_4_index]
+            if res_3 != '':
+                res_4_index = all_res_ids.index(res_3_id) + 1
+                if 0 <= res_4_index and res_4_index < len(all_res_ids):
+                    res_4_id = all_res_ids[res_4_index]
+                    res_4_full_id
+                    res_4 = all_res_ampal[res_4_index]
 
+            twist = ''
+            angle = ''
             if (    all(x != '' for x in [res_1, res_2, res_3, res_4])
-                and all(x in strands_res_list for x in [res_1_id, res_2_id, res_3_id, res_4_id])
+                and all('{}_{}'.format(strand_id, x) in strands_res for x in [res_1_full_id, res_2_full_id, res_3_full_id, res_4_full_id])
             ):
+                print('YAY!')
                 calpha_1 = np.array([res_1['CA'].x, res_1['CA'].y, res_1['CA'].z])
                 calpha_2 = np.array([res_2['CA'].x, res_2['CA'].y, res_2['CA'].z])
                 calpha_3 = np.array([res_3['CA'].x, res_3['CA'].y, res_3['CA'].z])
                 calpha_4 = np.array([res_4['CA'].x, res_4['CA'].y, res_4['CA'].z])
 
                 angle = isambard.tools.geometry.dihedral(calpha_1, calpha_2, calpha_3, calpha_4)
-                twist = ''
                 if abs(angle) < 90:  # Parallel beta strands
                     if angle < 0:
                         twist = 'right'
@@ -218,13 +233,17 @@ def find_strand_twist(domain_id, domain_df, strand_or_res):
                 elif strand_or_res == 'strand':
                     twist_list_nhb_pairs[strand_index].append(twist)
                     angle_list_nhb_pairs[strand_index].append(angle)
+            print(twist, angle)
 
     # Appends twist angles to domain_df
+    angle_df = pd.DataFrame(OrderedDict({
+        'twist_hb_pairs': twist_list_hb_pairs,
+        'twist_angle_hb_pairs': angle_list_hb_pairs,
+        'twist_nhb_pairs': twist_list_nhb_pairs,
+        'twist_angle_nhb_pairs': angle_list_nhb_pairs
+    }))
     upd_domain_df = copy.deepcopy(domain_df).reset_index(drop=True)
-    upd_domain_df['twist_hb_pairs'] = twist_list_hb_pairs
-    upd_domain_df['twist_angle_hb_pairs'] = angle_list_hb_pairs
-    upd_domain_df['twist_nhb_pairs'] = twist_list_nhb_pairs
-    upd_domain_df['twist_angle_nhb_pairs'] = angle_list_nhb_pairs
+    upd_domain_df = pd.concat([upd_domain_df, angle_df], axis=1)
 
     return upd_domain_df
 
@@ -274,7 +293,7 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
             'No strands without beta-bulges identified in {}'.format(domain_id)
         )
     start_index = strand_order.index(start)
-    strand_order = [start_index:] + [:start_index]
+    strand_order = strand_order[start_index:] + strand_order[:start_index]
 
     # Makes nested list, in which each sub-list records the residues in one strand
     strand_res = []
@@ -442,9 +461,10 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
     if shear % 2 == 1:
         raise Exception('Odd shear number ({}) recorded for {}'.format(shear, domain_id))
 
-    # Updates domain_df dataframe to include shear number
-    upd_domain_df = copy.deepcopy(domain_df)
-    upd_domain_df['shear_number'] = [shear]*domain_df.shape[1]
+    # Appends shear to domain_df
+    shear_df = pd.DataFrame(OrderedDict({'shear_number': [shear]*domain_df.shape[1]}))
+    upd_domain_df = copy.deepcopy(domain_df).reset_index(drop=True)
+    upd_domain_df = pd.concat([upd_domain_df, shear_df], axis=1)
 
     return upd_domain_df
 

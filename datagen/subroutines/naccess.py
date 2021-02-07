@@ -3,7 +3,7 @@ import os
 import sys
 import math
 import itertools
-import isambard
+import isambard_dev as isambard
 import pandas as pd
 import numpy as np
 import networkx as nx

@@ -1,6 +1,6 @@
 
 import pandas as pd
-import isambard
+import isambard_dev as isambard
 from collections import OrderedDict
 if __name__ == 'subroutines.dihedral_angles':
     from subroutines.run_stages import run_stages

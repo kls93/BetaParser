@@ -24,7 +24,7 @@ class calculate_residue_interaction_network(run_stages):
             if not os.path.isfile('ring/{}.ring'.format(domain_id)):
                 print('Running RING for {}'.format(domain_id))
                 os.system(
-                    '/bin/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 --all_edges > ring/{}.ring'.format(
+                    '/opt/ring/bin/Ring -i Parent_assemblies/{}.pdb --all -n lollipop -g 1 --all_edges > ring/{}.ring'.format(
                         domain_id, domain_id
                     )
                 )
