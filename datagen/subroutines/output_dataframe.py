@@ -440,8 +440,8 @@ class gen_output(run_stages):
         return sec_struct_dfs_dict
 
     def write_beta_strand_dataframe(self, strand_or_res, sec_struct_dfs_dict,
-                                    dssp_to_pdb_dict, tilt_angles,
-                                    strand_numbers):
+                                    domain_sheets_dict, dssp_to_pdb_dict,
+                                    tilt_angles, strand_numbers):
         # Generates dataframes of residues and strands in the retained domains.
         if __name__ == 'subroutines.output_dataframe':
             from subroutines.output_dataframe import output_calcs

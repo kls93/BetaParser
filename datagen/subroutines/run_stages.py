@@ -237,7 +237,7 @@ class run_stages():
         # each beta-sheet
         beta_structure = calc_twist_bend_shear(self.run_parameters)
         sec_struct_dfs_dict = beta_structure.find_strand_geometry(
-            sec_struct_dfs_dict, domain_sheets_dict
+            sec_struct_dfs_dict
         )
 
         # For beta-barrel domains, calculates the strand number, plus, if the
@@ -271,12 +271,12 @@ class run_stages():
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual beta-strand.
         output.write_beta_strand_dataframe(
-            'strand', sec_struct_dfs_dict, dssp_to_pdb_dict, tilt_angles,
-            strand_numbers
+            'strand', sec_struct_dfs_dict, domain_sheets_dict, dssp_to_pdb_dict,
+            tilt_angles, strand_numbers
         )
         # Writes a csv file of the beta-barrel/sandwich dataset organised such
         # that each row in the file represents an individual residue.
         output.write_beta_strand_dataframe(
-            'res', sec_struct_dfs_dict, dssp_to_pdb_dict, tilt_angles,
-            strand_numbers
+            'res', sec_struct_dfs_dict, domain_sheets_dict, dssp_to_pdb_dict,
+            tilt_angles, strand_numbers
         )
