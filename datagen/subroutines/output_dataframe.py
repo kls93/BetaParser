@@ -1125,6 +1125,13 @@ class gen_output(run_stages):
         beta_strands_df = pd.DataFrame(properties_list)
         beta_strands_df = beta_strands_df.dropna()
         beta_strands_df = beta_strands_df.reset_index(drop=True)
+        for domain_id in unprocessed_list:
+            for key in list(copy.deepcopy(sec_struct_dfs_dict).keys()):
+                if domain_id == key:
+                    del sec_struct_dfs_dict[key]
+            for key in list(copy.deepcopy(domain_sheets_dict).keys()):
+                if key.startswith(domain_id):
+                    del domain_sheets_dict[key]
 
         # Calculates strand twist angles for HB and NHB pairs
         domain_dfs = []
@@ -1132,22 +1139,27 @@ class gen_output(run_stages):
             domain_df = copy.deepcopy(
                 beta_strands_df[beta_strands_df['domain_ids']==domain_id]
             ).reset_index(drop=True)
+            if domain_df.empty:
+                raise Exception('No data recorded for {}'.format(domain_id))
             domain_df = find_strand_twist(domain_id, domain_df, strand_or_res)
             domain_dfs.append(domain_df)
-        beta_strands_df = pd.concat(domain_dfs, axis=1).reset_index(drop=True)
+        beta_strands_df = pd.concat(domain_dfs, axis=0).reset_index(drop=True)
 
         # Calculates barrel shear number
         if (self.code[0:4] in ['2.40']) and (strand_or_res == 'res'):
             domain_dfs = []
             for domain_id in list(sec_struct_dfs_dict.keys()):
+
                 domain_df = copy.deepcopy(
                     beta_strands_df[beta_strands_df['domain_ids']==domain_id]
                 ).reset_index(drop=True)
+                if domain_df.empty:
+                    raise Exception('No data recorded for {}'.format(domain_id))
                 domain_df = find_sheet_shear(
                     domain_id, domain_df, domain_sheets_dict
                 )
                 domain_dfs.append(domain_df)
-            beta_strands_df = pd.concat(domain_dfs, axis=1).reset_index(drop=True)
+            beta_strands_df = pd.concat(domain_dfs, axis=0).reset_index(drop=True)
 
         # Saves output dataframe
         beta_strands_df.to_pickle('Beta_{}_dataframe.pkl'.format(strand_or_res))
