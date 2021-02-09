@@ -265,7 +265,8 @@ def find_strand_twist(domain_id, domain_df, strand_or_res):
 
 def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
     """
-    Calculates the shear number of beta-barrels.
+    Calculates the shear number of beta-barrels. Shear number includes
+    displacement due to beta-bulged residues => may be an odd number.
     **First strand in calculation must not contain any beta-bulges. Currently
     does this by checking has alternating pattern of interior and exterior
     residues, and that phi and psi angles are in beta-range of Ramachandran
@@ -452,10 +453,12 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
                 raise Exception('Order of residues in strand {} domain {} not '
                                 'recognised'.format(strand_order[i], domain_id))
 
+    # Saves shear calculation (incl. beta-bulged residues)
     if not os.path.isdir('Shear_calc'):
         os.mkdir('Shear_calc')
     np.savetxt(
-        'Shear_calc/{}_shear.csv'.format(domain_id), coords, fmt='%s', delimiter=','
+        'Shear_calc/{}_shear.csv'.format(domain_id), coords, fmt='%s',
+        delimiter=','
     )
 
     # Calculates shear by working out difference in column number between
