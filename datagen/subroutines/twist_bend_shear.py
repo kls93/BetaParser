@@ -284,10 +284,15 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
 
     strand_order = nx.cycle_basis(G)
     if len(strand_order) > 1:
-        raise Exception(
-            'Only a single circular network expected for {}'.format(domain_id)
-        )
-    strand_order = strand_order[0]
+        # Appends shear to domain_df
+        shear_df = pd.DataFrame(OrderedDict({'shear_number': ['']*domain_df.shape[1]}))
+        upd_domain_df = copy.deepcopy(domain_df).reset_index(drop=True)
+        upd_domain_df = pd.concat([upd_domain_df, shear_df], axis=1)
+
+        return upd_domain_df
+    else:
+        strand_order = strand_order[0]
+
     if sorted(strand_order) != sorted(list(G.nodes())):
         raise Exception(
             'Expect non-barrel strands to have been removed in {}'.format(domain_id)
@@ -307,9 +312,15 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
             start = strand
             break
     if start == '':
-        raise Exception(
-            'No strands without beta-bulges identified in {}'.format(domain_id)
+        print(
+            'WARNING: No strands without beta-bulges identified in {}'.format(domain_id)
         )
+        # Appends shear to domain_df
+        shear_df = pd.DataFrame(OrderedDict({'shear_number': ['']*domain_df.shape[1]}))
+        upd_domain_df = copy.deepcopy(domain_df).reset_index(drop=True)
+        upd_domain_df = pd.concat([upd_domain_df, shear_df], axis=1)
+        return upd_domain_df
+
     start_index = strand_order.index(start)
     strand_order = strand_order[start_index:] + strand_order[:start_index]
 
@@ -465,7 +476,7 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
     # repeated residue numbers of strand X in first and last rows of the array
     keep_cols = []
     for c in range(coords.shape[1]):
-        if set(coords[:,c]) == {''}:
+        if set(coords[:,c]) == {'nan'}:
             pass
         else:
             keep_cols.append(c)
@@ -474,17 +485,22 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
     coord_diffs = []
     for c1, coord in np.ndenumerate(coords[0]):
         c1 = c1[0]
-        if coord != '':
-            c2 = np.argwhere(coords[-1] == coord)[0]
-            if len(c2) > 1:
-                raise Exception('Residue {} listed more than once in {}'.format(coord, domain_id))
-            else:
-                c2 = c2[0]
+        if coord != 'nan':
+            try:
+                c2 = np.argwhere(coords[-1] == coord)[0]
+                if len(c2) > 1:
+                    raise Exception('Residue {} listed more than once in {}'.format(coord, domain_id))
+                else:
+                    c2 = c2[0]
+            except IndexError:
+                continue
             coord_diff = np.abs(c2 - c1)
             coord_diffs.append(coord_diff)
     shear = stats.mode(np.array(coord_diffs))[0][0]
     if shear % 2 == 1:
         print('WARNING: Odd shear number ({}) recorded for {}'.format(shear, domain_id))
+    else:
+        print('{}: shear {}'.format(domain_id, shear))
 
     # Appends shear to domain_df
     shear_df = pd.DataFrame(OrderedDict({'shear_number': [shear]*domain_df.shape[1]}))
