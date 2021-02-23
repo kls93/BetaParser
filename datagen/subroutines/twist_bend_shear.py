@@ -285,7 +285,7 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
     strand_order = nx.cycle_basis(G)
     if len(strand_order) > 1:
         # Appends shear to domain_df
-        shear_df = pd.DataFrame(OrderedDict({'shear_number': ['']*domain_df.shape[1]}))
+        shear_df = pd.DataFrame(OrderedDict({'shear_number': ['']*domain_df.shape[0]}))
         upd_domain_df = copy.deepcopy(domain_df).reset_index(drop=True)
         upd_domain_df = pd.concat([upd_domain_df, shear_df], axis=1)
 
@@ -316,7 +316,7 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
             'WARNING: No strands without beta-bulges identified in {}'.format(domain_id)
         )
         # Appends shear to domain_df
-        shear_df = pd.DataFrame(OrderedDict({'shear_number': ['']*domain_df.shape[1]}))
+        shear_df = pd.DataFrame(OrderedDict({'shear_number': ['']*domain_df.shape[0]}))
         upd_domain_df = copy.deepcopy(domain_df).reset_index(drop=True)
         upd_domain_df = pd.concat([upd_domain_df, shear_df], axis=1)
         return upd_domain_df
@@ -503,7 +503,7 @@ def find_sheet_shear(domain_id, domain_df, domain_sheets_dict):
         print('{}: shear {}'.format(domain_id, shear))
 
     # Appends shear to domain_df
-    shear_df = pd.DataFrame(OrderedDict({'shear_number': [shear]*domain_df.shape[1]}))
+    shear_df = pd.DataFrame(OrderedDict({'shear_number': [shear]*domain_df.shape[0]}))
     upd_domain_df = copy.deepcopy(domain_df).reset_index(drop=True)
     upd_domain_df = pd.concat([upd_domain_df, shear_df], axis=1)
 
